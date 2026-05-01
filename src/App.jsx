@@ -34,12 +34,8 @@ try {
 }
 catch (e) { }
 const FAMILY_ID = 'oomine-study-2026';
-
-const getTasksCol = () =>
-  collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tasks');
-
-const getTestsCol = () =>
-  collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tests');
+const getTasksCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tasks');
+const getTestsCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tests');
 // ==========================================
 // Constants & Master Data
 // ==========================================
@@ -145,7 +141,7 @@ const generateSampleData = () => {
     return { tasks, tests };
 };
 const StrictTimer = ({ task, isAnyOtherRunning, onUpdate, onSave }) => {
-    const [seconds, setSeconds] = useState(task.currentDuration || 0);
+    const [sessionElapsed, setSessionElapsed] = useState(0); // 今回の計測時間のみを管理
     const [statusMessage, setStatusMessage] = useState(null);
     const lastActive = useRef(Date.now());
     const timerRef = useRef(null);
@@ -162,28 +158,28 @@ const StrictTimer = ({ task, isAnyOtherRunning, onUpdate, onSave }) => {
             sessionStartTime: null,
             lastUpdatedAt: now
         });
+        setSessionElapsed(0); // 停止時に今回のセッション時間をリセット
         if (reason)
             setStatusMessage(reason);
     }, [task.isRunning, task.sessionStartTime, task.currentDuration, task.id, onUpdate]);
     useEffect(() => {
         if (task.isRunning && task.sessionStartTime) {
             const startTime = Number(task.sessionStartTime);
-            const initialSec = task.currentDuration || 0;
             timerRef.current = setInterval(() => {
                 const now = Date.now();
                 const elapsed = Math.floor((now - startTime) / 1000);
-                setSeconds(initialSec + elapsed);
+                setSessionElapsed(elapsed);
                 if (now - lastActive.current > 5 * 60 * 1000) {
                     stopTimer("長時間無操作のため自動停止しました。");
                 }
             }, 1000);
         }
         else {
-            setSeconds(task.currentDuration || 0);
+            setSessionElapsed(0);
         }
         return () => { if (timerRef.current)
             clearInterval(timerRef.current); };
-    }, [task.isRunning, task.sessionStartTime, task.currentDuration, stopTimer]);
+    }, [task.isRunning, task.sessionStartTime, stopTimer]);
     useEffect(() => {
         const handleVisibilityChange = () => {
             if (document.visibilityState === 'visible' && task.isRunning && task.sessionStartTime) {
@@ -193,7 +189,7 @@ const StrictTimer = ({ task, isAnyOtherRunning, onUpdate, onSave }) => {
                 }
                 else {
                     const startTime = Number(task.sessionStartTime);
-                    setSeconds((task.currentDuration || 0) + Math.floor((now - startTime) / 1000));
+                    setSessionElapsed(Math.floor((now - startTime) / 1000));
                 }
             }
             if (document.visibilityState === 'hidden') {
@@ -202,7 +198,7 @@ const StrictTimer = ({ task, isAnyOtherRunning, onUpdate, onSave }) => {
         };
         document.addEventListener('visibilitychange', handleVisibilityChange);
         return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-    }, [task.isRunning, task.sessionStartTime, task.currentDuration, stopTimer]);
+    }, [task.isRunning, task.sessionStartTime, stopTimer]);
     useEffect(() => {
         const recordActivity = () => { lastActive.current = Date.now(); };
         window.addEventListener('mousemove', recordActivity);
@@ -224,20 +220,38 @@ const StrictTimer = ({ task, isAnyOtherRunning, onUpdate, onSave }) => {
         onUpdate(task.id, { isRunning: true, sessionStartTime: Date.now(), lastUpdatedAt: Date.now() });
     };
     const handleSaveClick = () => {
-        if (seconds < 10) {
+        const totalToSave = (task.currentDuration || 0) + sessionElapsed;
+        if (totalToSave < 10) {
             alert("学習時間が短すぎます（10秒以上必要です）。");
             return;
         }
-        onSave(task, seconds);
+        onSave(task, totalToSave);
     };
-    return (<div className="bg-slate-900 rounded-[2rem] p-6 sm:p-10 text-center shadow-2xl relative overflow-hidden border border-white/5">
+    // 累計時間の計算
+    const totalSeconds = (task.currentDuration || 0) + sessionElapsed;
+    return (<div className="bg-slate-900 rounded-[2rem] p-6 sm:p-10 text-center shadow-2xl relative overflow-hidden border border-white/5 flex flex-col items-center justify-center">
       {statusMessage && (<div className="absolute top-0 left-0 w-full bg-rose-600 text-white text-[10px] font-black py-2 z-10 animate-in slide-in-from-top duration-300">
            {statusMessage}
         </div>)}
-      <div className={`text-4xl sm:text-7xl font-mono font-black tracking-tighter mb-6 ${task.isRunning ? 'text-blue-400 animate-pulse' : 'text-white'}`}>
-        {formatDuration(seconds)}
+
+      <div className="mb-8 flex flex-col items-center justify-center w-full">
+        {task.isRunning ? (<>
+            <span className="text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-widest mb-2">現在の計測</span>
+            <div className="text-5xl sm:text-7xl font-mono font-black tracking-tighter text-blue-400 animate-pulse leading-none">
+              {formatDuration(sessionElapsed)}
+            </div>
+            <div className="mt-4 px-4 py-2 bg-white/10 rounded-full text-xs sm:text-sm font-bold text-white opacity-90 flex items-center gap-2">
+              <History size={14}/> 累計: {formatDuration(totalSeconds)}
+            </div>
+          </>) : (<>
+            <span className="text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-widest mb-2">累計学習時間</span>
+            <div className="text-4xl sm:text-6xl font-mono font-black tracking-tighter text-white leading-none">
+              {formatDuration(task.currentDuration || 0)}
+            </div>
+          </>)}
       </div>
-      <div className="flex gap-3">
+
+      <div className="flex gap-3 w-full max-w-sm">
         {!task.isRunning ? (<button onClick={handleStart} className="flex-1 bg-blue-600 text-white font-black py-4 sm:py-5 rounded-xl sm:rounded-2xl shadow-lg active:scale-95 transition flex items-center justify-center gap-2 text-sm sm:text-lg uppercase leading-none">
             <Play size={20} fill="currentColor"/> START
           </button>) : (<button onClick={() => stopTimer()} className="flex-1 bg-amber-500 text-white font-black py-4 sm:py-5 rounded-xl sm:rounded-2xl shadow-lg active:scale-95 transition flex items-center justify-center gap-2 text-sm sm:text-lg uppercase leading-none">
@@ -334,10 +348,10 @@ export default function App() {
         else {
             setIsSampleMode(false);
             setIsMobileView(false);
-            setTasks([]); // ← 画面に表示されているデータを明示的にリセット
-            setTests([]); // ← 画面に表示されているデータを明示的にリセット
+            setTasks([]);
+            setTests([]);
             setLoading(true);
-            // useEffect によってこの後自動的に本番データが fetchData(true) で取得されます。
+            fetchData();
         }
     };
     const handleUpdateLocalTask = (id, updates) => {
@@ -914,32 +928,32 @@ export default function App() {
                     return null;
                 const cat = CATEGORIES[task.categoryId.toUpperCase()];
                 return (<>
-                      <div className="p-6 sm:p-10 border-b border-slate-50 flex justify-between items-start shrink-0 text-left bg-slate-50/50">
-                         <div className="space-y-2 text-left text-left text-left">
-                            <div className="flex gap-2 leading-none text-left text-left text-left">
-                               <span className={`text-[9px] font-black px-3 py-1 rounded-full ${cat.bg} ${cat.color} uppercase leading-none text-left text-left text-left`}>{cat.label}</span>
-                               <span className="text-[9px] font-black bg-white text-slate-400 px-3 py-1 rounded-full uppercase shadow-sm leading-none text-left text-left text-left">{task.type === 'homework' ? '宿題' : '自習'}</span>
+                      <div className="p-6 sm:p-10 border-b border-slate-50 flex justify-between items-start shrink-0 bg-slate-50/50">
+                         <div className="space-y-2">
+                            <div className="flex gap-2">
+                               <span className={`text-[9px] font-black px-3 py-1 rounded-full ${cat.bg} ${cat.color} uppercase`}>{cat.label}</span>
+                               <span className="text-[9px] font-black bg-white text-slate-400 px-3 py-1 rounded-full uppercase shadow-sm">{task.type === 'homework' ? '宿題' : '自習'}</span>
                             </div>
-                            <h2 className="text-2xl sm:text-3xl font-black text-slate-800 tracking-tighter leading-tight text-left text-left text-left">{task.title}</h2>
+                            <h2 className="text-2xl sm:text-3xl font-black text-slate-800 tracking-tighter leading-tight">{task.title}</h2>
                          </div>
-                         <button onClick={() => setSelectedTaskId(null)} className="p-3 bg-white rounded-2xl shadow-sm hover:bg-slate-50 transition shrink-0 leading-none text-left text-left text-left"><X size={24}/></button>
+                         <button onClick={() => setSelectedTaskId(null)} className="p-3 bg-white rounded-2xl shadow-sm hover:bg-slate-50 transition shrink-0"><X size={24}/></button>
                       </div>
                       <div className="flex-1 overflow-y-auto p-6 sm:p-10 space-y-10 no-scrollbar pb-32 text-left">
                          <StrictTimer task={task} isAnyOtherRunning={isAnyTaskRunning && !task.isRunning} onUpdate={handleUpdateLocalTask} onSave={handleSaveRecord}/>
-                         <div className="space-y-4 text-left leading-none text-left text-left text-left">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 px-2 leading-none text-left text-left text-left text-left text-left"><Search size={14}/> 学習メモ</label>
-                            <textarea value={task.tempDetail || ""} onChange={(e) => handleUpdateLocalTask(task.id, { tempDetail: e.target.value })} placeholder="内容をメモ..." className="w-full h-28 bg-slate-50/50 border-none rounded-2xl p-4 font-black text-md resize-none shadow-inner outline-none focus:ring-2 focus:ring-blue-100 text-left leading-snug text-left text-left text-left"/>
+                         <div className="space-y-4">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 px-2"><Search size={14}/> 学習メモ</label>
+                            <textarea value={task.tempDetail || ""} onChange={(e) => handleUpdateLocalTask(task.id, { tempDetail: e.target.value })} placeholder="内容をメモ..." className="w-full h-28 bg-slate-50/50 border-none rounded-2xl p-4 font-black text-md resize-none shadow-inner outline-none focus:ring-2 focus:ring-blue-100 leading-snug"/>
                          </div>
-                         <div className="space-y-6 text-left leading-none text-left text-left text-left">
-                            <h3 className="font-black text-lg flex items-center gap-2 px-2 leading-none text-left text-left text-left text-left"><History className="text-blue-500"/> 履歴</h3>
-                            <div className="space-y-3 text-left leading-none text-left text-left text-left text-left">
-                              {(task.history || []).length === 0 ? <p className="text-center py-10 text-slate-300 font-bold italic text-sm leading-none text-center">記録なし</p> :
-                        [...task.history].reverse().map(h => (<div key={h.id} className="bg-white border border-slate-100 p-4 rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center shadow-sm text-left leading-none gap-3">
-                                   <div className="flex-1 pr-4 text-left leading-none text-left text-left text-left w-full">
-                                      <span className="text-[10px] font-black bg-slate-50 text-slate-500 px-3 py-1 rounded-full mb-2 inline-block leading-none text-left text-left text-left text-left">{h.date}</span>
-                                      <p className="font-bold text-slate-500 text-xs leading-snug break-words text-left text-left text-left text-left">{h.memo || "詳細なし"}</p>
+                         <div className="space-y-6">
+                            <h3 className="font-black text-lg flex items-center gap-2 px-2"><History className="text-blue-500"/> 履歴</h3>
+                            <div className="space-y-3">
+                              {(task.history || []).length === 0 ? <p className="text-center py-10 text-slate-300 font-bold italic text-sm">記録なし</p> :
+                        [...task.history].reverse().map(h => (<div key={h.id} className="bg-white border border-slate-100 p-4 rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center shadow-sm gap-3">
+                                   <div className="flex-1 pr-4 w-full">
+                                      <span className="text-[10px] font-black bg-slate-50 text-slate-500 px-3 py-1 rounded-full mb-2 inline-block">{h.date}</span>
+                                      <p className="font-bold text-slate-500 text-xs leading-snug break-words">{h.memo || "詳細なし"}</p>
                                    </div>
-                                   <div className="text-blue-600 font-mono font-black text-xl tracking-tighter shrink-0 leading-none self-end sm:self-auto">{formatDuration(h.duration)}</div>
+                                   <div className="text-blue-600 font-mono font-black text-xl tracking-tighter shrink-0 self-end sm:self-auto">{formatDuration(h.duration)}</div>
                                 </div>))}
                             </div>
                          </div>
@@ -961,7 +975,7 @@ export default function App() {
                                 }
                             }
                         }
-                    }} className="w-full py-6 text-rose-300 hover:text-rose-500 font-black text-[10px] flex items-center justify-center gap-2 border-2 border-dashed border-rose-50 rounded-2xl transition-all hover:bg-rose-50/50 uppercase tracking-widest mt-10 leading-none text-center">Delete Task Item</button>
+                    }} className="w-full py-6 text-rose-300 hover:text-rose-500 font-black text-[10px] flex items-center justify-center gap-2 border-2 border-dashed border-rose-50 rounded-2xl transition-all hover:bg-rose-50/50 uppercase tracking-widest mt-10">Delete Task Item</button>
                       </div>
                     </>);
             })()}
