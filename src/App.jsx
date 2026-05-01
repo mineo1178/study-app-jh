@@ -34,8 +34,12 @@ try {
 }
 catch (e) { }
 const FAMILY_ID = 'oomine-study-2026';
-const getTasksCol = () => collection(db, 'families', FAMILY_ID, 'tasks');
-const getTestsCol = () => collection(db, 'families', FAMILY_ID, 'tests');
+
+const getTasksCol = () =>
+  collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tasks');
+
+const getTestsCol = () =>
+  collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tests');
 // ==========================================
 // Constants & Master Data
 // ==========================================
