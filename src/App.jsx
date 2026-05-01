@@ -330,8 +330,10 @@ export default function App() {
         else {
             setIsSampleMode(false);
             setIsMobileView(false);
+            setTasks([]); // ← 画面に表示されているデータを明示的にリセット
+            setTests([]); // ← 画面に表示されているデータを明示的にリセット
             setLoading(true);
-            fetchData();
+            // useEffect によってこの後自動的に本番データが fetchData(true) で取得されます。
         }
     };
     const handleUpdateLocalTask = (id, updates) => {
