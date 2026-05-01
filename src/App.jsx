@@ -458,6 +458,17 @@ export default function App() {
                 break;
         }
     };
+    const getSortedTasks = (categoryTasks) => {
+        const subjectOrder = SUBJECT_DEFS[activeCategory]?.map(s => s.id) || [];
+        return categoryTasks.sort((a, b) => {
+            const idxA = subjectOrder.indexOf(a.subjectId);
+            const idxB = subjectOrder.indexOf(b.subjectId);
+            if (idxA !== idxB) {
+                return (idxA === -1 ? 99 : idxA) - (idxB === -1 ? 99 : idxB);
+            }
+            return b.lastUpdatedAt - a.lastUpdatedAt;
+        });
+    };
     const stats = useMemo(() => {
         const sDate = new Date(startDate);
         const eDate = new Date(endDate);
@@ -926,17 +937,25 @@ export default function App() {
                                 </div>))}
                             </div>
                          </div>
-                         <button onClick={async () => { if (confirm("削除しますか？")) {
-                    try {
-                        await deleteDoc(doc(getTasksCol(), task.id));
-                        setTasks(prev => prev.filter(t => t.id !== task.id));
-                        setSelectedTaskId(null);
-                        fetchData(true);
-                    }
-                    catch (e) {
-                        alert("失敗");
-                    }
-                } }} className="w-full py-6 text-rose-300 hover:text-rose-500 font-black text-[10px] flex items-center justify-center gap-2 border-2 border-dashed border-rose-50 rounded-2xl transition-all hover:bg-rose-50/50 uppercase tracking-widest mt-10 leading-none text-center">Delete Task Item</button>
+                         <button onClick={async () => {
+                        if (confirm("削除しますか？")) {
+                            if (isSampleMode) {
+                                setTasks(prev => prev.filter(t => t.id !== task.id));
+                                setSelectedTaskId(null);
+                            }
+                            else {
+                                try {
+                                    await deleteDoc(doc(getTasksCol(), task.id));
+                                    setTasks(prev => prev.filter(t => t.id !== task.id));
+                                    setSelectedTaskId(null);
+                                    fetchData(true);
+                                }
+                                catch (e) {
+                                    alert("失敗");
+                                }
+                            }
+                        }
+                    }} className="w-full py-6 text-rose-300 hover:text-rose-500 font-black text-[10px] flex items-center justify-center gap-2 border-2 border-dashed border-rose-50 rounded-2xl transition-all hover:bg-rose-50/50 uppercase tracking-widest mt-10 leading-none text-center">Delete Task Item</button>
                       </div>
                     </>);
             })()}
