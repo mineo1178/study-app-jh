@@ -34,6 +34,7 @@ try {
 }
 catch (e) { }
 const FAMILY_ID = 'oomine-study-2026';
+// Firestore path: families/{FAMILY_ID}/apps/junior-high/tasks, tests
 const getTasksCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tasks');
 const getTestsCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tests');
 // ==========================================
@@ -141,7 +142,7 @@ const generateSampleData = () => {
     return { tasks, tests };
 };
 const StrictTimer = ({ task, isAnyOtherRunning, onUpdate, onSave }) => {
-    const [sessionElapsed, setSessionElapsed] = useState(0); // 今回の計測時間のみを管理
+    const [seconds, setSeconds] = useState(task.currentDuration || 0);
     const [statusMessage, setStatusMessage] = useState(null);
     const lastActive = useRef(Date.now());
     const timerRef = useRef(null);
@@ -158,28 +159,28 @@ const StrictTimer = ({ task, isAnyOtherRunning, onUpdate, onSave }) => {
             sessionStartTime: null,
             lastUpdatedAt: now
         });
-        setSessionElapsed(0); // 停止時に今回のセッション時間をリセット
         if (reason)
             setStatusMessage(reason);
     }, [task.isRunning, task.sessionStartTime, task.currentDuration, task.id, onUpdate]);
     useEffect(() => {
         if (task.isRunning && task.sessionStartTime) {
             const startTime = Number(task.sessionStartTime);
+            const initialSec = task.currentDuration || 0;
             timerRef.current = setInterval(() => {
                 const now = Date.now();
                 const elapsed = Math.floor((now - startTime) / 1000);
-                setSessionElapsed(elapsed);
+                setSeconds(initialSec + elapsed);
                 if (now - lastActive.current > 5 * 60 * 1000) {
                     stopTimer("長時間無操作のため自動停止しました。");
                 }
             }, 1000);
         }
         else {
-            setSessionElapsed(0);
+            setSeconds(task.currentDuration || 0);
         }
         return () => { if (timerRef.current)
             clearInterval(timerRef.current); };
-    }, [task.isRunning, task.sessionStartTime, stopTimer]);
+    }, [task.isRunning, task.sessionStartTime, task.currentDuration, stopTimer]);
     useEffect(() => {
         const handleVisibilityChange = () => {
             if (document.visibilityState === 'visible' && task.isRunning && task.sessionStartTime) {
@@ -189,7 +190,7 @@ const StrictTimer = ({ task, isAnyOtherRunning, onUpdate, onSave }) => {
                 }
                 else {
                     const startTime = Number(task.sessionStartTime);
-                    setSessionElapsed(Math.floor((now - startTime) / 1000));
+                    setSeconds((task.currentDuration || 0) + Math.floor((now - startTime) / 1000));
                 }
             }
             if (document.visibilityState === 'hidden') {
@@ -198,7 +199,7 @@ const StrictTimer = ({ task, isAnyOtherRunning, onUpdate, onSave }) => {
         };
         document.addEventListener('visibilitychange', handleVisibilityChange);
         return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-    }, [task.isRunning, task.sessionStartTime, stopTimer]);
+    }, [task.isRunning, task.sessionStartTime, task.currentDuration, stopTimer]);
     useEffect(() => {
         const recordActivity = () => { lastActive.current = Date.now(); };
         window.addEventListener('mousemove', recordActivity);
@@ -220,38 +221,20 @@ const StrictTimer = ({ task, isAnyOtherRunning, onUpdate, onSave }) => {
         onUpdate(task.id, { isRunning: true, sessionStartTime: Date.now(), lastUpdatedAt: Date.now() });
     };
     const handleSaveClick = () => {
-        const totalToSave = (task.currentDuration || 0) + sessionElapsed;
-        if (totalToSave < 10) {
+        if (seconds < 10) {
             alert("学習時間が短すぎます（10秒以上必要です）。");
             return;
         }
-        onSave(task, totalToSave);
+        onSave(task, seconds);
     };
-    // 累計時間の計算
-    const totalSeconds = (task.currentDuration || 0) + sessionElapsed;
-    return (<div className="bg-slate-900 rounded-[2rem] p-6 sm:p-10 text-center shadow-2xl relative overflow-hidden border border-white/5 flex flex-col items-center justify-center">
+    return (<div className="bg-slate-900 rounded-[2rem] p-6 sm:p-10 text-center shadow-2xl relative overflow-hidden border border-white/5">
       {statusMessage && (<div className="absolute top-0 left-0 w-full bg-rose-600 text-white text-[10px] font-black py-2 z-10 animate-in slide-in-from-top duration-300">
            {statusMessage}
         </div>)}
-
-      <div className="mb-8 flex flex-col items-center justify-center w-full">
-        {task.isRunning ? (<>
-            <span className="text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-widest mb-2">現在の計測</span>
-            <div className="text-5xl sm:text-7xl font-mono font-black tracking-tighter text-blue-400 animate-pulse leading-none">
-              {formatDuration(sessionElapsed)}
-            </div>
-            <div className="mt-4 px-4 py-2 bg-white/10 rounded-full text-xs sm:text-sm font-bold text-white opacity-90 flex items-center gap-2">
-              <History size={14}/> 累計: {formatDuration(totalSeconds)}
-            </div>
-          </>) : (<>
-            <span className="text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-widest mb-2">累計学習時間</span>
-            <div className="text-4xl sm:text-6xl font-mono font-black tracking-tighter text-white leading-none">
-              {formatDuration(task.currentDuration || 0)}
-            </div>
-          </>)}
+      <div className={`text-4xl sm:text-7xl font-mono font-black tracking-tighter mb-6 ${task.isRunning ? 'text-blue-400 animate-pulse' : 'text-white'}`}>
+        {formatDuration(seconds)}
       </div>
-
-      <div className="flex gap-3 w-full max-w-sm">
+      <div className="flex gap-3">
         {!task.isRunning ? (<button onClick={handleStart} className="flex-1 bg-blue-600 text-white font-black py-4 sm:py-5 rounded-xl sm:rounded-2xl shadow-lg active:scale-95 transition flex items-center justify-center gap-2 text-sm sm:text-lg uppercase leading-none">
             <Play size={20} fill="currentColor"/> START
           </button>) : (<button onClick={() => stopTimer()} className="flex-1 bg-amber-500 text-white font-black py-4 sm:py-5 rounded-xl sm:rounded-2xl shadow-lg active:scale-95 transition flex items-center justify-center gap-2 text-sm sm:text-lg uppercase leading-none">
@@ -272,6 +255,8 @@ export default function App() {
     const [isMobileView, setIsMobileView] = useState(false);
     const [activeTab, setActiveTab] = useState('daily');
     const [activeCategory, setActiveCategory] = useState('school');
+    // カテゴリ連動用の選択中の教科State
+    const [selectedSubjectId, setSelectedSubjectId] = useState('');
     const [tasks, setTasks] = useState([]);
     const [tests, setTests] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -288,6 +273,11 @@ export default function App() {
     const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
     const [visibleSubjects, setVisibleSubjects] = useState(['s_math', 's_english', 'j_math', 'average']);
     const isAnyTaskRunning = useMemo(() => tasks.some(t => t.isRunning), [tasks]);
+    // カテゴリが変更されたら、対象カテゴリの先頭の教科を初期選択する
+    useEffect(() => {
+        const subjects = SUBJECT_DEFS[activeCategory] || [];
+        setSelectedSubjectId(subjects[0]?.id || '');
+    }, [activeCategory]);
     const fetchData = useCallback(async (silent = false) => {
         if (isSampleMode || !auth.currentUser)
             return;
@@ -379,7 +369,7 @@ export default function App() {
         const fd = new FormData(e.currentTarget);
         const newTask = {
             categoryId: activeCategory,
-            subjectId: fd.get('subjectId'),
+            subjectId: selectedSubjectId, // Stateを使用して教科をセット
             type: fd.get('type'),
             title: fd.get('detail'),
             history: [], currentDuration: 0, isRunning: false, sessionStartTime: null,
@@ -503,6 +493,13 @@ export default function App() {
         });
         const totalSec = rangeHistory.reduce((acc, h) => acc + h.duration, 0);
         const dailyMap = new Map();
+        // 指定期間の日付をすべて初期化 (データがない日もX軸に表示するため)
+        let loopDate = new Date(sDate);
+        while (loopDate <= eDate) {
+            const dStr = `${loopDate.getFullYear()}-${(loopDate.getMonth() + 1).toString().padStart(2, '0')}-${loopDate.getDate().toString().padStart(2, '0')}`;
+            dailyMap.set(dStr, { name: dStr.split('-').slice(1).join('/'), school: 0, juku: 0, etc: 0 });
+            loopDate.setDate(loopDate.getDate() + 1);
+        }
         rangeHistory.forEach(h => {
             if (!dailyMap.has(h.date))
                 dailyMap.set(h.date, { name: h.date.split('-').slice(1).join('/'), school: 0, juku: 0, etc: 0 });
@@ -654,7 +651,7 @@ export default function App() {
               <div className={`${isMobileView ? 'grid grid-cols-3 gap-2' : 'md:col-span-3 grid grid-cols-3 gap-2 sm:gap-4'} text-center`}>
                  {Object.values(CATEGORIES).map(cat => {
                 const catTotal = tasks.filter(t => t.categoryId === cat.id).reduce((sum, t) => sum + (t.history || []).filter((h) => parseInt(h.date.split('-')[1]) === selectedMonth).reduce((s, h) => s + h.duration, 0), 0);
-                return (<div key={cat.id} className="bg-white p-2 sm:p-4 rounded-[1.5rem] sm:rounded-[2rem] border border-slate-100 shadow-sm flex flex-col items-center justify-center min-h-[70px] sm:min-h-[120px] text-center leading-none">
+                return (<div key={cat.id} onClick={() => setActiveCategory(cat.id)} className={`cursor-pointer transition-all bg-white p-2 sm:p-4 rounded-[1.5rem] sm:rounded-[2rem] border-2 shadow-sm flex flex-col items-center justify-center min-h-[70px] sm:min-h-[120px] text-center leading-none ${activeCategory === cat.id ? 'border-blue-400 shadow-blue-100 scale-105 z-10' : 'border-slate-100 hover:border-blue-200'}`}>
                         <cat.icon size={16} className={`sm:w-6 sm:h-6 ${cat.color}`}/>
                         <p className="text-[9px] sm:text-sm font-black text-slate-600 mt-1.5 sm:mt-3 uppercase leading-none">{cat.label}</p>
                         <p className="text-xs sm:text-lg font-black font-mono text-slate-800 mt-1 sm:mt-2 w-full text-center leading-none tracking-tighter whitespace-nowrap">{formatDuration(catTotal)}</p>
@@ -740,17 +737,18 @@ export default function App() {
                   <div className="h-56 sm:h-64 text-center">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
-                        <Pie data={stats.breakdown} innerRadius="60%" outerRadius="85%" paddingAngle={5} dataKey="duration">
+                        <Pie data={stats.breakdown} innerRadius="60%" outerRadius="85%" paddingAngle={5} dataKey="duration" nameKey="label">
                           {stats.breakdown.map((e) => <Cell key={e.id} fill={e.hex} stroke="none"/>)}
                         </Pie>
-                        <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', fontSize: '10px' }}/>
+                        <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', fontSize: '14px', fontWeight: 'bold' }}/>
+                        <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px', fontSize: '12px', fontWeight: '900' }}/>
                       </PieChart>
                     </ResponsiveContainer>
                   </div>
                   <div className="flex justify-center gap-2 sm:gap-4 mt-2 sm:mt-4 flex-wrap leading-none">
-                    {stats.breakdown.map(d => (<div key={d.id} className="flex flex-col items-center p-2 sm:p-3 bg-slate-50 rounded-lg sm:rounded-xl min-w-[50px] sm:min-w-[60px] leading-none text-center">
-                         <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full mb-1 leading-none text-center" style={{ backgroundColor: d.hex }}/>
-                         <span className="text-[9px] sm:text-[10px] font-black text-slate-800 font-mono leading-none">{d.percent}%</span>
+                    {stats.breakdown.map(d => (<div key={d.id} className="flex flex-col items-center p-3 sm:p-4 bg-slate-50 rounded-xl sm:rounded-2xl min-w-[70px] sm:min-w-[90px] leading-none text-center">
+                         <div className="w-2 h-2 sm:w-3 sm:h-3 rounded-full mb-2 leading-none text-center" style={{ backgroundColor: d.hex }}/>
+                         <span className="text-sm sm:text-base font-black text-slate-800 font-mono leading-none">{d.percent}%</span>
                       </div>))}
                   </div>
                </div>
@@ -895,7 +893,7 @@ export default function App() {
                 <form onSubmit={handleAddTask} className="p-8 space-y-6 text-left leading-none text-left">
                    <div className="text-left leading-none text-left text-left">
                       <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 ml-2 leading-none text-left text-left text-left">教科</label>
-                      <select name="subjectId" required className="w-full bg-slate-50 border-none rounded-xl p-4 font-black text-slate-800 appearance-none shadow-inner text-sm outline-none focus:ring-2 focus:ring-blue-600 leading-none">
+                      <select name="subjectId" value={selectedSubjectId} onChange={(e) => setSelectedSubjectId(e.target.value)} required className="w-full bg-slate-50 border-none rounded-xl p-4 font-black text-slate-800 appearance-none shadow-inner text-sm outline-none focus:ring-2 focus:ring-blue-600 leading-none">
                          {SUBJECT_DEFS[activeCategory]?.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
                       </select>
                    </div>
@@ -979,45 +977,6 @@ export default function App() {
                       </div>
                     </>);
             })()}
-             </div>
-          </div>)}
-
-        {isAddingTest && (<div className={modalOverlayClass}>
-             <div className="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 h-[85vh] flex flex-col text-left">
-                <div className="p-6 border-b border-slate-50 flex justify-between items-center bg-slate-50/50 shrink-0 text-left leading-none text-left text-left">
-                   <h3 className="text-lg font-black tracking-tight text-center flex-1 leading-none text-center">成績登録</h3>
-                   <button onClick={() => { setIsAddingTest(false); setEditingTest(null); }} className="p-2 bg-white rounded-xl shadow-sm transition leading-none text-left text-left text-left text-left"><X size={20}/></button>
-                </div>
-                <form onSubmit={handleSaveTest} className="p-6 space-y-6 overflow-y-auto no-scrollbar pb-24 text-left leading-none text-left text-left">
-                   <div className="grid grid-cols-2 gap-4 text-left leading-none text-left text-left text-left">
-                      <div className="text-left leading-none text-left text-left text-left">
-                        <label className="block text-[9px] font-black text-slate-400 uppercase mb-2 leading-none text-left text-left text-left">カテゴリ</label>
-                        <select name="testCategory" defaultValue={editingTest?.category || "school"} className="w-full bg-slate-50 border-none rounded-xl p-3 font-black text-sm shadow-inner appearance-none leading-none"><option value="school">中学校</option><option value="juku">塾</option></select>
-                      </div>
-                      <div className="text-left leading-none text-left text-left text-left">
-                        <label className="block text-[9px] font-black text-slate-400 uppercase mb-2 leading-none text-left text-left text-left">種別</label>
-                        <select name="testSubType" defaultValue={editingTest?.subType || "midterm"} className="w-full bg-slate-50 border-none rounded-xl p-3 font-black text-sm shadow-inner appearance-none leading-none"><option value="midterm">中間</option><option value="final">期末</option><option value="normal">その他</option></select>
-                      </div>
-                   </div>
-                   <div className="grid grid-cols-2 gap-4 text-left leading-none text-left text-left text-left">
-                      <div className="text-left leading-none text-left text-left text-left text-left"><label className="block text-[9px] font-black text-slate-400 uppercase mb-2 leading-none text-left text-left text-left text-left">名称</label><input name="name" required defaultValue={editingTest?.name} placeholder="考査名" className="w-full bg-slate-50 border-none rounded-xl p-3 font-black text-sm shadow-inner leading-none text-left text-left text-left"/></div>
-                      <div className="text-left leading-none text-left text-left text-left text-left text-left"><label className="block text-[9px] font-black text-slate-400 uppercase mb-2 leading-none text-left text-left text-left text-left">日</label><input name="date" type="date" required defaultValue={editingTest?.date} className="w-full bg-slate-50 border-none rounded-xl p-3 font-black text-sm shadow-inner leading-none text-left text-left text-left"/></div>
-                   </div>
-                   <div className="space-y-4 text-left">
-                      <label className="block text-[9px] font-black text-slate-400 uppercase leading-none text-left">点数入力</label>
-                      <div className="grid grid-cols-3 gap-3 text-left">
-                         {[...SUBJECT_DEFS.school, ...SUBJECT_DEFS.juku].map(sub => (<div key={sub.id} className="bg-slate-50 p-3 rounded-2xl border border-slate-100 shadow-inner text-center leading-none">
-                              <p className="text-[8px] font-black text-slate-400 mb-1 truncate leading-none text-center">{sub.label}</p>
-                              <input name={`score_${sub.id}`} type="number" defaultValue={editingTest?.scores?.[sub.id]} placeholder="0" className="w-full bg-white border-none rounded-lg p-2 font-black text-sm text-center shadow-sm outline-none focus:ring-1 focus:ring-blue-600 leading-none"/>
-                           </div>))}
-                      </div>
-                   </div>
-                   <div className="grid grid-cols-2 gap-4 border-t border-slate-50 pt-6 text-left">
-                      <div className="text-left"><label className="block text-[9px] font-black text-slate-400 uppercase mb-2 leading-none text-left">平均点</label><input name="average" type="number" step="0.1" defaultValue={editingTest?.average} className="w-full bg-slate-50 border-none rounded-xl p-3 font-black text-sm leading-none"/></div>
-                      <div className="text-left"><label className="block text-[9px] font-black text-slate-400 uppercase mb-2 leading-none text-left">順位</label><input name="rank" defaultValue={editingTest?.rank} placeholder="例: 10位" className="w-full bg-slate-50 border-none rounded-xl p-3 font-black text-sm leading-none"/></div>
-                   </div>
-                   <button type="submit" className="w-full bg-rose-500 text-white font-black py-4 rounded-2xl shadow-xl active:scale-95 transition text-md uppercase leading-none mt-4 text-center">Save</button>
-                </form>
              </div>
           </div>)}
 
