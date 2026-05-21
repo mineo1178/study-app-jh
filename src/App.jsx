@@ -1,5 +1,6 @@
+// IMPORTANT: Rename this file to App.tsx OR remove TypeScript syntax if using JSX.
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { Play, Pause, Trash2, X, Zap, History, TrendingUp, Calendar as CalendarIcon, PieChart as PieChartIcon, BarChart2, RefreshCw, FlaskConical, LogOut, ChevronRight, BookOpen, GraduationCap, Laptop, Trophy, Save, ChevronLeft, Search, PlusCircle, Edit3, Eye, EyeOff, CheckSquare, Square, ListFilter, Award, Smartphone, Monitor } from 'lucide-react';
+import { Play, Pause, Trash2, X, Zap, History, TrendingUp, Calendar as CalendarIcon, PieChart as PieChartIcon, BarChart2, RefreshCw, FlaskConical, LogOut, ChevronRight, BookOpen, GraduationCap, Laptop, Trophy, Save, ChevronLeft, Search, PlusCircle, Edit3, Eye, EyeOff, CheckSquare, Square, ListFilter, Award, Smartphone, Monitor, Clock } from 'lucide-react';
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from 'firebase/auth';
@@ -34,7 +35,6 @@ try {
 }
 catch (e) { }
 const FAMILY_ID = 'oomine-study-2026';
-// Firestore path: families/{FAMILY_ID}/apps/junior-high/tasks, tests
 const getTasksCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tasks');
 const getTestsCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tests');
 // ==========================================
@@ -104,11 +104,15 @@ const generateSampleData = () => {
         while (loopDate <= now) {
             if (Math.random() > 0.3) {
                 const dStr = `${loopDate.getFullYear()}-${(loopDate.getMonth() + 1).toString().padStart(2, '0')}-${loopDate.getDate().toString().padStart(2, '0')}`;
+                const duration = (Math.floor(Math.random() * 60) + 15) * 60;
+                const dummyStart = loopDate.getTime() + 1000 * 60 * 60 * 15; // ダミー:15時
                 history.push({
                     id: `h-${dStr}-${idx}`,
                     date: dStr,
-                    duration: (Math.floor(Math.random() * 60) + 15) * 60,
-                    memo: "演習と復習"
+                    duration: duration,
+                    memo: "演習と復習",
+                    startedAt: dummyStart,
+                    endedAt: dummyStart + (duration * 1000)
                 });
             }
             loopDate.setDate(loopDate.getDate() + 1);
@@ -140,6 +144,68 @@ const generateSampleData = () => {
         });
     });
     return { tasks, tests };
+};
+// ==========================================
+// Component: TodayTimeline (当日の学習タイムライン)
+// ==========================================
+const TodayTimeline = ({ tasks }) => {
+    const todayHistories = useMemo(() => {
+        const todayStr = getTodayStr();
+        const histories = [];
+        tasks.forEach(t => {
+            const subjectInfo = SUBJECT_DEFS[t.categoryId]?.find(s => s.id === t.subjectId);
+            const color = subjectInfo?.hex || '#94a3b8';
+            const subjectLabel = subjectInfo?.label || 'Unknown';
+            (t.history || []).forEach(h => {
+                // startedAt と endedAt が存在し、当日の履歴のみを抽出
+                if (h.date === todayStr && h.startedAt && h.endedAt) {
+                    histories.push({ ...h, color, subjectLabel });
+                }
+            });
+        });
+        return histories.sort((a, b) => (a.startedAt || 0) - (b.startedAt || 0));
+    }, [tasks]);
+    const totalTodaySeconds = useMemo(() => {
+        return todayHistories.reduce((sum, h) => sum + h.duration, 0);
+    }, [todayHistories]);
+    if (todayHistories.length === 0)
+        return null;
+    const minTime = Math.min(...todayHistories.map(h => h.startedAt));
+    const maxTime = Math.max(...todayHistories.map(h => h.endedAt));
+    // 見栄えのため、最初と最後に15分程度の余白を持たせる
+    const paddingMs = 15 * 60 * 1000;
+    const displayMinTime = minTime - paddingMs;
+    const displayMaxTime = maxTime + paddingMs;
+    const totalDurationMs = displayMaxTime - displayMinTime;
+    const formatTime = (ms) => {
+        const d = new Date(ms);
+        return `${d.getHours()}:${d.getMinutes().toString().padStart(2, '0')}`;
+    };
+    return (<div className="bg-white p-4 sm:p-6 rounded-[2rem] border border-slate-100 shadow-sm relative overflow-hidden text-left mb-6">
+      <div className="flex justify-between items-center mb-4">
+        <h3 className="text-xs sm:text-sm font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
+          <Clock size={16}/> Today's Timeline
+        </h3>
+        <div className="text-xs sm:text-sm font-black font-mono text-blue-600 bg-blue-50 px-3 py-1.5 rounded-full shadow-sm flex items-center gap-1">
+          Total: {formatDuration(totalTodaySeconds)}
+        </div>
+      </div>
+      <div className="relative w-full h-8 sm:h-10 bg-slate-50 rounded-full overflow-hidden flex items-center border border-slate-100 shadow-inner">
+        {todayHistories.map((h, i) => {
+            const leftPercent = Math.max(0, ((h.startedAt - displayMinTime) / totalDurationMs) * 100);
+            const widthPercent = Math.min(100 - leftPercent, ((h.endedAt - h.startedAt) / totalDurationMs) * 100);
+            return (<div key={`${h.id}-${i}`} className="absolute h-full opacity-80 hover:opacity-100 transition-opacity rounded-md border-r border-white/20" style={{
+                    left: `${leftPercent}%`,
+                    width: `${widthPercent}%`,
+                    backgroundColor: h.color,
+                }} title={`${h.subjectLabel}: ${formatTime(h.startedAt)} ~ ${formatTime(h.endedAt)}`}/>);
+        })}
+      </div>
+      <div className="flex justify-between text-[10px] font-black text-slate-400 mt-2 px-1">
+        <span>{formatTime(displayMinTime)}</span>
+        <span>{formatTime(displayMaxTime)}</span>
+      </div>
+    </div>);
 };
 const StrictTimer = ({ task, isAnyOtherRunning, onUpdate, onSave }) => {
     const [seconds, setSeconds] = useState(task.currentDuration || 0);
@@ -267,7 +333,7 @@ export default function App() {
     const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
     const [startDate, setStartDate] = useState(() => {
         const d = new Date();
-        d.setDate(d.getDate() - 90);
+        d.setDate(d.getDate() - 7); // 改善②: 90日から7日に変更
         return d.toISOString().split('T')[0];
     });
     const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
@@ -350,7 +416,17 @@ export default function App() {
     const handleSaveRecord = async (task, totalSeconds) => {
         const memo = prompt("学習内容：") || "";
         const now = Date.now();
-        const historyItem = { id: now.toString(), date: getTodayStr(), duration: totalSeconds, memo };
+        // 改善①: sessionStartTimeが無い場合(PAUSE状態等からの保存)は逆算して補完
+        const startedAt = task.sessionStartTime || (now - (totalSeconds * 1000));
+        const endedAt = now;
+        const historyItem = {
+            id: now.toString(),
+            date: getTodayStr(),
+            duration: totalSeconds,
+            memo,
+            startedAt,
+            endedAt
+        };
         const updatedHistory = [...(task.history || []), historyItem];
         const updates = { history: updatedHistory, currentDuration: 0, isRunning: false, sessionStartTime: null, lastUpdatedAt: now };
         handleUpdateLocalTask(task.id, updates);
@@ -661,6 +737,9 @@ export default function App() {
             </div>
 
             <div className="space-y-6 text-center">
+              {/* 改善①: 当日のタイムラインをタブ上に配置 */}
+              <TodayTimeline tasks={tasks}/>
+
               <div className="flex gap-2 bg-slate-100 p-1.5 rounded-[1.75rem] w-full max-w-md mx-auto shadow-inner overflow-hidden leading-none text-center">
                     {Object.values(CATEGORIES).map(cat => (<button key={cat.id} onClick={() => setActiveCategory(cat.id)} className={`flex-1 flex items-center justify-center gap-1.5 py-3 rounded-2xl text-[10px] font-black transition-all leading-none ${activeCategory === cat.id ? 'bg-white text-slate-900 shadow-md' : 'text-slate-400'}`}>
                         <cat.icon size={14}/> {cat.label}
