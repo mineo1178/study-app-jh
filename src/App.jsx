@@ -329,7 +329,8 @@ const StrictTimer = ({ task, isAnyOtherRunning, onUpdate, onSave, onLiveUpdate }
                 taskId: task.id,
                 taskTitle: task.title,
                 sessionElapsed,
-                idleRemaining
+                idleRemaining,
+                totalSeconds: (task.currentDuration || 0) + sessionElapsed
             });
         }
         else {
@@ -792,52 +793,6 @@ export default function App() {
               <button onClick={() => setSelectedMonth(m => m === 12 ? 1 : m + 1)} className="p-2 bg-slate-50 hover:bg-slate-100 rounded-xl transition leading-none text-left"><ChevronRight size={20}/></button>
             </div>
 
-            {liveTimerInfo && (<div className="bg-slate-900 text-white rounded-[2rem] p-4 sm:p-5 shadow-2xl border border-white/5 flex items-center justify-between gap-4 animate-in fade-in duration-300">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-3 h-3 bg-blue-400 rounded-full animate-pulse shrink-0"/>
-                  <div className="min-w-0">
-                    <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">
-                      学習中
-                    </div>
-                    <div className="font-black text-base sm:text-lg truncate">
-                      {liveTimerInfo.taskTitle}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3 sm:gap-6 shrink-0">
-                  <div className="text-center">
-                    <div className="text-[9px] uppercase tracking-widest text-slate-500 font-black mb-1">
-                      現在
-                    </div>
-                    <div className="text-lg sm:text-2xl font-black font-mono text-blue-400 tracking-tighter">
-                      {formatDuration(liveTimerInfo.sessionElapsed)}
-                    </div>
-                  </div>
-
-                  <div className="text-center">
-                    <div className="text-[9px] uppercase tracking-widest text-slate-500 font-black mb-1">
-                      停止まで
-                    </div>
-                    <div className={`text-sm sm:text-lg font-black font-mono tracking-tighter ${liveTimerInfo.idleRemaining <= 30
-                    ? 'text-rose-400 animate-pulse'
-                    : liveTimerInfo.idleRemaining <= 60
-                        ? 'text-amber-300'
-                        : 'text-slate-200'}`}>
-                      {Math.floor(liveTimerInfo.idleRemaining / 60)
-                    .toString()
-                    .padStart(2, '0')}
-                      :
-                      {(liveTimerInfo.idleRemaining % 60)
-                    .toString()
-                    .padStart(2, '0')}
-                    </div>
-                  </div>
-                </div>
-              </div>)}
-
-
-
             <div className={`grid gap-3 sm:gap-4 text-center ${isMobileView ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-4'}`}>
               <div className={`${isMobileView ? '' : 'md:col-span-1'} bg-gradient-to-br from-blue-600 to-indigo-700 p-3 sm:p-6 rounded-[1.5rem] sm:rounded-[2rem] text-white shadow-xl relative overflow-hidden text-center flex flex-col justify-center min-h-[70px] sm:min-h-[120px]`}>
                  <p className="text-[9px] sm:text-[10px] font-black opacity-70 mb-1 sm:mb-2 uppercase tracking-widest leading-none">Monthly</p>
@@ -860,6 +815,33 @@ export default function App() {
             <div className="space-y-6 text-center">
               {/* 当日のタイムライン */}
               <TodayTimeline tasks={tasks}/>
+
+              {liveTimerInfo && (<div className="bg-white rounded-[2rem] border border-blue-100 shadow-sm p-4 sm:p-5 text-left">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-2.5 h-2.5 bg-blue-500 rounded-full animate-pulse shrink-0" />
+                  <div className="min-w-0">
+                    <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 leading-none mb-1">現在学習中</div>
+                    <div className="font-black text-slate-800 text-sm sm:text-base truncate leading-tight">{liveTimerInfo.taskTitle}</div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                  <div className="bg-blue-50 rounded-2xl p-3 text-center">
+                    <div className="text-[9px] font-black text-blue-400 uppercase tracking-widest mb-1">現在</div>
+                    <div className="font-mono font-black text-blue-600 text-base sm:text-xl tracking-tighter">{formatDuration(liveTimerInfo.sessionElapsed)}</div>
+                  </div>
+                  <div className="bg-slate-50 rounded-2xl p-3 text-center">
+                    <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">停止まで</div>
+                    <div className={`font-mono font-black text-base sm:text-xl tracking-tighter ${liveTimerInfo.idleRemaining <= 30 ? 'text-rose-500 animate-pulse' : liveTimerInfo.idleRemaining <= 60 ? 'text-amber-500' : 'text-slate-700'}`}>
+                      {Math.floor(liveTimerInfo.idleRemaining / 60).toString().padStart(2, '0')}:{(liveTimerInfo.idleRemaining % 60).toString().padStart(2, '0')}
+                    </div>
+                  </div>
+                  <div className="bg-slate-50 rounded-2xl p-3 text-center">
+                    <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">累計</div>
+                    <div className="font-mono font-black text-slate-800 text-base sm:text-xl tracking-tighter">{formatDuration(liveTimerInfo.totalSeconds || 0)}</div>
+                  </div>
+                </div>
+              </div>)}
 
               <div className="flex gap-2 bg-slate-100 p-1.5 rounded-[1.75rem] w-full max-w-md mx-auto shadow-inner overflow-hidden leading-none text-center">
                     {Object.values(CATEGORIES).map(cat => (<button key={cat.id} onClick={() => setActiveCategory(cat.id)} className={`flex-1 flex items-center justify-center gap-1.5 py-3 rounded-2xl text-[10px] font-black transition-all leading-none ${activeCategory === cat.id ? 'bg-white text-slate-900 shadow-md' : 'text-slate-400'}`}>
