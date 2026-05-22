@@ -388,6 +388,150 @@ const StrictTimer = ({ task, isAnyOtherRunning, onUpdate, onSave, onLiveUpdate }
       </div>
     </div>);
 };
+
+const ActiveTimerSummary = ({ task, onUpdate }) => {
+    const [sessionElapsed, setSessionElapsed] = useState(0);
+    const [idleRemaining, setIdleRemaining] = useState(300);
+    const lastActive = useRef(Date.now());
+    const timerRef = useRef(null);
+    const hiddenStartedAt = useRef(null);
+
+    const stopFromSummary = useCallback((reason = "") => {
+        if (!task?.isRunning || !task?.sessionStartTime)
+            return;
+        const now = Date.now();
+        const startTime = Number(task.sessionStartTime);
+        const elapsed = Math.floor((now - startTime) / 1000);
+        const finalSecs = (task.currentDuration || 0) + elapsed;
+
+        onUpdate(task.id, {
+            isRunning: false,
+            currentDuration: finalSecs,
+            sessionStartTime: null,
+            lastUpdatedAt: now
+        });
+
+        setSessionElapsed(0);
+        setIdleRemaining(300);
+        hiddenStartedAt.current = null;
+
+        if (reason) {
+            console.warn(reason);
+        }
+    }, [task, onUpdate]);
+
+    useEffect(() => {
+        if (timerRef.current)
+            clearInterval(timerRef.current);
+
+        if (task?.isRunning && task?.sessionStartTime) {
+            lastActive.current = Date.now();
+            const startTime = Number(task.sessionStartTime);
+
+            timerRef.current = setInterval(() => {
+                const now = Date.now();
+                const elapsed = Math.floor((now - startTime) / 1000);
+                const remaining = Math.max(0, 300 - Math.floor((now - lastActive.current) / 1000));
+
+                setSessionElapsed(elapsed);
+                setIdleRemaining(remaining);
+
+                if (remaining === 0) {
+                    stopFromSummary("長時間無操作のため自動停止しました。");
+                }
+            }, 1000);
+        }
+        else {
+            setSessionElapsed(0);
+            setIdleRemaining(300);
+        }
+
+        return () => {
+            if (timerRef.current)
+                clearInterval(timerRef.current);
+        };
+    }, [task?.id, task?.isRunning, task?.sessionStartTime, stopFromSummary]);
+
+    useEffect(() => {
+        const recordActivity = () => {
+            lastActive.current = Date.now();
+        };
+
+        window.addEventListener('mousemove', recordActivity);
+        window.addEventListener('touchstart', recordActivity);
+        window.addEventListener('touchmove', recordActivity);
+        window.addEventListener('scroll', recordActivity);
+        window.addEventListener('click', recordActivity);
+        window.addEventListener('keydown', recordActivity);
+
+        return () => {
+            window.removeEventListener('mousemove', recordActivity);
+            window.removeEventListener('touchstart', recordActivity);
+            window.removeEventListener('touchmove', recordActivity);
+            window.removeEventListener('scroll', recordActivity);
+            window.removeEventListener('click', recordActivity);
+            window.removeEventListener('keydown', recordActivity);
+        };
+    }, []);
+
+    useEffect(() => {
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'hidden') {
+                hiddenStartedAt.current = Date.now();
+                return;
+            }
+
+            if (document.visibilityState === 'visible' && task?.isRunning && task?.sessionStartTime) {
+                const now = Date.now();
+                if (hiddenStartedAt.current && now - hiddenStartedAt.current > 5 * 60 * 1000) {
+                    stopFromSummary("長時間バックグラウンドにいたため停止しました。");
+                }
+                hiddenStartedAt.current = null;
+            }
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+    }, [task?.isRunning, task?.sessionStartTime, stopFromSummary]);
+
+    if (!task?.isRunning || !task?.sessionStartTime)
+        return null;
+
+    const totalSeconds = (task.currentDuration || 0) + sessionElapsed;
+    const formatIdleTime = (sec) => {
+        const m = Math.floor(sec / 60);
+        const s = sec % 60;
+        return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    };
+
+    return (<div className="bg-white rounded-[2rem] border border-blue-100 shadow-sm p-4 sm:p-5 text-left">
+      <div className="flex items-center gap-2 mb-3">
+        <div className="w-2.5 h-2.5 bg-blue-500 rounded-full animate-pulse shrink-0"/>
+        <div className="min-w-0">
+          <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 leading-none mb-1">現在学習中</div>
+          <div className="font-black text-slate-800 text-sm sm:text-base truncate leading-tight">{task.title || "Untitled"}</div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-3 gap-2 sm:gap-3">
+        <div className="bg-blue-50 rounded-2xl p-3 text-center">
+          <div className="text-[9px] font-black text-blue-400 uppercase tracking-widest mb-1">現在</div>
+          <div className="font-mono font-black text-blue-600 text-base sm:text-xl tracking-tighter">{formatDuration(sessionElapsed)}</div>
+        </div>
+        <div className="bg-slate-50 rounded-2xl p-3 text-center">
+          <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">停止まで</div>
+          <div className={`font-mono font-black text-base sm:text-xl tracking-tighter ${idleRemaining <= 30 ? 'text-rose-500 animate-pulse' : idleRemaining <= 60 ? 'text-amber-500' : 'text-slate-700'}`}>
+            {formatIdleTime(idleRemaining)}
+          </div>
+        </div>
+        <div className="bg-slate-50 rounded-2xl p-3 text-center">
+          <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">累計</div>
+          <div className="font-mono font-black text-slate-800 text-base sm:text-xl tracking-tighter">{formatDuration(totalSeconds)}</div>
+        </div>
+      </div>
+    </div>);
+};
+
 // ==========================================
 // Main Application Component
 // ==========================================
@@ -416,6 +560,7 @@ export default function App() {
     const [visibleSubjects, setVisibleSubjects] = useState(['s_math', 's_english', 'j_math', 'average']);
     const [liveTimerInfo, setLiveTimerInfo] = useState(null);
     const isAnyTaskRunning = useMemo(() => tasks.some(t => t.isRunning), [tasks]);
+    const runningTask = useMemo(() => tasks.find(t => t.isRunning) || null, [tasks]);
     // カテゴリが変更されたら、対象カテゴリの先頭の教科を初期選択する
     useEffect(() => {
         const subjects = SUBJECT_DEFS[activeCategory] || [];
@@ -816,32 +961,7 @@ export default function App() {
               {/* 当日のタイムライン */}
               <TodayTimeline tasks={tasks}/>
 
-              {liveTimerInfo && (<div className="bg-white rounded-[2rem] border border-blue-100 shadow-sm p-4 sm:p-5 text-left">
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="w-2.5 h-2.5 bg-blue-500 rounded-full animate-pulse shrink-0" />
-                  <div className="min-w-0">
-                    <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 leading-none mb-1">現在学習中</div>
-                    <div className="font-black text-slate-800 text-sm sm:text-base truncate leading-tight">{liveTimerInfo.taskTitle}</div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-3 gap-2 sm:gap-3">
-                  <div className="bg-blue-50 rounded-2xl p-3 text-center">
-                    <div className="text-[9px] font-black text-blue-400 uppercase tracking-widest mb-1">現在</div>
-                    <div className="font-mono font-black text-blue-600 text-base sm:text-xl tracking-tighter">{formatDuration(liveTimerInfo.sessionElapsed)}</div>
-                  </div>
-                  <div className="bg-slate-50 rounded-2xl p-3 text-center">
-                    <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">停止まで</div>
-                    <div className={`font-mono font-black text-base sm:text-xl tracking-tighter ${liveTimerInfo.idleRemaining <= 30 ? 'text-rose-500 animate-pulse' : liveTimerInfo.idleRemaining <= 60 ? 'text-amber-500' : 'text-slate-700'}`}>
-                      {Math.floor(liveTimerInfo.idleRemaining / 60).toString().padStart(2, '0')}:{(liveTimerInfo.idleRemaining % 60).toString().padStart(2, '0')}
-                    </div>
-                  </div>
-                  <div className="bg-slate-50 rounded-2xl p-3 text-center">
-                    <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">累計</div>
-                    <div className="font-mono font-black text-slate-800 text-base sm:text-xl tracking-tighter">{formatDuration(liveTimerInfo.totalSeconds || 0)}</div>
-                  </div>
-                </div>
-              </div>)}
+              <ActiveTimerSummary task={runningTask} onUpdate={handleUpdateLocalTask}/>
 
               <div className="flex gap-2 bg-slate-100 p-1.5 rounded-[1.75rem] w-full max-w-md mx-auto shadow-inner overflow-hidden leading-none text-center">
                     {Object.values(CATEGORIES).map(cat => (<button key={cat.id} onClick={() => setActiveCategory(cat.id)} className={`flex-1 flex items-center justify-center gap-1.5 py-3 rounded-2xl text-[10px] font-black transition-all leading-none ${activeCategory === cat.id ? 'bg-white text-slate-900 shadow-md' : 'text-slate-400'}`}>
