@@ -1,4 +1,3 @@
-// IMPORTANT: Rename this file to App.tsx OR remove TypeScript syntax if using JSX.
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Play, Pause, Trash2, X, Zap, History, TrendingUp, Calendar as CalendarIcon, PieChart as PieChartIcon, BarChart2, RefreshCw, FlaskConical, LogOut, ChevronRight, BookOpen, GraduationCap, Laptop, Trophy, Save, ChevronLeft, Search, PlusCircle, Edit3, Eye, EyeOff, CheckSquare, Square, ListFilter, Award, Smartphone, Monitor, Clock } from 'lucide-react';
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
@@ -207,11 +206,13 @@ const TodayTimeline = ({ tasks }) => {
       </div>
     </div>);
 };
-const StrictTimer = ({ task, isAnyOtherRunning, onUpdate, onSave }) => {
-    const [seconds, setSeconds] = useState(task.currentDuration || 0);
+const StrictTimer = ({ task, isAnyOtherRunning, onUpdate, onSave, onLiveUpdate }) => {
+    const [sessionElapsed, setSessionElapsed] = useState(0); // 今回の計測時間のみを管理
     const [statusMessage, setStatusMessage] = useState(null);
+    const [idleRemaining, setIdleRemaining] = useState(300); // 無操作停止までの残り時間
     const lastActive = useRef(Date.now());
     const timerRef = useRef(null);
+    const hiddenStartedAt = useRef(null); // hidden開始時間を別管理
     const stopTimer = useCallback((reason = "") => {
         if (!task.isRunning || !task.sessionStartTime)
             return;
@@ -225,55 +226,70 @@ const StrictTimer = ({ task, isAnyOtherRunning, onUpdate, onSave }) => {
             sessionStartTime: null,
             lastUpdatedAt: now
         });
+        setSessionElapsed(0); // 停止時に今回のセッション時間をリセット
+        setIdleRemaining(300);
+        hiddenStartedAt.current = null;
         if (reason)
             setStatusMessage(reason);
     }, [task.isRunning, task.sessionStartTime, task.currentDuration, task.id, onUpdate]);
     useEffect(() => {
         if (task.isRunning && task.sessionStartTime) {
             const startTime = Number(task.sessionStartTime);
-            const initialSec = task.currentDuration || 0;
             timerRef.current = setInterval(() => {
                 const now = Date.now();
                 const elapsed = Math.floor((now - startTime) / 1000);
-                setSeconds(initialSec + elapsed);
-                if (now - lastActive.current > 5 * 60 * 1000) {
+                setSessionElapsed(elapsed);
+                // 残り時間の計算と更新
+                const remaining = Math.max(0, 300 - Math.floor((now - lastActive.current) / 1000));
+                setIdleRemaining(remaining);
+                if (remaining === 0) {
                     stopTimer("長時間無操作のため自動停止しました。");
                 }
             }, 1000);
         }
         else {
-            setSeconds(task.currentDuration || 0);
+            setSessionElapsed(0);
+            setIdleRemaining(300);
         }
         return () => { if (timerRef.current)
             clearInterval(timerRef.current); };
-    }, [task.isRunning, task.sessionStartTime, task.currentDuration, stopTimer]);
+    }, [task.isRunning, task.sessionStartTime, stopTimer]);
     useEffect(() => {
         const handleVisibilityChange = () => {
             if (document.visibilityState === 'visible' && task.isRunning && task.sessionStartTime) {
                 const now = Date.now();
-                if (now - lastActive.current > 5 * 60 * 1000) {
+                // hidden開始時間からの経過時間で判定 (復帰時のリセット問題を解決)
+                if (hiddenStartedAt.current && now - hiddenStartedAt.current > 5 * 60 * 1000) {
                     stopTimer("長時間バックグラウンドにいたため停止しました。");
                 }
                 else {
                     const startTime = Number(task.sessionStartTime);
-                    setSeconds((task.currentDuration || 0) + Math.floor((now - startTime) / 1000));
+                    setSessionElapsed(Math.floor((now - startTime) / 1000));
                 }
+                hiddenStartedAt.current = null;
             }
             if (document.visibilityState === 'hidden') {
-                lastActive.current = Date.now();
+                hiddenStartedAt.current = Date.now();
             }
         };
         document.addEventListener('visibilitychange', handleVisibilityChange);
         return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-    }, [task.isRunning, task.sessionStartTime, task.currentDuration, stopTimer]);
+    }, [task.isRunning, task.sessionStartTime, stopTimer]);
     useEffect(() => {
         const recordActivity = () => { lastActive.current = Date.now(); };
+        // 操作検知イベントを強化 (スマホやスクロール時の誤判定を防止)
         window.addEventListener('mousemove', recordActivity);
         window.addEventListener('touchstart', recordActivity);
+        window.addEventListener('touchmove', recordActivity);
+        window.addEventListener('scroll', recordActivity);
+        window.addEventListener('click', recordActivity);
         window.addEventListener('keydown', recordActivity);
         return () => {
             window.removeEventListener('mousemove', recordActivity);
             window.removeEventListener('touchstart', recordActivity);
+            window.removeEventListener('touchmove', recordActivity);
+            window.removeEventListener('scroll', recordActivity);
+            window.removeEventListener('click', recordActivity);
             window.removeEventListener('keydown', recordActivity);
         };
     }, []);
@@ -283,24 +299,83 @@ const StrictTimer = ({ task, isAnyOtherRunning, onUpdate, onSave }) => {
             return;
         }
         lastActive.current = Date.now();
+        setIdleRemaining(300);
+        hiddenStartedAt.current = null;
         setStatusMessage(null);
         onUpdate(task.id, { isRunning: true, sessionStartTime: Date.now(), lastUpdatedAt: Date.now() });
     };
     const handleSaveClick = () => {
-        if (seconds < 10) {
+        const totalToSave = (task.currentDuration || 0) + sessionElapsed;
+        if (totalToSave < 10) {
             alert("学習時間が短すぎます（10秒以上必要です）。");
             return;
         }
-        onSave(task, seconds);
+        onSave(task, totalToSave);
     };
-    return (<div className="bg-slate-900 rounded-[2rem] p-6 sm:p-10 text-center shadow-2xl relative overflow-hidden border border-white/5">
+    // 累計時間の計算
+    const totalSeconds = (task.currentDuration || 0) + sessionElapsed;
+    // 残り時間のフォーマット (mm:ss)
+    const formatIdleTime = (sec) => {
+        const m = Math.floor(sec / 60);
+        const s = sec % 60;
+        return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    };
+    // 親コンポーネントへライブ状態通知
+    useEffect(() => {
+        if (!onLiveUpdate)
+            return;
+        if (task.isRunning) {
+            onLiveUpdate({
+                taskId: task.id,
+                taskTitle: task.title,
+                sessionElapsed,
+                idleRemaining
+            });
+        }
+        else {
+            onLiveUpdate(null);
+        }
+        return () => {
+            onLiveUpdate(null);
+        };
+    }, [task.isRunning, task.id, task.title, sessionElapsed, idleRemaining, onLiveUpdate]);
+    // 残り時間に応じた色クラスの取得
+    const getIdleColorClass = (sec) => {
+        if (sec <= 30)
+            return "text-rose-500 animate-pulse";
+        if (sec <= 60)
+            return "text-amber-400";
+        return "text-slate-400";
+    };
+    return (<div className="bg-slate-900 rounded-[2rem] p-6 sm:p-10 text-center shadow-2xl relative overflow-hidden border border-white/5 flex flex-col items-center justify-center">
       {statusMessage && (<div className="absolute top-0 left-0 w-full bg-rose-600 text-white text-[10px] font-black py-2 z-10 animate-in slide-in-from-top duration-300">
            {statusMessage}
         </div>)}
-      <div className={`text-4xl sm:text-7xl font-mono font-black tracking-tighter mb-6 ${task.isRunning ? 'text-blue-400 animate-pulse' : 'text-white'}`}>
-        {formatDuration(seconds)}
+
+      <div className="mb-8 flex flex-col items-center justify-center w-full">
+        {task.isRunning ? (<>
+            <span className="text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-widest mb-2">現在の計測</span>
+            <div className="text-5xl sm:text-7xl font-mono font-black tracking-tighter text-blue-400 animate-pulse leading-none">
+              {formatDuration(sessionElapsed)}
+            </div>
+            
+            {/* 無操作停止までの残り時間表示 */}
+            <div className={`mt-3 text-[10px] sm:text-xs font-black tracking-widest flex items-center gap-1.5 ${getIdleColorClass(idleRemaining)}`}>
+               <Clock size={12}/> 操作なし停止まで: {formatIdleTime(idleRemaining)}
+            </div>
+
+            <div className="mt-4 px-4 py-2 bg-white/10 rounded-full text-xs sm:text-sm font-bold text-white opacity-90 flex items-center gap-2">
+              <History size={14}/> 累計: {formatDuration(totalSeconds)}
+            </div>
+          </>) : (<>
+            <span className="text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-widest mb-2">累計学習時間</span>
+            <div className="text-4xl sm:text-6xl font-mono font-black tracking-tighter text-white leading-none">
+              {formatDuration(task.currentDuration || 0)}
+            </div>
+          </>)}
       </div>
-      <div className="flex gap-3">
+
+      <div className="flex gap-3 w-full max-w-sm">
         {!task.isRunning ? (<button onClick={handleStart} className="flex-1 bg-blue-600 text-white font-black py-4 sm:py-5 rounded-xl sm:rounded-2xl shadow-lg active:scale-95 transition flex items-center justify-center gap-2 text-sm sm:text-lg uppercase leading-none">
             <Play size={20} fill="currentColor"/> START
           </button>) : (<button onClick={() => stopTimer()} className="flex-1 bg-amber-500 text-white font-black py-4 sm:py-5 rounded-xl sm:rounded-2xl shadow-lg active:scale-95 transition flex items-center justify-center gap-2 text-sm sm:text-lg uppercase leading-none">
@@ -333,11 +408,12 @@ export default function App() {
     const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
     const [startDate, setStartDate] = useState(() => {
         const d = new Date();
-        d.setDate(d.getDate() - 7); // 改善②: 90日から7日に変更
+        d.setDate(d.getDate() - 7);
         return d.toISOString().split('T')[0];
     });
     const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
     const [visibleSubjects, setVisibleSubjects] = useState(['s_math', 's_english', 'j_math', 'average']);
+    const [liveTimerInfo, setLiveTimerInfo] = useState(null);
     const isAnyTaskRunning = useMemo(() => tasks.some(t => t.isRunning), [tasks]);
     // カテゴリが変更されたら、対象カテゴリの先頭の教科を初期選択する
     useEffect(() => {
@@ -416,7 +492,6 @@ export default function App() {
     const handleSaveRecord = async (task, totalSeconds) => {
         const memo = prompt("学習内容：") || "";
         const now = Date.now();
-        // 改善①: sessionStartTimeが無い場合(PAUSE状態等からの保存)は逆算して補完
         const startedAt = task.sessionStartTime || (now - (totalSeconds * 1000));
         const endedAt = now;
         const historyItem = {
@@ -717,6 +792,52 @@ export default function App() {
               <button onClick={() => setSelectedMonth(m => m === 12 ? 1 : m + 1)} className="p-2 bg-slate-50 hover:bg-slate-100 rounded-xl transition leading-none text-left"><ChevronRight size={20}/></button>
             </div>
 
+            {liveTimerInfo && (<div className="bg-slate-900 text-white rounded-[2rem] p-4 sm:p-5 shadow-2xl border border-white/5 flex items-center justify-between gap-4 animate-in fade-in duration-300">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-3 h-3 bg-blue-400 rounded-full animate-pulse shrink-0"/>
+                  <div className="min-w-0">
+                    <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">
+                      学習中
+                    </div>
+                    <div className="font-black text-base sm:text-lg truncate">
+                      {liveTimerInfo.taskTitle}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 sm:gap-6 shrink-0">
+                  <div className="text-center">
+                    <div className="text-[9px] uppercase tracking-widest text-slate-500 font-black mb-1">
+                      現在
+                    </div>
+                    <div className="text-lg sm:text-2xl font-black font-mono text-blue-400 tracking-tighter">
+                      {formatDuration(liveTimerInfo.sessionElapsed)}
+                    </div>
+                  </div>
+
+                  <div className="text-center">
+                    <div className="text-[9px] uppercase tracking-widest text-slate-500 font-black mb-1">
+                      停止まで
+                    </div>
+                    <div className={`text-sm sm:text-lg font-black font-mono tracking-tighter ${liveTimerInfo.idleRemaining <= 30
+                    ? 'text-rose-400 animate-pulse'
+                    : liveTimerInfo.idleRemaining <= 60
+                        ? 'text-amber-300'
+                        : 'text-slate-200'}`}>
+                      {Math.floor(liveTimerInfo.idleRemaining / 60)
+                    .toString()
+                    .padStart(2, '0')}
+                      :
+                      {(liveTimerInfo.idleRemaining % 60)
+                    .toString()
+                    .padStart(2, '0')}
+                    </div>
+                  </div>
+                </div>
+              </div>)}
+
+
+
             <div className={`grid gap-3 sm:gap-4 text-center ${isMobileView ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-4'}`}>
               <div className={`${isMobileView ? '' : 'md:col-span-1'} bg-gradient-to-br from-blue-600 to-indigo-700 p-3 sm:p-6 rounded-[1.5rem] sm:rounded-[2rem] text-white shadow-xl relative overflow-hidden text-center flex flex-col justify-center min-h-[70px] sm:min-h-[120px]`}>
                  <p className="text-[9px] sm:text-[10px] font-black opacity-70 mb-1 sm:mb-2 uppercase tracking-widest leading-none">Monthly</p>
@@ -737,7 +858,7 @@ export default function App() {
             </div>
 
             <div className="space-y-6 text-center">
-              {/* 改善①: 当日のタイムラインをタブ上に配置 */}
+              {/* 当日のタイムライン */}
               <TodayTimeline tasks={tasks}/>
 
               <div className="flex gap-2 bg-slate-100 p-1.5 rounded-[1.75rem] w-full max-w-md mx-auto shadow-inner overflow-hidden leading-none text-center">
@@ -791,7 +912,11 @@ export default function App() {
                 </div>
               </div>)}
 
-            {activeTab === 'stats' && (<div className="space-y-10 animate-in slide-in-from-bottom-5 duration-500 text-center">
+            {activeTab === 'stats' && (<div className="space-y-8 sm:space-y-10 animate-in slide-in-from-bottom-5 duration-500 text-center">
+                
+                {/* 追加: 当日の学習タイムラインを実績分析画面にも表示 */}
+                <TodayTimeline tasks={tasks}/>
+
                 <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden text-center text-left">
                    <h3 className="text-lg font-black mb-6 flex items-center justify-center gap-2 leading-none text-center"><BarChart2 className="text-blue-600" size={20}/> 学習推移 (分)</h3>
                    <div className="h-64 sm:h-80 w-full text-center">
@@ -1007,30 +1132,30 @@ export default function App() {
                 return (<>
                       <div className="p-6 sm:p-10 border-b border-slate-50 flex justify-between items-start shrink-0 bg-slate-50/50">
                          <div className="space-y-2">
-                            <div className="flex gap-2">
-                               <span className={`text-[9px] font-black px-3 py-1 rounded-full ${cat.bg} ${cat.color} uppercase`}>{cat.label}</span>
-                               <span className="text-[9px] font-black bg-white text-slate-400 px-3 py-1 rounded-full uppercase shadow-sm">{task.type === 'homework' ? '宿題' : '自習'}</span>
+                            <div className="flex gap-2 text-left">
+                               <span className={`text-[9px] font-black px-3 py-1 rounded-full ${cat.bg} ${cat.color} uppercase text-left`}>{cat.label}</span>
+                               <span className="text-[9px] font-black bg-white text-slate-400 px-3 py-1 rounded-full uppercase shadow-sm text-left">{task.type === 'homework' ? '宿題' : '自習'}</span>
                             </div>
-                            <h2 className="text-2xl sm:text-3xl font-black text-slate-800 tracking-tighter leading-tight">{task.title}</h2>
+                            <h2 className="text-2xl sm:text-3xl font-black text-slate-800 tracking-tighter leading-tight text-left">{task.title}</h2>
                          </div>
-                         <button onClick={() => setSelectedTaskId(null)} className="p-3 bg-white rounded-2xl shadow-sm hover:bg-slate-50 transition shrink-0"><X size={24}/></button>
+                         <button onClick={() => setSelectedTaskId(null)} className="p-3 bg-white rounded-2xl shadow-sm hover:bg-slate-50 transition shrink-0 text-left"><X size={24}/></button>
                       </div>
                       <div className="flex-1 overflow-y-auto p-6 sm:p-10 space-y-10 no-scrollbar pb-32 text-left">
                          <StrictTimer task={task} isAnyOtherRunning={isAnyTaskRunning && !task.isRunning} onUpdate={handleUpdateLocalTask} onSave={handleSaveRecord}/>
-                         <div className="space-y-4">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 px-2"><Search size={14}/> 学習メモ</label>
-                            <textarea value={task.tempDetail || ""} onChange={(e) => handleUpdateLocalTask(task.id, { tempDetail: e.target.value })} placeholder="内容をメモ..." className="w-full h-28 bg-slate-50/50 border-none rounded-2xl p-4 font-black text-md resize-none shadow-inner outline-none focus:ring-2 focus:ring-blue-100 leading-snug"/>
+                         <div className="space-y-4 text-left">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 px-2 text-left"><Search size={14}/> 学習メモ</label>
+                            <textarea value={task.tempDetail || ""} onChange={(e) => handleUpdateLocalTask(task.id, { tempDetail: e.target.value })} placeholder="内容をメモ..." className="w-full h-28 bg-slate-50/50 border-none rounded-2xl p-4 font-black text-md resize-none shadow-inner outline-none focus:ring-2 focus:ring-blue-100 text-left leading-snug"/>
                          </div>
-                         <div className="space-y-6">
-                            <h3 className="font-black text-lg flex items-center gap-2 px-2"><History className="text-blue-500"/> 履歴</h3>
-                            <div className="space-y-3">
-                              {(task.history || []).length === 0 ? <p className="text-center py-10 text-slate-300 font-bold italic text-sm">記録なし</p> :
-                        [...task.history].reverse().map(h => (<div key={h.id} className="bg-white border border-slate-100 p-4 rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center shadow-sm gap-3">
-                                   <div className="flex-1 pr-4 w-full">
-                                      <span className="text-[10px] font-black bg-slate-50 text-slate-500 px-3 py-1 rounded-full mb-2 inline-block">{h.date}</span>
-                                      <p className="font-bold text-slate-500 text-xs leading-snug break-words">{h.memo || "詳細なし"}</p>
+                         <div className="space-y-6 text-left">
+                            <h3 className="font-black text-lg flex items-center gap-2 px-2 text-left"><History className="text-blue-500"/> 履歴</h3>
+                            <div className="space-y-3 text-left">
+                              {(task.history || []).length === 0 ? <p className="text-center py-10 text-slate-300 font-bold italic text-sm text-center">記録なし</p> :
+                        [...task.history].reverse().map(h => (<div key={h.id} className="bg-white border border-slate-100 p-4 rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center shadow-sm gap-3 text-left">
+                                   <div className="flex-1 pr-4 w-full text-left">
+                                      <span className="text-[10px] font-black bg-slate-50 text-slate-500 px-3 py-1 rounded-full mb-2 inline-block text-left">{h.date}</span>
+                                      <p className="font-bold text-slate-500 text-xs leading-snug break-words text-left">{h.memo || "詳細なし"}</p>
                                    </div>
-                                   <div className="text-blue-600 font-mono font-black text-xl tracking-tighter shrink-0 self-end sm:self-auto">{formatDuration(h.duration)}</div>
+                                   <div className="text-blue-600 font-mono font-black text-xl tracking-tighter shrink-0 self-end sm:self-auto text-left">{formatDuration(h.duration)}</div>
                                 </div>))}
                             </div>
                          </div>
@@ -1052,10 +1177,49 @@ export default function App() {
                                 }
                             }
                         }
-                    }} className="w-full py-6 text-rose-300 hover:text-rose-500 font-black text-[10px] flex items-center justify-center gap-2 border-2 border-dashed border-rose-50 rounded-2xl transition-all hover:bg-rose-50/50 uppercase tracking-widest mt-10">Delete Task Item</button>
+                    }} className="w-full py-6 text-rose-300 hover:text-rose-500 font-black text-[10px] flex items-center justify-center gap-2 border-2 border-dashed border-rose-50 rounded-2xl transition-all hover:bg-rose-50/50 uppercase tracking-widest mt-10 text-center">Delete Task Item</button>
                       </div>
                     </>);
             })()}
+             </div>
+          </div>)}
+
+        {isAddingTest && (<div className={modalOverlayClass}>
+             <div className="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 h-[85vh] flex flex-col text-left">
+                <div className="p-6 border-b border-slate-50 flex justify-between items-center bg-slate-50/50 shrink-0 text-left leading-none text-left text-left">
+                   <h3 className="text-lg font-black tracking-tight text-center flex-1 leading-none text-center">成績登録</h3>
+                   <button onClick={() => { setIsAddingTest(false); setEditingTest(null); }} className="p-2 bg-white rounded-xl shadow-sm transition leading-none text-left text-left text-left text-left"><X size={20}/></button>
+                </div>
+                <form onSubmit={handleSaveTest} className="p-6 space-y-6 overflow-y-auto no-scrollbar pb-24 text-left leading-none text-left text-left">
+                   <div className="grid grid-cols-2 gap-4 text-left leading-none text-left text-left text-left">
+                      <div className="text-left leading-none text-left text-left text-left">
+                        <label className="block text-[9px] font-black text-slate-400 uppercase mb-2 leading-none text-left text-left text-left">カテゴリ</label>
+                        <select name="testCategory" defaultValue={editingTest?.category || "school"} className="w-full bg-slate-50 border-none rounded-xl p-3 font-black text-sm shadow-inner appearance-none leading-none"><option value="school">中学校</option><option value="juku">塾</option></select>
+                      </div>
+                      <div className="text-left leading-none text-left text-left text-left">
+                        <label className="block text-[9px] font-black text-slate-400 uppercase mb-2 leading-none text-left text-left text-left">種別</label>
+                        <select name="testSubType" defaultValue={editingTest?.subType || "midterm"} className="w-full bg-slate-50 border-none rounded-xl p-3 font-black text-sm shadow-inner appearance-none leading-none"><option value="midterm">中間</option><option value="final">期末</option><option value="normal">その他</option></select>
+                      </div>
+                   </div>
+                   <div className="grid grid-cols-2 gap-4 text-left leading-none text-left text-left text-left">
+                      <div className="text-left leading-none text-left text-left text-left text-left"><label className="block text-[9px] font-black text-slate-400 uppercase mb-2 leading-none text-left text-left text-left text-left">名称</label><input name="name" required defaultValue={editingTest?.name} placeholder="考査名" className="w-full bg-slate-50 border-none rounded-xl p-3 font-black text-sm shadow-inner leading-none text-left text-left text-left"/></div>
+                      <div className="text-left leading-none text-left text-left text-left text-left text-left"><label className="block text-[9px] font-black text-slate-400 uppercase mb-2 leading-none text-left text-left text-left text-left">日</label><input name="date" type="date" required defaultValue={editingTest?.date} className="w-full bg-slate-50 border-none rounded-xl p-3 font-black text-sm shadow-inner leading-none text-left text-left text-left"/></div>
+                   </div>
+                   <div className="space-y-4 text-left">
+                      <label className="block text-[9px] font-black text-slate-400 uppercase leading-none text-left">点数入力</label>
+                      <div className="grid grid-cols-3 gap-3 text-left">
+                         {[...SUBJECT_DEFS.school, ...SUBJECT_DEFS.juku].map(sub => (<div key={sub.id} className="bg-slate-50 p-3 rounded-2xl border border-slate-100 shadow-inner text-center leading-none">
+                              <p className="text-[8px] font-black text-slate-400 mb-1 truncate leading-none text-center">{sub.label}</p>
+                              <input name={`score_${sub.id}`} type="number" defaultValue={editingTest?.scores?.[sub.id]} placeholder="0" className="w-full bg-white border-none rounded-lg p-2 font-black text-sm text-center shadow-sm outline-none focus:ring-1 focus:ring-blue-600 leading-none"/>
+                           </div>))}
+                      </div>
+                   </div>
+                   <div className="grid grid-cols-2 gap-4 border-t border-slate-50 pt-6 text-left">
+                      <div className="text-left"><label className="block text-[9px] font-black text-slate-400 uppercase mb-2 leading-none text-left">平均点</label><input name="average" type="number" step="0.1" defaultValue={editingTest?.average} className="w-full bg-slate-50 border-none rounded-xl p-3 font-black text-sm leading-none"/></div>
+                      <div className="text-left"><label className="block text-[9px] font-black text-slate-400 uppercase mb-2 leading-none text-left">順位</label><input name="rank" defaultValue={editingTest?.rank} placeholder="例: 10位" className="w-full bg-slate-50 border-none rounded-xl p-3 font-black text-sm leading-none"/></div>
+                   </div>
+                   <button type="submit" className="w-full bg-rose-500 text-white font-black py-4 rounded-2xl shadow-xl active:scale-95 transition text-md uppercase leading-none mt-4 text-center">Save</button>
+                </form>
              </div>
           </div>)}
 
