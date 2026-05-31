@@ -66,7 +66,8 @@ const SUBJECT_DEFS = {
     etc: [
         { id: 'e_news', label: '新聞', hex: '#475569' },
         { id: 'e_manga', label: '歴史マンガ', hex: '#ea580c' },
-        { id: 'e_duolingo', label: 'Duolingo', hex: '#84cc16' }
+        { id: 'e_duolingo', label: 'Duolingo', hex: '#84cc16' },
+        { id: 'e_programming', label: 'プログラミング', hex: '#0ea5e9' }
     ]
 };
 // ==========================================
@@ -95,6 +96,7 @@ const generateSampleData = () => {
         { catId: 'school', subId: 's_japanese', type: 'self', title: '漢字ドリル' },
         { catId: 'juku', subId: 'j_math', type: 'homework', title: '塾演習' },
         { catId: 'etc', subId: 'e_duolingo', type: 'self', title: 'Duolingo' },
+        { catId: 'etc', subId: 'e_programming', type: 'self', title: 'プログラミング' },
         { catId: 'school', subId: 's_social', type: 'self', title: '歴史まとめ' }
     ];
     baseTasks.forEach((base, idx) => {
