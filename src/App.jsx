@@ -3,7 +3,7 @@ import { Play, Pause, Trash2, X, Zap, History, TrendingUp, Calendar as CalendarI
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from 'firebase/auth';
-import { getFirestore, collection, doc, getDocs, updateDoc, deleteDoc, enableIndexedDbPersistence, addDoc, setDoc } from 'firebase/firestore';
+import { getFirestore, collection, doc, getDocs, updateDoc, deleteDoc, enableIndexedDbPersistence, addDoc, setDoc, onSnapshot } from 'firebase/firestore';
 // ==========================================
 // Firebase Initialization (Vite/Vercel Dedicated)
 // ==========================================
@@ -36,6 +36,9 @@ catch (e) { }
 const FAMILY_ID = 'oomine-study-2026';
 const getTasksCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tasks');
 const getTestsCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tests');
+const IDLE_LIMIT_SECONDS = 5 * 60;
+const TIMER_HEARTBEAT_MS = 30 * 1000;
+const isDocumentHidden = () => typeof document !== 'undefined' && isDocumentHidden();
 // ==========================================
 // Constants & Master Data
 // ==========================================
@@ -209,77 +212,104 @@ const TodayTimeline = ({ tasks }) => {
     </div>);
 };
 const StrictTimer = ({ task, isAnyOtherRunning, onUpdate, onSave, onLiveUpdate }) => {
-    const [sessionElapsed, setSessionElapsed] = useState(0); // 今回の計測時間のみを管理
+    const [sessionElapsed, setSessionElapsed] = useState(0);
     const [statusMessage, setStatusMessage] = useState(null);
-    const [idleRemaining, setIdleRemaining] = useState(300); // 無操作停止までの残り時間
+    const [idleRemaining, setIdleRemaining] = useState(IDLE_LIMIT_SECONDS);
     const lastActive = useRef(Date.now());
     const timerRef = useRef(null);
-    const hiddenStartedAt = useRef(null); // hidden開始時間を別管理
+    const heartbeatRef = useRef(0);
+
+    const getAccurateElapsed = useCallback(() => {
+        if (!task.isRunning || !task.sessionStartTime)
+            return 0;
+        return Math.max(0, Math.floor((Date.now() - Number(task.sessionStartTime)) / 1000));
+    }, [task.isRunning, task.sessionStartTime]);
+
+    const getAccurateTotal = useCallback(() => {
+        return (task.currentDuration || 0) + getAccurateElapsed();
+    }, [task.currentDuration, getAccurateElapsed]);
+
+    const updateIdleRemaining = useCallback(() => {
+        if (typeof document !== 'undefined' && isDocumentHidden()) {
+            setIdleRemaining(IDLE_LIMIT_SECONDS);
+            return IDLE_LIMIT_SECONDS;
+        }
+        const remaining = Math.max(0, IDLE_LIMIT_SECONDS - Math.floor((Date.now() - lastActive.current) / 1000));
+        setIdleRemaining(remaining);
+        return remaining;
+    }, []);
+
     const stopTimer = useCallback((reason = "") => {
         if (!task.isRunning || !task.sessionStartTime)
             return;
         const now = Date.now();
-        const startTime = Number(task.sessionStartTime);
-        const elapsed = Math.floor((now - startTime) / 1000);
-        const finalSecs = (task.currentDuration || 0) + elapsed;
+        const finalSecs = getAccurateTotal();
         onUpdate(task.id, {
             isRunning: false,
             currentDuration: finalSecs,
             sessionStartTime: null,
+            lastActivityAt: now,
             lastUpdatedAt: now
-        });
-        setSessionElapsed(0); // 停止時に今回のセッション時間をリセット
-        setIdleRemaining(300);
-        hiddenStartedAt.current = null;
+        }, true);
+        setSessionElapsed(0);
+        setIdleRemaining(IDLE_LIMIT_SECONDS);
         if (reason)
             setStatusMessage(reason);
-    }, [task.isRunning, task.sessionStartTime, task.currentDuration, task.id, onUpdate]);
+    }, [task.isRunning, task.sessionStartTime, task.id, getAccurateTotal, onUpdate]);
+
     useEffect(() => {
+        if (timerRef.current)
+            clearInterval(timerRef.current);
         if (task.isRunning && task.sessionStartTime) {
-            const startTime = Number(task.sessionStartTime);
+            setSessionElapsed(getAccurateElapsed());
             timerRef.current = setInterval(() => {
                 const now = Date.now();
-                const elapsed = Math.floor((now - startTime) / 1000);
+                const elapsed = getAccurateElapsed();
                 setSessionElapsed(elapsed);
-                // 残り時間の計算と更新
-                const remaining = Math.max(0, 300 - Math.floor((now - lastActive.current) / 1000));
-                setIdleRemaining(remaining);
-                if (remaining === 0) {
-                    stopTimer("長時間無操作のため自動停止しました。");
+
+                const remaining = updateIdleRemaining();
+                if (!isDocumentHidden() && remaining === 0) {
+                    stopTimer("5分以上操作がなかったため一時停止しました。");
+                    return;
+                }
+
+                // 他端末に「計測中であること」を軽く知らせるためのハートビート。
+                // 経過時間そのものは sessionStartTime から各端末で再計算するため、毎秒のDB更新はしない。
+                if (!isDocumentHidden() && now - heartbeatRef.current > TIMER_HEARTBEAT_MS) {
+                    heartbeatRef.current = now;
+                    onUpdate(task.id, { lastUpdatedAt: now, lastActivityAt: lastActive.current }, true);
                 }
             }, 1000);
         }
         else {
             setSessionElapsed(0);
-            setIdleRemaining(300);
+            setIdleRemaining(IDLE_LIMIT_SECONDS);
         }
-        return () => { if (timerRef.current)
-            clearInterval(timerRef.current); };
-    }, [task.isRunning, task.sessionStartTime, stopTimer]);
+        return () => {
+            if (timerRef.current)
+                clearInterval(timerRef.current);
+        };
+    }, [task.isRunning, task.sessionStartTime, task.id, getAccurateElapsed, updateIdleRemaining, stopTimer, onUpdate]);
+
     useEffect(() => {
         const handleVisibilityChange = () => {
-            if (document.visibilityState === 'visible' && task.isRunning && task.sessionStartTime) {
-                const now = Date.now();
-                // hidden開始時間からの経過時間で判定 (復帰時のリセット問題を解決)
-                if (hiddenStartedAt.current && now - hiddenStartedAt.current > 5 * 60 * 1000) {
-                    stopTimer("長時間バックグラウンドにいたため停止しました。");
-                }
-                else {
-                    const startTime = Number(task.sessionStartTime);
-                    setSessionElapsed(Math.floor((now - startTime) / 1000));
-                }
-                hiddenStartedAt.current = null;
-            }
-            if (document.visibilityState === 'hidden') {
-                hiddenStartedAt.current = Date.now();
+            if (!isDocumentHidden() && task.isRunning && task.sessionStartTime) {
+                // タブ復帰・スマホスリープ復帰時も停止しない。Date.now()差分で表示だけ即補正する。
+                lastActive.current = Date.now();
+                setSessionElapsed(getAccurateElapsed());
+                setIdleRemaining(IDLE_LIMIT_SECONDS);
+                setStatusMessage(null);
             }
         };
         document.addEventListener('visibilitychange', handleVisibilityChange);
         return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-    }, [task.isRunning, task.sessionStartTime, stopTimer]);
+    }, [task.isRunning, task.sessionStartTime, getAccurateElapsed]);
+
     useEffect(() => {
-        const recordActivity = () => { lastActive.current = Date.now(); };
-        // 操作検知イベントを強化 (スマホやスクロール時の誤判定を防止)
+        const recordActivity = () => {
+            lastActive.current = Date.now();
+            setIdleRemaining(IDLE_LIMIT_SECONDS);
+        };
         window.addEventListener('mousemove', recordActivity);
         window.addEventListener('touchstart', recordActivity);
         window.addEventListener('touchmove', recordActivity);
@@ -295,34 +325,41 @@ const StrictTimer = ({ task, isAnyOtherRunning, onUpdate, onSave, onLiveUpdate }
             window.removeEventListener('keydown', recordActivity);
         };
     }, []);
+
     const handleStart = () => {
         if (isAnyOtherRunning) {
             alert("他の教科を計測中です。一度終了させてください。");
             return;
         }
-        lastActive.current = Date.now();
-        setIdleRemaining(300);
-        hiddenStartedAt.current = null;
+        const now = Date.now();
+        lastActive.current = now;
+        heartbeatRef.current = now;
+        setIdleRemaining(IDLE_LIMIT_SECONDS);
         setStatusMessage(null);
-        onUpdate(task.id, { isRunning: true, sessionStartTime: Date.now(), lastUpdatedAt: Date.now() });
+        onUpdate(task.id, {
+            isRunning: true,
+            sessionStartTime: now,
+            lastActivityAt: now,
+            lastUpdatedAt: now
+        }, true);
     };
+
     const handleSaveClick = () => {
-        const totalToSave = (task.currentDuration || 0) + sessionElapsed;
+        const totalToSave = getAccurateTotal();
         if (totalToSave < 10) {
             alert("学習時間が短すぎます（10秒以上必要です）。");
             return;
         }
-        onSave(task, totalToSave);
+        onSave({ ...task, currentDuration: totalToSave, isRunning: false, sessionStartTime: null }, totalToSave);
     };
-    // 累計時間の計算
-    const totalSeconds = (task.currentDuration || 0) + sessionElapsed;
-    // 残り時間のフォーマット (mm:ss)
+
+    const totalSeconds = getAccurateTotal();
     const formatIdleTime = (sec) => {
         const m = Math.floor(sec / 60);
         const s = sec % 60;
         return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
     };
-    // 親コンポーネントへライブ状態通知
+
     useEffect(() => {
         if (!onLiveUpdate)
             return;
@@ -332,42 +369,46 @@ const StrictTimer = ({ task, isAnyOtherRunning, onUpdate, onSave, onLiveUpdate }
                 taskTitle: task.title,
                 sessionElapsed,
                 idleRemaining,
-                totalSeconds: (task.currentDuration || 0) + sessionElapsed
+                totalSeconds,
+                sessionStartTime: task.sessionStartTime
             });
         }
         else {
             onLiveUpdate(null);
         }
-        return () => {
-            onLiveUpdate(null);
-        };
-    }, [task.isRunning, task.id, task.title, sessionElapsed, idleRemaining, onLiveUpdate]);
-    // 残り時間に応じた色クラスの取得
+        return () => onLiveUpdate(null);
+    }, [task.isRunning, task.id, task.title, task.sessionStartTime, sessionElapsed, idleRemaining, totalSeconds, onLiveUpdate]);
+
     const getIdleColorClass = (sec) => {
+        if (isDocumentHidden())
+            return "text-blue-300";
         if (sec <= 30)
-            return "text-rose-500 animate-pulse";
+            return "text-rose-300 animate-pulse";
         if (sec <= 60)
-            return "text-amber-400";
-        return "text-slate-400";
+            return "text-amber-300";
+        return "text-slate-300";
     };
-    return (<div className="bg-slate-900 rounded-[2rem] p-6 sm:p-10 text-center shadow-2xl relative overflow-hidden border border-white/5 flex flex-col items-center justify-center">
-      {statusMessage && (<div className="absolute top-0 left-0 w-full bg-rose-600 text-white text-[10px] font-black py-2 z-10 animate-in slide-in-from-top duration-300">
+
+    return (<div className="bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950 rounded-[2rem] p-6 sm:p-10 text-center shadow-2xl relative overflow-hidden border border-white/10 flex flex-col items-center justify-center">
+      <div className="absolute -top-24 -right-24 w-56 h-56 bg-blue-500/20 rounded-full blur-3xl"/>
+      <div className="absolute -bottom-28 -left-20 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl"/>
+      {statusMessage && (<div className="absolute top-4 left-4 right-4 bg-amber-400/95 text-slate-950 text-[10px] font-black py-2 px-3 rounded-2xl z-10 shadow-lg animate-in slide-in-from-top duration-300">
            {statusMessage}
         </div>)}
 
-      <div className="mb-8 flex flex-col items-center justify-center w-full">
+      <div className="mb-8 flex flex-col items-center justify-center w-full relative z-10">
         {task.isRunning ? (<>
+            <div className="mb-4 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-400/10 border border-blue-300/20 text-blue-200 text-[10px] sm:text-xs font-black uppercase tracking-widest">
+              <span className="w-2 h-2 rounded-full bg-blue-300 animate-pulse"/> Live Sync
+            </div>
             <span className="text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-widest mb-2">現在の計測</span>
-            <div className="text-5xl sm:text-7xl font-mono font-black tracking-tighter text-blue-400 animate-pulse leading-none">
+            <div className="text-5xl sm:text-7xl font-mono font-black tracking-tighter text-white leading-none drop-shadow-sm">
               {formatDuration(sessionElapsed)}
             </div>
-            
-            {/* 無操作停止までの残り時間表示 */}
             <div className={`mt-3 text-[10px] sm:text-xs font-black tracking-widest flex items-center gap-1.5 ${getIdleColorClass(idleRemaining)}`}>
-               <Clock size={12}/> 操作なし停止まで: {formatIdleTime(idleRemaining)}
+               <Clock size={12}/> {isDocumentHidden() ? 'バックグラウンド中も計測継続' : `操作なし停止まで: ${formatIdleTime(idleRemaining)}`}
             </div>
-
-            <div className="mt-4 px-4 py-2 bg-white/10 rounded-full text-xs sm:text-sm font-bold text-white opacity-90 flex items-center gap-2">
+            <div className="mt-4 px-4 py-2 bg-white/10 border border-white/10 rounded-full text-xs sm:text-sm font-bold text-white/90 flex items-center gap-2 shadow-sm">
               <History size={14}/> 累計: {formatDuration(totalSeconds)}
             </div>
           </>) : (<>
@@ -378,13 +419,13 @@ const StrictTimer = ({ task, isAnyOtherRunning, onUpdate, onSave, onLiveUpdate }
           </>)}
       </div>
 
-      <div className="flex gap-3 w-full max-w-sm">
-        {!task.isRunning ? (<button onClick={handleStart} className="flex-1 bg-blue-600 text-white font-black py-4 sm:py-5 rounded-xl sm:rounded-2xl shadow-lg active:scale-95 transition flex items-center justify-center gap-2 text-sm sm:text-lg uppercase leading-none">
+      <div className="flex gap-3 w-full max-w-sm relative z-10">
+        {!task.isRunning ? (<button onClick={handleStart} className="flex-1 bg-white text-slate-950 font-black py-4 sm:py-5 rounded-xl sm:rounded-2xl shadow-lg active:scale-95 transition flex items-center justify-center gap-2 text-sm sm:text-lg uppercase leading-none hover:bg-blue-50">
             <Play size={20} fill="currentColor"/> START
-          </button>) : (<button onClick={() => stopTimer()} className="flex-1 bg-amber-500 text-white font-black py-4 sm:py-5 rounded-xl sm:rounded-2xl shadow-lg active:scale-95 transition flex items-center justify-center gap-2 text-sm sm:text-lg uppercase leading-none">
+          </button>) : (<button onClick={() => stopTimer()} className="flex-1 bg-amber-400 text-slate-950 font-black py-4 sm:py-5 rounded-xl sm:rounded-2xl shadow-lg active:scale-95 transition flex items-center justify-center gap-2 text-sm sm:text-lg uppercase leading-none hover:bg-amber-300">
             <Pause size={20} fill="currentColor"/> PAUSE
           </button>)}
-        <button onClick={handleSaveClick} className="flex-1 bg-white/10 text-white font-black py-4 sm:py-5 rounded-xl sm:rounded-2xl hover:bg-white/20 transition flex items-center justify-center gap-2 text-sm sm:text-lg uppercase leading-none">
+        <button onClick={handleSaveClick} className="flex-1 bg-blue-600 text-white font-black py-4 sm:py-5 rounded-xl sm:rounded-2xl hover:bg-blue-500 transition flex items-center justify-center gap-2 text-sm sm:text-lg uppercase leading-none shadow-lg">
           <Save size={20}/> FINISH
         </button>
       </div>
@@ -393,79 +434,74 @@ const StrictTimer = ({ task, isAnyOtherRunning, onUpdate, onSave, onLiveUpdate }
 
 const ActiveTimerSummary = ({ task, onUpdate }) => {
     const [sessionElapsed, setSessionElapsed] = useState(0);
-    const [idleRemaining, setIdleRemaining] = useState(300);
+    const [idleRemaining, setIdleRemaining] = useState(IDLE_LIMIT_SECONDS);
     const lastActive = useRef(Date.now());
     const timerRef = useRef(null);
-    const hiddenStartedAt = useRef(null);
+
+    const getAccurateElapsed = useCallback(() => {
+        if (!task?.isRunning || !task?.sessionStartTime)
+            return 0;
+        return Math.max(0, Math.floor((Date.now() - Number(task.sessionStartTime)) / 1000));
+    }, [task?.isRunning, task?.sessionStartTime]);
 
     const stopFromSummary = useCallback((reason = "") => {
         if (!task?.isRunning || !task?.sessionStartTime)
             return;
         const now = Date.now();
-        const startTime = Number(task.sessionStartTime);
-        const elapsed = Math.floor((now - startTime) / 1000);
-        const finalSecs = (task.currentDuration || 0) + elapsed;
-
+        const finalSecs = (task.currentDuration || 0) + getAccurateElapsed();
         onUpdate(task.id, {
             isRunning: false,
             currentDuration: finalSecs,
             sessionStartTime: null,
+            lastActivityAt: now,
             lastUpdatedAt: now
-        });
-
+        }, true);
         setSessionElapsed(0);
-        setIdleRemaining(300);
-        hiddenStartedAt.current = null;
-
-        if (reason) {
+        setIdleRemaining(IDLE_LIMIT_SECONDS);
+        if (reason)
             console.warn(reason);
-        }
-    }, [task, onUpdate]);
+    }, [task, getAccurateElapsed, onUpdate]);
 
     useEffect(() => {
         if (timerRef.current)
             clearInterval(timerRef.current);
-
         if (task?.isRunning && task?.sessionStartTime) {
             lastActive.current = Date.now();
-            const startTime = Number(task.sessionStartTime);
-
+            setSessionElapsed(getAccurateElapsed());
             timerRef.current = setInterval(() => {
                 const now = Date.now();
-                const elapsed = Math.floor((now - startTime) / 1000);
-                const remaining = Math.max(0, 300 - Math.floor((now - lastActive.current) / 1000));
-
-                setSessionElapsed(elapsed);
-                setIdleRemaining(remaining);
-
-                if (remaining === 0) {
-                    stopFromSummary("長時間無操作のため自動停止しました。");
+                setSessionElapsed(getAccurateElapsed());
+                if (isDocumentHidden()) {
+                    setIdleRemaining(IDLE_LIMIT_SECONDS);
+                    return;
                 }
+                const remaining = Math.max(0, IDLE_LIMIT_SECONDS - Math.floor((now - lastActive.current) / 1000));
+                setIdleRemaining(remaining);
+                if (remaining === 0)
+                    stopFromSummary("5分以上操作がなかったため一時停止しました。");
             }, 1000);
         }
         else {
             setSessionElapsed(0);
-            setIdleRemaining(300);
+            setIdleRemaining(IDLE_LIMIT_SECONDS);
         }
-
         return () => {
             if (timerRef.current)
                 clearInterval(timerRef.current);
         };
-    }, [task?.id, task?.isRunning, task?.sessionStartTime, stopFromSummary]);
+    }, [task?.id, task?.isRunning, task?.sessionStartTime, getAccurateElapsed, stopFromSummary]);
 
     useEffect(() => {
         const recordActivity = () => {
             lastActive.current = Date.now();
+            setIdleRemaining(IDLE_LIMIT_SECONDS);
         };
-
         window.addEventListener('mousemove', recordActivity);
         window.addEventListener('touchstart', recordActivity);
         window.addEventListener('touchmove', recordActivity);
         window.addEventListener('scroll', recordActivity);
         window.addEventListener('click', recordActivity);
         window.addEventListener('keydown', recordActivity);
-
         return () => {
             window.removeEventListener('mousemove', recordActivity);
             window.removeEventListener('touchstart', recordActivity);
@@ -478,23 +514,15 @@ const ActiveTimerSummary = ({ task, onUpdate }) => {
 
     useEffect(() => {
         const handleVisibilityChange = () => {
-            if (document.visibilityState === 'hidden') {
-                hiddenStartedAt.current = Date.now();
-                return;
-            }
-
-            if (document.visibilityState === 'visible' && task?.isRunning && task?.sessionStartTime) {
-                const now = Date.now();
-                if (hiddenStartedAt.current && now - hiddenStartedAt.current > 5 * 60 * 1000) {
-                    stopFromSummary("長時間バックグラウンドにいたため停止しました。");
-                }
-                hiddenStartedAt.current = null;
+            if (!isDocumentHidden() && task?.isRunning && task?.sessionStartTime) {
+                lastActive.current = Date.now();
+                setSessionElapsed(getAccurateElapsed());
+                setIdleRemaining(IDLE_LIMIT_SECONDS);
             }
         };
-
         document.addEventListener('visibilitychange', handleVisibilityChange);
         return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-    }, [task?.isRunning, task?.sessionStartTime, stopFromSummary]);
+    }, [task?.isRunning, task?.sessionStartTime, getAccurateElapsed]);
 
     if (!task?.isRunning || !task?.sessionStartTime)
         return null;
@@ -506,27 +534,30 @@ const ActiveTimerSummary = ({ task, onUpdate }) => {
         return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
     };
 
-    return (<div className="bg-white rounded-[2rem] border border-blue-100 shadow-sm p-4 sm:p-5 text-left">
-      <div className="flex items-center gap-2 mb-3">
-        <div className="w-2.5 h-2.5 bg-blue-500 rounded-full animate-pulse shrink-0"/>
-        <div className="min-w-0">
-          <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 leading-none mb-1">現在学習中</div>
-          <div className="font-black text-slate-800 text-sm sm:text-base truncate leading-tight">{task.title || "Untitled"}</div>
+    return (<div className="bg-white/90 backdrop-blur-xl rounded-[2rem] border border-blue-100 shadow-sm p-4 sm:p-5 text-left ring-1 ring-white/70">
+      <div className="flex items-center justify-between gap-3 mb-3">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="w-2.5 h-2.5 bg-blue-500 rounded-full animate-pulse shrink-0"/>
+          <div className="min-w-0">
+            <div className="text-[10px] font-black uppercase tracking-widest text-blue-400 leading-none mb-1">他端末にも同期中</div>
+            <div className="font-black text-slate-800 text-sm sm:text-base truncate leading-tight">{task.title || "Untitled"}</div>
+          </div>
         </div>
+        <div className="text-[10px] font-black text-slate-400 whitespace-nowrap">Live</div>
       </div>
 
       <div className="grid grid-cols-3 gap-2 sm:gap-3">
-        <div className="bg-blue-50 rounded-2xl p-3 text-center">
+        <div className="bg-blue-50 rounded-2xl p-3 text-center border border-blue-100">
           <div className="text-[9px] font-black text-blue-400 uppercase tracking-widest mb-1">現在</div>
           <div className="font-mono font-black text-blue-600 text-base sm:text-xl tracking-tighter">{formatDuration(sessionElapsed)}</div>
         </div>
-        <div className="bg-slate-50 rounded-2xl p-3 text-center">
+        <div className="bg-slate-50 rounded-2xl p-3 text-center border border-slate-100">
           <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">停止まで</div>
           <div className={`font-mono font-black text-base sm:text-xl tracking-tighter ${idleRemaining <= 30 ? 'text-rose-500 animate-pulse' : idleRemaining <= 60 ? 'text-amber-500' : 'text-slate-700'}`}>
-            {formatIdleTime(idleRemaining)}
+            {isDocumentHidden() ? '--:--' : formatIdleTime(idleRemaining)}
           </div>
         </div>
-        <div className="bg-slate-50 rounded-2xl p-3 text-center">
+        <div className="bg-slate-50 rounded-2xl p-3 text-center border border-slate-100">
           <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">累計</div>
           <div className="font-mono font-black text-slate-800 text-base sm:text-xl tracking-tighter">{formatDuration(totalSeconds)}</div>
         </div>
@@ -603,6 +634,27 @@ export default function App() {
         if (user && !isSampleMode)
             fetchData(true);
     }, [user, isSampleMode, fetchData]);
+
+    // 他端末で開始・停止されたタイマーを即時反映するため、Firestoreをリアルタイム購読する。
+    useEffect(() => {
+        if (!user || isSampleMode)
+            return;
+        const unsubTasks = onSnapshot(getTasksCol(), (snap) => {
+            setTasks(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+            setLoading(false);
+        }, (err) => {
+            console.error("Task realtime sync error:", err);
+        });
+        const unsubTests = onSnapshot(getTestsCol(), (snap) => {
+            setTests(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()));
+        }, (err) => {
+            console.error("Test realtime sync error:", err);
+        });
+        return () => {
+            unsubTasks();
+            unsubTests();
+        };
+    }, [user, isSampleMode]);
     const handleLogin = async (e) => {
         e.preventDefault();
         const fd = new FormData(e.currentTarget);
@@ -634,9 +686,18 @@ export default function App() {
             fetchData();
         }
     };
-    const handleUpdateLocalTask = (id, updates) => {
-        setTasks(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
-    };
+    const handleUpdateLocalTask = useCallback(async (id, updates, syncToCloud = false) => {
+        const updatesWithTimestamp = { ...updates };
+        setTasks(prev => prev.map(t => t.id === id ? { ...t, ...updatesWithTimestamp } : t));
+        if (syncToCloud && !isSampleMode && user) {
+            try {
+                await updateDoc(doc(getTasksCol(), id), updatesWithTimestamp);
+            }
+            catch (err) {
+                console.error("Task sync failed:", err);
+            }
+        }
+    }, [isSampleMode, user]);
     const handleSaveRecord = async (task, totalSeconds) => {
         const memo = prompt("学習内容：") || "";
         const now = Date.now();
