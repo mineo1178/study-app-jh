@@ -36,7 +36,7 @@ catch (e) { }
 const FAMILY_ID = 'oomine-study-2026';
 const getTasksCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tasks');
 const getTestsCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tests');
-const APP_VERSION = 'v1.60';
+const APP_VERSION = 'v1.61';
 const IDLE_LIMIT_SECONDS = 5 * 60;
 const TIMER_HEARTBEAT_MS = 30 * 1000;
 const isDocumentHidden = () => typeof document !== 'undefined' && document.hidden;
@@ -88,6 +88,32 @@ const formatDuration = (seconds) => {
 const getTodayStr = () => {
     const d = new Date();
     return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')}`;
+};
+const getHistoryMonth = (historyItem) => {
+    if (!historyItem?.date)
+        return null;
+    const parsed = new Date(historyItem.date);
+    if (!Number.isNaN(parsed.getTime()))
+        return parsed.getMonth() + 1;
+    const parts = String(historyItem.date).split('-');
+    return Number(parts[1]) || null;
+};
+const getMonthlyHistories = (task, selectedMonth) => {
+    return (task.history || []).filter((h) => getHistoryMonth(h) === selectedMonth);
+};
+const getMonthlyDuration = (task, selectedMonth) => {
+    return getMonthlyHistories(task, selectedMonth).reduce((sum, h) => sum + (h.duration || 0), 0);
+};
+const getLatestMonthlyTimestamp = (task, selectedMonth) => {
+    const histories = getMonthlyHistories(task, selectedMonth);
+    if (histories.length === 0)
+        return 0;
+    return Math.max(...histories.map((h) => h.endedAt || h.startedAt || new Date(h.date).getTime() || 0));
+};
+const formatRecordDate = (timestamp) => {
+    if (!timestamp)
+        return '今月の記録なし';
+    return new Date(timestamp).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 };
 const generateSampleData = () => {
     const tasks = [];
@@ -1014,27 +1040,31 @@ export default function App() {
                </div>)}
 
             {activeTab === 'daily' && (<div className="space-y-8 animate-in fade-in duration-500">
-            <div className="flex items-center justify-between bg-white/80 backdrop-blur-xl p-4 rounded-[2rem] shadow-sm border border-white lg:sticky lg:top-4 z-30">
-              <button onClick={() => setSelectedMonth(m => m === 1 ? 12 : m - 1)} className="p-2 bg-slate-50 hover:bg-slate-100 rounded-xl transition leading-none text-left"><ChevronLeft size={20}/></button>
-              <div className="flex-1 text-center">
-                <h2 className="text-lg sm:text-2xl font-black text-slate-800 tracking-tight leading-none">{selectedMonth}月の学習記録</h2>
-                <div className="mt-2 inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-[10px] font-black text-blue-700 ring-1 ring-blue-100">
-                  <span className="h-1.5 w-1.5 rounded-full bg-blue-500"/> {APP_VERSION} / Timer Sync UI
+            <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-slate-950 via-blue-950 to-indigo-700 p-4 sm:p-5 shadow-2xl shadow-blue-200/40 ring-1 ring-white/20 lg:sticky lg:top-4 z-30">
+              <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full bg-blue-400/25 blur-2xl"/>
+              <div className="relative z-10 flex items-center justify-between">
+                <button onClick={() => setSelectedMonth(m => m === 1 ? 12 : m - 1)} className="p-2 bg-white/10 hover:bg-white/20 rounded-xl transition leading-none text-white ring-1 ring-white/15"><ChevronLeft size={20}/></button>
+                <div className="flex-1 text-center">
+                  <div className="text-[10px] font-black uppercase tracking-[0.22em] text-blue-100/80">Monthly Clean View</div>
+                  <h2 className="mt-1 text-xl sm:text-3xl font-black text-white tracking-tight leading-none">{selectedMonth}月の学習記録</h2>
+                  <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-[10px] font-black text-blue-50 ring-1 ring-white/15">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-300 animate-pulse"/> {APP_VERSION} / Monthly Clean View
+                  </div>
                 </div>
+                <button onClick={() => setSelectedMonth(m => m === 12 ? 1 : m + 1)} className="p-2 bg-white/10 hover:bg-white/20 rounded-xl transition leading-none text-white ring-1 ring-white/15"><ChevronRight size={20}/></button>
               </div>
-              <button onClick={() => setSelectedMonth(m => m === 12 ? 1 : m + 1)} className="p-2 bg-slate-50 hover:bg-slate-100 rounded-xl transition leading-none text-left"><ChevronRight size={20}/></button>
             </div>
 
             <div className={`grid gap-3 sm:gap-4 text-center ${isMobileView ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-4'}`}>
               <div className={`${isMobileView ? '' : 'md:col-span-1'} bg-gradient-to-br from-blue-600 to-indigo-700 p-3 sm:p-6 rounded-[1.5rem] sm:rounded-[2rem] text-white shadow-xl relative overflow-hidden text-center flex flex-col justify-center min-h-[70px] sm:min-h-[120px]`}>
                  <p className="text-[9px] sm:text-[10px] font-black opacity-70 mb-1 sm:mb-2 uppercase tracking-widest leading-none">Monthly</p>
                  <p className="text-2xl sm:text-4xl font-black font-mono leading-none tracking-tighter">
-                   {formatDuration(tasks.reduce((sum, t) => sum + (t.history || []).filter((h) => parseInt(h.date.split('-')[1]) === selectedMonth).reduce((s, h) => s + h.duration, 0), 0))}
+                   {formatDuration(tasks.reduce((sum, t) => sum + getMonthlyDuration(t, selectedMonth), 0))}
                  </p>
               </div>
               <div className={`${isMobileView ? 'grid grid-cols-3 gap-2' : 'md:col-span-3 grid grid-cols-3 gap-2 sm:gap-4'} text-center`}>
                  {Object.values(CATEGORIES).map(cat => {
-                const catTotal = tasks.filter(t => t.categoryId === cat.id).reduce((sum, t) => sum + (t.history || []).filter((h) => parseInt(h.date.split('-')[1]) === selectedMonth).reduce((s, h) => s + h.duration, 0), 0);
+                const catTotal = tasks.filter(t => t.categoryId === cat.id).reduce((sum, t) => sum + getMonthlyDuration(t, selectedMonth), 0);
                 return (<div key={cat.id} onClick={() => setActiveCategory(cat.id)} className={`cursor-pointer transition-all bg-white/90 backdrop-blur-xl p-2 sm:p-4 rounded-[1.5rem] sm:rounded-[2rem] border-2 shadow-sm hover:shadow-xl flex flex-col items-center justify-center min-h-[70px] sm:min-h-[120px] text-center leading-none ${activeCategory === cat.id ? 'border-blue-400 shadow-blue-100 scale-105 z-10 ring-4 ring-blue-50' : 'border-slate-100 hover:border-blue-200'}`}>
                         <cat.icon size={16} className={`sm:w-6 sm:h-6 ${cat.color}`}/>
                         <p className="text-[9px] sm:text-sm font-black text-slate-600 mt-1.5 sm:mt-3 uppercase leading-none">{cat.label}</p>
@@ -1063,10 +1093,10 @@ export default function App() {
                   </div>
 
                   <div className="space-y-8 pb-10 text-left">
-                    {tasks.filter(t => t.categoryId === activeCategory).length === 0 ? (<div className="py-16 text-center border-2 border-dashed border-slate-200 rounded-3xl">
+                    {tasks.filter(t => t.categoryId === activeCategory && (t.isRunning || getMonthlyHistories(t, selectedMonth).length > 0)).length === 0 ? (<div className="py-16 text-center border-2 border-dashed border-slate-200 rounded-3xl">
                         <p className="text-slate-300 font-black text-sm uppercase">記録が見つかりません</p>
                       </div>) : (SUBJECT_DEFS[activeCategory]?.map(subject => {
-                const subjectTasks = tasks.filter(t => t.categoryId === activeCategory && t.subjectId === subject.id);
+                const subjectTasks = tasks.filter(t => t.categoryId === activeCategory && t.subjectId === subject.id && (t.isRunning || getMonthlyHistories(t, selectedMonth).length > 0));
                 if (subjectTasks.length === 0)
                     return null;
                 return (<div key={subject.id} className="space-y-4">
@@ -1075,8 +1105,10 @@ export default function App() {
                                <h3 className="font-black text-slate-700 text-base sm:text-lg leading-none">{subject.label}</h3>
                             </div>
                             <div className={`gap-3 sm:gap-4 ${isMobileView ? 'grid grid-cols-1' : 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'}`}>
-                              {subjectTasks.sort((a, b) => b.lastUpdatedAt - a.lastUpdatedAt).map(task => {
-                        const monthlyTime = (task.history || []).filter((h) => parseInt(h.date.split('-')[1]) === selectedMonth).reduce((acc, h) => acc + h.duration, 0);
+                              {subjectTasks.sort((a, b) => getLatestMonthlyTimestamp(b, selectedMonth) - getLatestMonthlyTimestamp(a, selectedMonth)).map(task => {
+                        const monthlyHistories = getMonthlyHistories(task, selectedMonth);
+                        const monthlyTime = getMonthlyDuration(task, selectedMonth);
+                        const latestMonthlyTimestamp = getLatestMonthlyTimestamp(task, selectedMonth);
                         return (<div key={task.id} onClick={() => setSelectedTaskId(task.id)} className={`p-4 sm:p-6 rounded-[1.5rem] sm:rounded-[2rem] border shadow-sm hover:shadow-xl transition-all cursor-pointer relative overflow-hidden text-left group ${task.isRunning ? 'bg-gradient-to-br from-blue-600 to-indigo-800 text-white border-blue-400 shadow-blue-200' : 'bg-white border-slate-100'}`}>
                                     <div className="flex justify-between items-start mb-2 sm:mb-3 text-left">
                                       <div className="flex items-center gap-1.5 sm:gap-2 leading-none text-left">
@@ -1085,11 +1117,11 @@ export default function App() {
                                       {task.isRunning && <div className="rounded-full bg-white/15 px-2 py-1 text-[8px] font-black text-white ring-1 ring-white/20">LIVE</div>}
                                     </div>
                                     <div className={`text-[9px] sm:text-[10px] font-bold mb-2 sm:mb-3 ${task.isRunning ? 'text-blue-100/80' : 'text-slate-400'}`}>
-                                       {new Date(task.lastUpdatedAt).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })} 更新
+                                       {task.isRunning ? '現在計測中' : `${formatRecordDate(latestMonthlyTimestamp)} 記録`}
                                     </div>
                                     <h4 className={`font-black text-base sm:text-lg mb-3 sm:mb-4 truncate leading-tight text-left ${task.isRunning ? 'text-white' : 'text-slate-800'}`}>{task.title || "Untitled"}</h4>
                                     <div className={`flex justify-between items-end border-t pt-3 sm:pt-4 leading-none text-left ${task.isRunning ? 'border-white/15' : 'border-slate-50'}`}>
-                                       <div className={`text-[9px] sm:text-[10px] font-black flex items-center gap-1 uppercase leading-none text-left ${task.isRunning ? 'text-blue-100/80' : 'text-slate-300'}`}><History size={12}/> {task.history?.length || 0}回</div>
+                                       <div className={`text-[9px] sm:text-[10px] font-black flex items-center gap-1 uppercase leading-none text-left ${task.isRunning ? 'text-blue-100/80' : 'text-slate-300'}`}><History size={12}/> {monthlyHistories.length}回</div>
                                        <p className={`text-lg sm:text-xl font-black font-mono tracking-tighter leading-none text-left ${task.isRunning ? 'text-white' : 'text-blue-600'}`}>{formatDuration(monthlyTime)}</p>
                                     </div>
                                   </div>);
@@ -1338,8 +1370,8 @@ export default function App() {
                          <div className="space-y-6 text-left">
                             <h3 className="font-black text-lg flex items-center gap-2 px-2 text-left"><History className="text-blue-500"/> 履歴</h3>
                             <div className="space-y-3 text-left">
-                              {(task.history || []).length === 0 ? <p className="text-center py-10 text-slate-300 font-bold italic text-sm text-center">記録なし</p> :
-                        [...task.history].reverse().map(h => (<div key={h.id} className="bg-white border border-slate-100 p-4 rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center shadow-sm gap-3 text-left">
+                              {getMonthlyHistories(task, selectedMonth).length === 0 ? <p className="text-center py-10 text-slate-300 font-bold italic text-sm text-center">この月の記録なし</p> :
+                        [...getMonthlyHistories(task, selectedMonth)].reverse().map(h => (<div key={h.id} className="bg-white border border-slate-100 p-4 rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center shadow-sm gap-3 text-left">
                                    <div className="flex-1 pr-4 w-full text-left">
                                       <span className="text-[10px] font-black bg-slate-50 text-slate-500 px-3 py-1 rounded-full mb-2 inline-block text-left">{h.date}</span>
                                       <p className="font-bold text-slate-500 text-xs leading-snug break-words text-left">{h.memo || "詳細なし"}</p>
