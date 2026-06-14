@@ -36,9 +36,10 @@ catch (e) { }
 const FAMILY_ID = 'oomine-study-2026';
 const getTasksCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tasks');
 const getTestsCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tests');
-const APP_VERSION = 'v1.61';
+const APP_VERSION = 'v1.62';
 const IDLE_LIMIT_SECONDS = 5 * 60;
 const TIMER_HEARTBEAT_MS = 30 * 1000;
+const DAILY_TARGET_SECONDS = 2 * 60 * 60;
 const isDocumentHidden = () => typeof document !== 'undefined' && document.hidden;
 // ==========================================
 // Constants & Master Data
@@ -115,6 +116,22 @@ const formatRecordDate = (timestamp) => {
         return '今月の記録なし';
     return new Date(timestamp).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 };
+const formatClockTime = (ms) => {
+    if (!ms)
+        return '--:--';
+    const d = new Date(ms);
+    return `${d.getHours()}:${d.getMinutes().toString().padStart(2, '0')}`;
+};
+const getTaskMeta = (task) => {
+    const categoryInfo = Object.values(CATEGORIES).find(c => c.id === task?.categoryId);
+    const subjectInfo = SUBJECT_DEFS[task?.categoryId]?.find(s => s.id === task?.subjectId);
+    return {
+        categoryLabel: categoryInfo?.label || '学習',
+        subjectLabel: subjectInfo?.label || categoryInfo?.label || '学習',
+        color: subjectInfo?.hex || categoryInfo?.hex || '#94a3b8',
+        typeLabel: task?.type === 'homework' ? '宿題' : '自習'
+    };
+};
 const generateSampleData = () => {
     const tasks = [];
     const tests = [];
@@ -180,62 +197,205 @@ const generateSampleData = () => {
 // Component: TodayTimeline (当日の学習タイムライン)
 // ==========================================
 const TodayTimeline = ({ tasks }) => {
+    const [selectedHistory, setSelectedHistory] = useState(null);
+    const [nowTick, setNowTick] = useState(Date.now());
+
+    useEffect(() => {
+        const hasRunning = tasks.some(t => t.isRunning && t.sessionStartTime);
+        if (!hasRunning)
+            return;
+        const interval = setInterval(() => setNowTick(Date.now()), 1000);
+        return () => clearInterval(interval);
+    }, [tasks]);
+
     const todayHistories = useMemo(() => {
         const todayStr = getTodayStr();
         const histories = [];
         tasks.forEach(t => {
-            const subjectInfo = SUBJECT_DEFS[t.categoryId]?.find(s => s.id === t.subjectId);
-            const color = subjectInfo?.hex || '#94a3b8';
-            const subjectLabel = subjectInfo?.label || 'Unknown';
+            const meta = getTaskMeta(t);
             (t.history || []).forEach(h => {
-                // startedAt と endedAt が存在し、当日の履歴のみを抽出
                 if (h.date === todayStr && h.startedAt && h.endedAt) {
-                    histories.push({ ...h, color, subjectLabel });
+                    histories.push({
+                        ...h,
+                        color: meta.color,
+                        subjectLabel: meta.subjectLabel,
+                        categoryLabel: meta.categoryLabel,
+                        typeLabel: meta.typeLabel,
+                        taskTitle: t.title || 'Untitled',
+                        isLive: false
+                    });
                 }
             });
+            if (t.isRunning && t.sessionStartTime) {
+                const start = Number(t.sessionStartTime);
+                const startDate = new Date(start);
+                const startStr = `${startDate.getFullYear()}-${(startDate.getMonth() + 1).toString().padStart(2, '0')}-${startDate.getDate().toString().padStart(2, '0')}`;
+                if (startStr === todayStr) {
+                    const elapsed = Math.max(0, Math.floor((nowTick - start) / 1000));
+                    histories.push({
+                        id: `live-${t.id}`,
+                        date: todayStr,
+                        duration: elapsed,
+                        memo: '現在計測中',
+                        startedAt: start,
+                        endedAt: nowTick,
+                        color: meta.color,
+                        subjectLabel: meta.subjectLabel,
+                        categoryLabel: meta.categoryLabel,
+                        typeLabel: meta.typeLabel,
+                        taskTitle: t.title || 'Untitled',
+                        isLive: true,
+                        currentDuration: t.currentDuration || 0
+                    });
+                }
+            }
         });
         return histories.sort((a, b) => (a.startedAt || 0) - (b.startedAt || 0));
+    }, [tasks, nowTick]);
+
+    const completedTodaySeconds = useMemo(() => {
+        const todayStr = getTodayStr();
+        return tasks.reduce((sum, t) => {
+            return sum + (t.history || []).filter(h => h.date === todayStr).reduce((acc, h) => acc + (h.duration || 0), 0);
+        }, 0);
     }, [tasks]);
-    const totalTodaySeconds = useMemo(() => {
-        return todayHistories.reduce((sum, h) => sum + h.duration, 0);
-    }, [todayHistories]);
-    if (todayHistories.length === 0)
-        return null;
-    const minTime = Math.min(...todayHistories.map(h => h.startedAt));
-    const maxTime = Math.max(...todayHistories.map(h => h.endedAt));
-    // 見栄えのため、最初と最後に15分程度の余白を持たせる
+
+    const runningTodaySeconds = useMemo(() => {
+        const todayStr = getTodayStr();
+        return tasks.reduce((sum, t) => {
+            if (!t.isRunning || !t.sessionStartTime)
+                return sum;
+            const start = Number(t.sessionStartTime);
+            const d = new Date(start);
+            const startStr = `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')}`;
+            if (startStr !== todayStr)
+                return sum;
+            return sum + (t.currentDuration || 0) + Math.max(0, Math.floor((nowTick - start) / 1000));
+        }, 0);
+    }, [tasks, nowTick]);
+
+    const totalTodaySeconds = completedTodaySeconds + runningTodaySeconds;
+    const remainingSeconds = Math.max(0, DAILY_TARGET_SECONDS - totalTodaySeconds);
+    const goalPercent = Math.min(100, Math.round((totalTodaySeconds / DAILY_TARGET_SECONDS) * 100));
+    const runningTask = tasks.find(t => t.isRunning);
+    const goalMessage = remainingSeconds === 0
+        ? '今日の2時間目標は達成済みです。追加するなら苦手科目を短く積み増し。'
+        : runningTask
+            ? `このまま継続すると、残り ${formatDuration(remainingSeconds)} で2時間に到達します。`
+            : `2時間まで残り ${formatDuration(remainingSeconds)}。30分単位ならあと${Math.ceil(remainingSeconds / 1800)}コマです。`;
+
+    const minTime = todayHistories.length > 0 ? Math.min(...todayHistories.map(h => h.startedAt)) : nowTick - (60 * 60 * 1000);
+    const maxTime = todayHistories.length > 0 ? Math.max(...todayHistories.map(h => h.endedAt)) : nowTick + (60 * 60 * 1000);
     const paddingMs = 15 * 60 * 1000;
     const displayMinTime = minTime - paddingMs;
     const displayMaxTime = maxTime + paddingMs;
-    const totalDurationMs = displayMaxTime - displayMinTime;
-    const formatTime = (ms) => {
-        const d = new Date(ms);
-        return `${d.getHours()}:${d.getMinutes().toString().padStart(2, '0')}`;
-    };
+    const totalDurationMs = Math.max(1, displayMaxTime - displayMinTime);
+
+    const taskSummary = todayHistories.reduce((acc, h) => {
+        const key = `${h.categoryLabel}-${h.subjectLabel}-${h.taskTitle}`;
+        if (!acc[key]) {
+            acc[key] = { ...h, duration: 0, count: 0, latestAt: 0, hasLive: false };
+        }
+        acc[key].duration += (h.duration || 0) + (h.currentDuration || 0);
+        acc[key].count += h.isLive ? 0 : 1;
+        acc[key].latestAt = Math.max(acc[key].latestAt, h.endedAt || 0);
+        acc[key].hasLive = acc[key].hasLive || h.isLive;
+        return acc;
+    }, {});
+    const taskSummaryList = Object.values(taskSummary).sort((a, b) => b.latestAt - a.latestAt);
+
     return (<div className="bg-white p-4 sm:p-6 rounded-[2rem] border border-slate-100 shadow-sm relative overflow-hidden text-left mb-6">
-      <div className="flex justify-between items-center mb-4">
-        <h3 className="text-xs sm:text-sm font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
-          <Clock size={16}/> Today's Timeline
-        </h3>
-        <div className="text-xs sm:text-sm font-black font-mono text-blue-600 bg-blue-50 px-3 py-1.5 rounded-full shadow-sm flex items-center gap-1">
-          Total: {formatDuration(totalTodaySeconds)}
+      <div className="flex flex-col gap-4 mb-5 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h3 className="text-xs sm:text-sm font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
+            <Clock size={16}/> Today's Timeline
+          </h3>
+          <p className="mt-2 text-[10px] sm:text-xs font-bold text-slate-400">今日やったタスクと、2時間目標までの残りを表示</p>
+        </div>
+        <div className="text-xs sm:text-sm font-black font-mono text-blue-600 bg-blue-50 px-3 py-1.5 rounded-full shadow-sm flex items-center gap-1 self-start">
+          Total: {formatDuration(totalTodaySeconds)} / 2h
         </div>
       </div>
-      <div className="relative w-full h-8 sm:h-10 bg-slate-50 rounded-full overflow-hidden flex items-center border border-slate-100 shadow-inner">
-        {todayHistories.map((h, i) => {
-            const leftPercent = Math.max(0, ((h.startedAt - displayMinTime) / totalDurationMs) * 100);
-            const widthPercent = Math.min(100 - leftPercent, ((h.endedAt - h.startedAt) / totalDurationMs) * 100);
-            return (<div key={`${h.id}-${i}`} className="absolute h-full opacity-80 hover:opacity-100 transition-opacity rounded-md border-r border-white/20" style={{
-                    left: `${leftPercent}%`,
-                    width: `${widthPercent}%`,
-                    backgroundColor: h.color,
-                }} title={`${h.subjectLabel}: ${formatTime(h.startedAt)} ~ ${formatTime(h.endedAt)}`}/>);
-        })}
+
+      <div className="mb-5 rounded-[1.5rem] bg-slate-50 p-4 ring-1 ring-slate-100">
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">Daily Goal</div>
+          <div className="text-xs font-black text-slate-700">{goalPercent}%</div>
+        </div>
+        <div className="h-3 w-full overflow-hidden rounded-full bg-white shadow-inner ring-1 ring-slate-100">
+          <div className="h-full rounded-full bg-blue-600 transition-all" style={{ width: `${goalPercent}%` }}/>
+        </div>
+        <div className={`mt-3 text-xs font-black ${remainingSeconds === 0 ? 'text-emerald-600' : 'text-slate-600'}`}>{goalMessage}</div>
       </div>
-      <div className="flex justify-between text-[10px] font-black text-slate-400 mt-2 px-1">
-        <span>{formatTime(displayMinTime)}</span>
-        <span>{formatTime(displayMaxTime)}</span>
-      </div>
+
+      {todayHistories.length === 0 ? (<div className="rounded-[1.5rem] border-2 border-dashed border-slate-200 py-8 text-center">
+        <p className="text-sm font-black text-slate-300">今日はまだ保存済みの学習記録がありません</p>
+        <p className="mt-2 text-[10px] font-bold text-slate-300">START後、FINISHで保存するとここにタスクが出ます。</p>
+      </div>) : (<>
+        <div className="relative w-full h-9 sm:h-11 bg-slate-50 rounded-full overflow-hidden flex items-center border border-slate-100 shadow-inner">
+          {todayHistories.map((h, i) => {
+              const leftPercent = Math.max(0, ((h.startedAt - displayMinTime) / totalDurationMs) * 100);
+              const widthPercent = Math.max(2, Math.min(100 - leftPercent, ((h.endedAt - h.startedAt) / totalDurationMs) * 100));
+              return (<button key={`${h.id}-${i}`} type="button" onClick={() => setSelectedHistory(h)} className={`absolute h-full opacity-85 hover:opacity-100 active:scale-y-95 transition-all rounded-md border-r border-white/30 cursor-pointer ${h.isLive ? 'animate-pulse ring-2 ring-white/60' : ''}`} style={{
+                      left: `${leftPercent}%`,
+                      width: `${widthPercent}%`,
+                      backgroundColor: h.color,
+                  }} title={`${h.subjectLabel} / ${h.taskTitle}: ${formatClockTime(h.startedAt)} ~ ${h.isLive ? '計測中' : formatClockTime(h.endedAt)}`}/>);
+          })}
+        </div>
+        <div className="flex justify-between text-[10px] font-black text-slate-400 mt-2 px-1">
+          <span>{formatClockTime(displayMinTime)}</span>
+          <span>{formatClockTime(displayMaxTime)}</span>
+        </div>
+
+        <div className="mt-5 space-y-2">
+          <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">今日やったタスク</div>
+          {taskSummaryList.map((item, i) => (<button key={`${item.taskTitle}-${i}`} type="button" onClick={() => setSelectedHistory(item)} className="w-full rounded-2xl border border-slate-100 bg-white px-4 py-3 text-left shadow-sm hover:bg-slate-50 transition">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <div className="mb-1 flex flex-wrap items-center gap-1.5">
+                  <span className="rounded-full bg-slate-50 px-2 py-0.5 text-[9px] font-black text-slate-400">{item.categoryLabel}</span>
+                  <span className="rounded-full px-2 py-0.5 text-[9px] font-black text-white" style={{ backgroundColor: item.color }}>{item.subjectLabel}</span>
+                  {item.hasLive && <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[9px] font-black text-blue-600 ring-1 ring-blue-100">LIVE</span>}
+                </div>
+                <div className="truncate text-sm font-black text-slate-800">{item.taskTitle}</div>
+                <div className="mt-1 text-[10px] font-bold text-slate-400">{item.count > 0 ? `${item.count}回保存` : '現在計測中'} ・ 最終 {formatClockTime(item.latestAt)}</div>
+              </div>
+              <div className="shrink-0 text-right font-mono text-lg font-black tracking-tighter text-blue-600">{formatDuration(item.duration)}</div>
+            </div>
+          </button>))}
+        </div>
+      </>)}
+
+      {selectedHistory && (<div className="fixed inset-0 z-[120] flex items-end justify-center bg-slate-900/50 p-0 sm:items-center sm:p-4" onClick={() => setSelectedHistory(null)}>
+        <div className="w-full max-w-md rounded-t-[2rem] bg-white p-6 shadow-2xl sm:rounded-[2rem]" onClick={(e) => e.stopPropagation()}>
+          <div className="mb-4 flex items-start justify-between gap-4">
+            <div>
+              <div className="mb-2 flex flex-wrap items-center gap-1.5">
+                <span className="rounded-full bg-slate-50 px-2.5 py-1 text-[10px] font-black text-slate-500">{selectedHistory.categoryLabel}</span>
+                <span className="rounded-full px-2.5 py-1 text-[10px] font-black text-white" style={{ backgroundColor: selectedHistory.color }}>{selectedHistory.subjectLabel}</span>
+                {selectedHistory.isLive && <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-black text-blue-600">LIVE</span>}
+              </div>
+              <h4 className="text-xl font-black leading-tight text-slate-800">{selectedHistory.taskTitle}</h4>
+            </div>
+            <button onClick={() => setSelectedHistory(null)} className="rounded-2xl bg-slate-50 p-3 text-slate-400"><X size={20}/></button>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-2xl bg-slate-50 p-4">
+              <div className="mb-1 text-[9px] font-black uppercase tracking-widest text-slate-400">時間</div>
+              <div className="text-sm font-black text-slate-700">{formatClockTime(selectedHistory.startedAt)}〜{selectedHistory.isLive ? '計測中' : formatClockTime(selectedHistory.endedAt)}</div>
+            </div>
+            <div className="rounded-2xl bg-blue-50 p-4">
+              <div className="mb-1 text-[9px] font-black uppercase tracking-widest text-blue-300">学習時間</div>
+              <div className="font-mono text-lg font-black tracking-tighter text-blue-700">{formatDuration((selectedHistory.duration || 0) + (selectedHistory.currentDuration || 0))}</div>
+            </div>
+          </div>
+          <div className="mt-3 rounded-2xl bg-slate-50 p-4">
+            <div className="mb-1 text-[9px] font-black uppercase tracking-widest text-slate-400">内容</div>
+            <div className="text-sm font-bold leading-relaxed text-slate-600">{selectedHistory.memo || '詳細なし'}</div>
+          </div>
+        </div>
+      </div>)}
     </div>);
 };
 const StrictTimer = ({ task, isAnyOtherRunning, onUpdate, onSave, onLiveUpdate }) => {
