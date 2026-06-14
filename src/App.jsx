@@ -36,9 +36,10 @@ catch (e) { }
 const FAMILY_ID = 'oomine-study-2026';
 const getTasksCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tasks');
 const getTestsCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tests');
+const APP_VERSION = 'v1.60';
 const IDLE_LIMIT_SECONDS = 5 * 60;
 const TIMER_HEARTBEAT_MS = 30 * 1000;
-const isDocumentHidden = () => typeof document !== 'undefined' && isDocumentHidden();
+const isDocumentHidden = () => typeof document !== 'undefined' && document.hidden;
 // ==========================================
 // Constants & Master Data
 // ==========================================
@@ -528,38 +529,48 @@ const ActiveTimerSummary = ({ task, onUpdate }) => {
         return null;
 
     const totalSeconds = (task.currentDuration || 0) + sessionElapsed;
+    const categoryInfo = Object.values(CATEGORIES).find(c => c.id === task.categoryId);
+    const subjectInfo = SUBJECT_DEFS[task.categoryId]?.find(s => s.id === task.subjectId);
+    const subjectLabel = subjectInfo?.label || categoryInfo?.label || '学習';
+    const startedTime = new Date(Number(task.sessionStartTime)).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
     const formatIdleTime = (sec) => {
         const m = Math.floor(sec / 60);
         const s = sec % 60;
         return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
     };
 
-    return (<div className="bg-white/90 backdrop-blur-xl rounded-[2rem] border border-blue-100 shadow-sm p-4 sm:p-5 text-left ring-1 ring-white/70">
-      <div className="flex items-center justify-between gap-3 mb-3">
-        <div className="flex items-center gap-2 min-w-0">
-          <div className="w-2.5 h-2.5 bg-blue-500 rounded-full animate-pulse shrink-0"/>
-          <div className="min-w-0">
-            <div className="text-[10px] font-black uppercase tracking-widest text-blue-400 leading-none mb-1">他端末にも同期中</div>
-            <div className="font-black text-slate-800 text-sm sm:text-base truncate leading-tight">{task.title || "Untitled"}</div>
+    return (<div className="relative overflow-hidden rounded-[2rem] sm:rounded-[2.5rem] bg-gradient-to-br from-blue-600 via-indigo-600 to-slate-950 p-5 sm:p-6 text-left text-white shadow-2xl shadow-blue-200/50 ring-1 ring-white/20">
+      <div className="absolute -right-16 -top-16 h-40 w-40 rounded-full bg-white/10 blur-2xl"/>
+      <div className="absolute -left-12 bottom-0 h-32 w-32 rounded-full bg-cyan-300/20 blur-2xl"/>
+      <div className="relative z-10 flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0">
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-blue-50 ring-1 ring-white/20">
+              <span className="h-2 w-2 rounded-full bg-emerald-300 animate-pulse"/> LIVE TIMER
+            </span>
+            <span className="rounded-full bg-white/10 px-3 py-1.5 text-[10px] font-black text-blue-50 ring-1 ring-white/15">他端末同期中</span>
+            <span className="rounded-full bg-white/10 px-3 py-1.5 text-[10px] font-black text-blue-50 ring-1 ring-white/15">{APP_VERSION}</span>
           </div>
+          <div className="text-xs font-black uppercase tracking-widest text-blue-100/80">現在計測中</div>
+          <div className="mt-1 truncate text-2xl sm:text-3xl font-black tracking-tight">{subjectLabel} / {task.title || 'Untitled'}</div>
+          <div className="mt-2 text-xs font-bold text-blue-100/80">開始 {startedTime} ・ Firestore Live Sync</div>
         </div>
-        <div className="text-[10px] font-black text-slate-400 whitespace-nowrap">Live</div>
-      </div>
 
-      <div className="grid grid-cols-3 gap-2 sm:gap-3">
-        <div className="bg-blue-50 rounded-2xl p-3 text-center border border-blue-100">
-          <div className="text-[9px] font-black text-blue-400 uppercase tracking-widest mb-1">現在</div>
-          <div className="font-mono font-black text-blue-600 text-base sm:text-xl tracking-tighter">{formatDuration(sessionElapsed)}</div>
-        </div>
-        <div className="bg-slate-50 rounded-2xl p-3 text-center border border-slate-100">
-          <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">停止まで</div>
-          <div className={`font-mono font-black text-base sm:text-xl tracking-tighter ${idleRemaining <= 30 ? 'text-rose-500 animate-pulse' : idleRemaining <= 60 ? 'text-amber-500' : 'text-slate-700'}`}>
-            {isDocumentHidden() ? '--:--' : formatIdleTime(idleRemaining)}
+        <div className="grid grid-cols-3 gap-2 sm:gap-3 lg:min-w-[420px]">
+          <div className="rounded-3xl bg-white/15 p-4 text-center ring-1 ring-white/20 backdrop-blur-xl">
+            <div className="mb-2 text-[9px] font-black uppercase tracking-widest text-blue-100/80">今回</div>
+            <div className="font-mono text-2xl sm:text-3xl font-black tracking-tighter">{formatDuration(sessionElapsed)}</div>
           </div>
-        </div>
-        <div className="bg-slate-50 rounded-2xl p-3 text-center border border-slate-100">
-          <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">累計</div>
-          <div className="font-mono font-black text-slate-800 text-base sm:text-xl tracking-tighter">{formatDuration(totalSeconds)}</div>
+          <div className="rounded-3xl bg-white/10 p-4 text-center ring-1 ring-white/15 backdrop-blur-xl">
+            <div className="mb-2 text-[9px] font-black uppercase tracking-widest text-blue-100/80">停止まで</div>
+            <div className={`font-mono text-2xl sm:text-3xl font-black tracking-tighter ${idleRemaining <= 30 && !isDocumentHidden() ? 'text-rose-200 animate-pulse' : 'text-white'}`}>
+              {isDocumentHidden() ? '--:--' : formatIdleTime(idleRemaining)}
+            </div>
+          </div>
+          <div className="rounded-3xl bg-white/10 p-4 text-center ring-1 ring-white/15 backdrop-blur-xl">
+            <div className="mb-2 text-[9px] font-black uppercase tracking-widest text-blue-100/80">累計</div>
+            <div className="font-mono text-2xl sm:text-3xl font-black tracking-tighter">{formatDuration(totalSeconds)}</div>
+          </div>
         </div>
       </div>
     </div>);
@@ -926,9 +937,16 @@ export default function App() {
         <aside className={isMobileView
             ? "hidden"
             : "hidden lg:flex flex-col fixed inset-y-0 left-0 w-72 bg-white border-r border-slate-100 p-8 z-40 text-left"}>
-          <div className="flex items-center gap-3 mb-10 text-left">
-            <div className="bg-blue-600 p-3 rounded-2xl text-white shadow-xl shadow-blue-200"><Trophy size={24}/></div>
+          <div className="flex items-center gap-3 mb-4 text-left">
+            <div className="bg-gradient-to-br from-blue-600 to-indigo-700 p-3 rounded-2xl text-white shadow-xl shadow-blue-200"><Trophy size={24}/></div>
             <h1 className="text-xl font-black tracking-tighter leading-none uppercase">Level Up<br /><span className="text-blue-600 text-md uppercase leading-none">Study JH</span></h1>
+          </div>
+          <div className="mb-8 rounded-2xl bg-slate-50 px-4 py-3 text-left ring-1 ring-slate-100">
+            <div className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">Release</div>
+            <div className="mt-1 flex items-center justify-between">
+              <span className="text-sm font-black text-slate-800">{APP_VERSION}</span>
+              <span className="rounded-full bg-blue-100 px-2 py-1 text-[9px] font-black text-blue-700">Timer Sync</span>
+            </div>
           </div>
           <nav className="flex-1 space-y-2">
             {[{ id: 'daily', label: '学習記録', icon: Zap }, { id: 'stats', label: '実績分析', icon: BarChart2 }, { id: 'tests', label: '成績推移', icon: TrendingUp }].map(item => (<button key={item.id} onClick={() => setActiveTab(item.id)} className={`w-full flex items-center gap-4 px-6 py-4 rounded-3xl font-black transition-all leading-none ${activeTab === item.id ? 'bg-blue-600 text-white shadow-2xl' : 'text-slate-400 hover:bg-slate-50'}`}>
@@ -961,6 +979,7 @@ export default function App() {
                 <Monitor size={14}/>
                 <span className="text-[9px] font-black uppercase">PC</span>
               </button>)}
+            <span className="mr-2 rounded-full bg-blue-50 px-2.5 py-1 text-[9px] font-black text-blue-700 ring-1 ring-blue-100">{APP_VERSION}</span>
             <button onClick={toggleSampleMode} className={`p-2 rounded-xl border leading-none ${isSampleMode ? 'bg-amber-100 border-amber-200 text-amber-600' : 'bg-slate-50 border-slate-100 text-slate-400'}`}>
               <FlaskConical size={18}/>
             </button>
@@ -997,7 +1016,12 @@ export default function App() {
             {activeTab === 'daily' && (<div className="space-y-8 animate-in fade-in duration-500">
             <div className="flex items-center justify-between bg-white/80 backdrop-blur-xl p-4 rounded-[2rem] shadow-sm border border-white lg:sticky lg:top-4 z-30">
               <button onClick={() => setSelectedMonth(m => m === 1 ? 12 : m - 1)} className="p-2 bg-slate-50 hover:bg-slate-100 rounded-xl transition leading-none text-left"><ChevronLeft size={20}/></button>
-              <h2 className="text-lg sm:text-2xl font-black text-slate-800 tracking-tight leading-none text-center flex-1">{selectedMonth}月の学習記録</h2>
+              <div className="flex-1 text-center">
+                <h2 className="text-lg sm:text-2xl font-black text-slate-800 tracking-tight leading-none">{selectedMonth}月の学習記録</h2>
+                <div className="mt-2 inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-[10px] font-black text-blue-700 ring-1 ring-blue-100">
+                  <span className="h-1.5 w-1.5 rounded-full bg-blue-500"/> {APP_VERSION} / Timer Sync UI
+                </div>
+              </div>
               <button onClick={() => setSelectedMonth(m => m === 12 ? 1 : m + 1)} className="p-2 bg-slate-50 hover:bg-slate-100 rounded-xl transition leading-none text-left"><ChevronRight size={20}/></button>
             </div>
 
@@ -1011,7 +1035,7 @@ export default function App() {
               <div className={`${isMobileView ? 'grid grid-cols-3 gap-2' : 'md:col-span-3 grid grid-cols-3 gap-2 sm:gap-4'} text-center`}>
                  {Object.values(CATEGORIES).map(cat => {
                 const catTotal = tasks.filter(t => t.categoryId === cat.id).reduce((sum, t) => sum + (t.history || []).filter((h) => parseInt(h.date.split('-')[1]) === selectedMonth).reduce((s, h) => s + h.duration, 0), 0);
-                return (<div key={cat.id} onClick={() => setActiveCategory(cat.id)} className={`cursor-pointer transition-all bg-white p-2 sm:p-4 rounded-[1.5rem] sm:rounded-[2rem] border-2 shadow-sm flex flex-col items-center justify-center min-h-[70px] sm:min-h-[120px] text-center leading-none ${activeCategory === cat.id ? 'border-blue-400 shadow-blue-100 scale-105 z-10' : 'border-slate-100 hover:border-blue-200'}`}>
+                return (<div key={cat.id} onClick={() => setActiveCategory(cat.id)} className={`cursor-pointer transition-all bg-white/90 backdrop-blur-xl p-2 sm:p-4 rounded-[1.5rem] sm:rounded-[2rem] border-2 shadow-sm hover:shadow-xl flex flex-col items-center justify-center min-h-[70px] sm:min-h-[120px] text-center leading-none ${activeCategory === cat.id ? 'border-blue-400 shadow-blue-100 scale-105 z-10 ring-4 ring-blue-50' : 'border-slate-100 hover:border-blue-200'}`}>
                         <cat.icon size={16} className={`sm:w-6 sm:h-6 ${cat.color}`}/>
                         <p className="text-[9px] sm:text-sm font-black text-slate-600 mt-1.5 sm:mt-3 uppercase leading-none">{cat.label}</p>
                         <p className="text-xs sm:text-lg font-black font-mono text-slate-800 mt-1 sm:mt-2 w-full text-center leading-none tracking-tighter whitespace-nowrap">{formatDuration(catTotal)}</p>
@@ -1053,20 +1077,20 @@ export default function App() {
                             <div className={`gap-3 sm:gap-4 ${isMobileView ? 'grid grid-cols-1' : 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'}`}>
                               {subjectTasks.sort((a, b) => b.lastUpdatedAt - a.lastUpdatedAt).map(task => {
                         const monthlyTime = (task.history || []).filter((h) => parseInt(h.date.split('-')[1]) === selectedMonth).reduce((acc, h) => acc + h.duration, 0);
-                        return (<div key={task.id} onClick={() => setSelectedTaskId(task.id)} className="bg-white p-4 sm:p-6 rounded-[1.5rem] sm:rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-xl transition-all cursor-pointer relative overflow-hidden text-left group">
+                        return (<div key={task.id} onClick={() => setSelectedTaskId(task.id)} className={`p-4 sm:p-6 rounded-[1.5rem] sm:rounded-[2rem] border shadow-sm hover:shadow-xl transition-all cursor-pointer relative overflow-hidden text-left group ${task.isRunning ? 'bg-gradient-to-br from-blue-600 to-indigo-800 text-white border-blue-400 shadow-blue-200' : 'bg-white border-slate-100'}`}>
                                     <div className="flex justify-between items-start mb-2 sm:mb-3 text-left">
                                       <div className="flex items-center gap-1.5 sm:gap-2 leading-none text-left">
                                         <span className={`text-[8px] sm:text-[9px] font-black px-2 py-0.5 rounded-full leading-none ${CATEGORIES[task.categoryId.toUpperCase()].bg} ${CATEGORIES[task.categoryId.toUpperCase()].color}`}>{task.type === 'homework' ? '宿題' : '自習'}</span>
                                       </div>
-                                      {task.isRunning && <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 bg-blue-500 rounded-full animate-ping"/>}
+                                      {task.isRunning && <div className="rounded-full bg-white/15 px-2 py-1 text-[8px] font-black text-white ring-1 ring-white/20">LIVE</div>}
                                     </div>
-                                    <div className="text-[9px] sm:text-[10px] font-bold text-slate-400 mb-2 sm:mb-3">
+                                    <div className={`text-[9px] sm:text-[10px] font-bold mb-2 sm:mb-3 ${task.isRunning ? 'text-blue-100/80' : 'text-slate-400'}`}>
                                        {new Date(task.lastUpdatedAt).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })} 更新
                                     </div>
-                                    <h4 className="font-black text-slate-800 text-base sm:text-lg mb-3 sm:mb-4 truncate leading-tight text-left">{task.title || "Untitled"}</h4>
-                                    <div className="flex justify-between items-end border-t border-slate-50 pt-3 sm:pt-4 leading-none text-left">
-                                       <div className="text-[9px] sm:text-[10px] font-black text-slate-300 flex items-center gap-1 uppercase leading-none text-left"><History size={12}/> {task.history?.length || 0}回</div>
-                                       <p className="text-lg sm:text-xl font-black font-mono text-blue-600 tracking-tighter leading-none text-left">{formatDuration(monthlyTime)}</p>
+                                    <h4 className={`font-black text-base sm:text-lg mb-3 sm:mb-4 truncate leading-tight text-left ${task.isRunning ? 'text-white' : 'text-slate-800'}`}>{task.title || "Untitled"}</h4>
+                                    <div className={`flex justify-between items-end border-t pt-3 sm:pt-4 leading-none text-left ${task.isRunning ? 'border-white/15' : 'border-slate-50'}`}>
+                                       <div className={`text-[9px] sm:text-[10px] font-black flex items-center gap-1 uppercase leading-none text-left ${task.isRunning ? 'text-blue-100/80' : 'text-slate-300'}`}><History size={12}/> {task.history?.length || 0}回</div>
+                                       <p className={`text-lg sm:text-xl font-black font-mono tracking-tighter leading-none text-left ${task.isRunning ? 'text-white' : 'text-blue-600'}`}>{formatDuration(monthlyTime)}</p>
                                     </div>
                                   </div>);
                     })}
