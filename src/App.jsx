@@ -36,7 +36,7 @@ catch (e) { }
 const FAMILY_ID = 'oomine-study-2026';
 const getTasksCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tasks');
 const getTestsCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tests');
-const APP_VERSION = 'v1.63';
+const APP_VERSION = 'v1.64';
 const IDLE_LIMIT_SECONDS = 5 * 60;
 const TIMER_HEARTBEAT_MS = 30 * 1000;
 const DAILY_TARGET_SECONDS = 2 * 60 * 60;
@@ -90,6 +90,14 @@ const getTodayStr = () => {
     const d = new Date();
     return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')}`;
 };
+const getDateStrFromTimestamp = (timestamp) => {
+    if (!timestamp)
+        return null;
+    const d = new Date(timestamp);
+    if (Number.isNaN(d.getTime()))
+        return null;
+    return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')}`;
+};
 const getHistoryMonth = (historyItem) => {
     if (!historyItem?.date)
         return null;
@@ -120,8 +128,8 @@ const shouldShowTaskInMonth = (task, selectedMonth) => {
     if (hasAnyHistory)
         return false;
     if (!task.createdAt)
-        return true;
-    return new Date(task.createdAt).getMonth() + 1 === selectedMonth;
+        return false;
+    return getDateStrFromTimestamp(task.createdAt) === getTodayStr() && new Date(task.createdAt).getMonth() + 1 === selectedMonth;
 };
 const formatRecordDate = (timestamp) => {
     if (!timestamp)
@@ -803,6 +811,31 @@ export default function App() {
     const [liveTimerInfo, setLiveTimerInfo] = useState(null);
     const isAnyTaskRunning = useMemo(() => tasks.some(t => t.isRunning), [tasks]);
     const runningTask = useMemo(() => tasks.find(t => t.isRunning) || null, [tasks]);
+    const todayTaskSummaries = useMemo(() => {
+        const todayStr = getTodayStr();
+        return tasks.flatMap(task => {
+            const meta = getTaskMeta(task);
+            const todayHistories = (task.history || []).filter(h => h.date === todayStr);
+            const totalDuration = todayHistories.reduce((sum, h) => sum + (h.duration || 0), 0);
+            const latestTimestamp = todayHistories.length > 0
+                ? Math.max(...todayHistories.map(h => h.endedAt || h.startedAt || 0))
+                : 0;
+            if (todayHistories.length === 0 && !task.isRunning)
+                return [];
+            return [{
+                    task,
+                    ...meta,
+                    count: todayHistories.length,
+                    totalDuration,
+                    latestTimestamp,
+                    isRunning: task.isRunning
+                }];
+        }).sort((a, b) => {
+            if (a.isRunning !== b.isRunning)
+                return a.isRunning ? -1 : 1;
+            return (b.latestTimestamp || 0) - (a.latestTimestamp || 0);
+        });
+    }, [tasks]);
     // カテゴリが変更されたら、対象カテゴリの先頭の教科を初期選択する
     useEffect(() => {
         const subjects = SUBJECT_DEFS[activeCategory] || [];
@@ -1247,6 +1280,33 @@ export default function App() {
             </div>
 
             <div className="space-y-6 text-center">
+              <div className="bg-white p-5 sm:p-6 rounded-[2rem] border border-slate-100 shadow-sm text-left">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between mb-4">
+                  <div>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Today Done</p>
+                    <h3 className="text-lg sm:text-xl font-black text-slate-800 tracking-tight">今日やった作業</h3>
+                  </div>
+                  <div className="text-xs font-black text-blue-600">
+                    {formatDuration(todayTaskSummaries.reduce((sum, item) => sum + item.totalDuration, 0))}
+                  </div>
+                </div>
+                {todayTaskSummaries.length === 0 ? (<div className="rounded-2xl border-2 border-dashed border-slate-100 py-8 text-center">
+                    <p className="text-xs font-black text-slate-300">今日はまだ記録がありません</p>
+                  </div>) : (<div className={`grid gap-3 ${isMobileView ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'}`}>
+                    {todayTaskSummaries.map(item => (<button key={item.task.id} onClick={() => setSelectedTaskId(item.task.id)} className={`rounded-2xl border p-4 text-left transition active:scale-95 ${item.isRunning ? 'border-blue-200 bg-blue-50 shadow-blue-100' : 'border-slate-100 bg-slate-50 hover:bg-white hover:shadow-md'}`}>
+                        <div className="mb-3 flex items-center justify-between gap-2">
+                          <span className="rounded-full px-2.5 py-1 text-[9px] font-black text-white" style={{ backgroundColor: item.color }}>{item.subjectLabel}</span>
+                          <span className={`text-[9px] font-black ${item.isRunning ? 'text-blue-600' : 'text-slate-400'}`}>{item.isRunning ? '計測中' : `${item.count}回`}</span>
+                        </div>
+                        <div className="truncate text-sm font-black text-slate-800">{item.task.title || 'Untitled'}</div>
+                        <div className="mt-3 flex items-center justify-between border-t border-white pt-3">
+                          <span className="text-[10px] font-bold text-slate-400">{item.typeLabel}</span>
+                          <span className="font-mono text-base font-black text-blue-600">{formatDuration(item.totalDuration)}</span>
+                        </div>
+                      </button>))}
+                  </div>)}
+              </div>
+
               {/* 当日のタイムライン */}
               <TodayTimeline tasks={tasks}/>
 
