@@ -36,7 +36,7 @@ catch (e) { }
 const FAMILY_ID = 'oomine-study-2026';
 const getTasksCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tasks');
 const getTestsCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tests');
-const APP_VERSION = 'v1.62';
+const APP_VERSION = 'v1.63';
 const IDLE_LIMIT_SECONDS = 5 * 60;
 const TIMER_HEARTBEAT_MS = 30 * 1000;
 const DAILY_TARGET_SECONDS = 2 * 60 * 60;
@@ -110,6 +110,18 @@ const getLatestMonthlyTimestamp = (task, selectedMonth) => {
     if (histories.length === 0)
         return 0;
     return Math.max(...histories.map((h) => h.endedAt || h.startedAt || new Date(h.date).getTime() || 0));
+};
+const shouldShowTaskInMonth = (task, selectedMonth) => {
+    if (task.isRunning)
+        return true;
+    if (getMonthlyHistories(task, selectedMonth).length > 0)
+        return true;
+    const hasAnyHistory = (task.history || []).length > 0;
+    if (hasAnyHistory)
+        return false;
+    if (!task.createdAt)
+        return true;
+    return new Date(task.createdAt).getMonth() + 1 === selectedMonth;
 };
 const formatRecordDate = (timestamp) => {
     if (!timestamp)
@@ -930,7 +942,7 @@ export default function App() {
             type: fd.get('type'),
             title: fd.get('detail'),
             history: [], currentDuration: 0, isRunning: false, sessionStartTime: null,
-            lastUpdatedAt: Date.now()
+            createdAt: Date.now(), lastUpdatedAt: Date.now()
         };
         if (isSampleMode) {
             setTasks(prev => [{ id: `s-${Date.now()}`, ...newTask }, ...prev]);
@@ -1253,10 +1265,10 @@ export default function App() {
                   </div>
 
                   <div className="space-y-8 pb-10 text-left">
-                    {tasks.filter(t => t.categoryId === activeCategory && (t.isRunning || getMonthlyHistories(t, selectedMonth).length > 0)).length === 0 ? (<div className="py-16 text-center border-2 border-dashed border-slate-200 rounded-3xl">
+                    {tasks.filter(t => t.categoryId === activeCategory && shouldShowTaskInMonth(t, selectedMonth)).length === 0 ? (<div className="py-16 text-center border-2 border-dashed border-slate-200 rounded-3xl">
                         <p className="text-slate-300 font-black text-sm uppercase">記録が見つかりません</p>
                       </div>) : (SUBJECT_DEFS[activeCategory]?.map(subject => {
-                const subjectTasks = tasks.filter(t => t.categoryId === activeCategory && t.subjectId === subject.id && (t.isRunning || getMonthlyHistories(t, selectedMonth).length > 0));
+                const subjectTasks = tasks.filter(t => t.categoryId === activeCategory && t.subjectId === subject.id && shouldShowTaskInMonth(t, selectedMonth));
                 if (subjectTasks.length === 0)
                     return null;
                 return (<div key={subject.id} className="space-y-4">
