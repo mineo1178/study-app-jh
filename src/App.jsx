@@ -1,4177 +1,1687 @@
-import React, {
-  useState,
-  useEffect,
-  useMemo,
-  useRef,
-  useCallback,
-} from "react";
-import {
-  Clock,
-  Play,
-  Pause,
-  Plus,
-  Trash2,
-  CheckCircle,
-  Circle,
-  Edit2,
-  ChevronDown,
-  Award,
-  X,
-  Zap,
-  Layers,
-  History,
-  LayoutDashboard,
-  TrendingUp,
-  Calendar as CalendarIcon,
-  PieChart as PieChartIcon,
-  BarChart2,
-  AlertTriangle,
-  RefreshCw,
-  CloudOff,
-  Cloud,
-  FileText,
-  FlaskConical,
-  LogIn,
-  LogOut,
-} from "lucide-react";
-import {
-  LineChart,
-  Line,
-  BarChart,
-  Bar,
-  PieChart,
-  Pie,
-  Cell,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  ReferenceLine,
-} from "recharts";
-import { initializeApp } from "firebase/app";
-import {
-  getAuth,
-  signInWithEmailAndPassword,
-  onAuthStateChanged,
-  signOut,
-} from "firebase/auth";
-import {
-  getFirestore,
-  collection,
-  doc,
-  setDoc,
-  getDocs,
-  updateDoc,
-  deleteDoc,
-  serverTimestamp,
-  writeBatch,
-  query,
-} from "firebase/firestore";
-
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { Play, Pause, Trash2, X, Zap, History, TrendingUp, Calendar as CalendarIcon, PieChart as PieChartIcon, BarChart2, RefreshCw, FlaskConical, LogOut, ChevronRight, BookOpen, GraduationCap, Laptop, Trophy, Save, ChevronLeft, Search, PlusCircle, Edit3, Eye, EyeOff, CheckSquare, Square, ListFilter, Award, Smartphone, Monitor, Clock } from 'lucide-react';
+import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { initializeApp } from 'firebase/app';
+import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from 'firebase/auth';
+import { getFirestore, collection, doc, getDocs, updateDoc, deleteDoc, enableIndexedDbPersistence, addDoc, setDoc, onSnapshot } from 'firebase/firestore';
 // ==========================================
-// Firebase Initialization (Vite + Vercel)
+// Firebase Initialization (Vite/Vercel Dedicated)
 // ==========================================
-
-const getEnv = (key) => {
-  try {
-    return import.meta.env?.[key];
-  } catch {
-    return undefined;
-  }
-};
-
-const firebaseConfig = {
-  apiKey: getEnv("VITE_FIREBASE_API_KEY"),
-  authDomain: getEnv("VITE_FIREBASE_AUTH_DOMAIN"),
-  projectId: getEnv("VITE_FIREBASE_PROJECT_ID"),
-  storageBucket: getEnv("VITE_FIREBASE_STORAGE_BUCKET"),
-  messagingSenderId: getEnv("VITE_FIREBASE_MESSAGING_SENDER_ID"),
-  appId: getEnv("VITE_FIREBASE_APP_ID"),
-};
-
-const hasFirebaseConfig =
-  !!firebaseConfig.apiKey &&
-  !!firebaseConfig.authDomain &&
-  !!firebaseConfig.projectId &&
-  !!firebaseConfig.appId;
-
-let app = null;
-let auth = null;
-let db = null;
-
-if (hasFirebaseConfig) {
-  try {
-    app = initializeApp(firebaseConfig);
-    auth = getAuth(app);
-    db = getFirestore(app);
-  } catch (e) {
-    console.error("Firebase init error", e);
-  }
+let env = {};
+try {
+    // @ts-ignore
+    env = import.meta.env || {};
 }
-
-// ==========================================
-// 1. Type Definitions & Constants
-// ==========================================
-
-const FAMILY_ID = "oomine-study-2026";
-const APP_VERSION = "v1.63";
-
-// Firestore Path 固定（変更禁止）
-// 実DB構造:
-// families/oomine-study-2026/tasks
-// families/oomine-study-2026/tests
-const FIRESTORE_ROOT = ["families", FAMILY_ID];
-
-// Safe DB Wrapper
-const getSafeDb = () => {
-  if (!db) {
-    console.warn("Firestore not initialized");
-    return null;
-  }
-  return db;
+catch (e) {
+    console.warn("Preview environment detected: Using dummy Firebase config.");
+}
+const firebaseConfig = {
+    apiKey: env.VITE_FIREBASE_API_KEY || "dummy-api-key",
+    authDomain: env.VITE_FIREBASE_AUTH_DOMAIN || "dummy.firebaseapp.com",
+    projectId: env.VITE_FIREBASE_PROJECT_ID || "dummy-project",
+    storageBucket: env.VITE_FIREBASE_STORAGE_BUCKET || "dummy.appspot.com",
+    messagingSenderId: env.VITE_FIREBASE_MESSAGING_SENDER_ID || "000000000000",
+    appId: env.VITE_FIREBASE_APP_ID || "1:000000000000:web:dummy",
 };
-
-// Firestore Path Helpers
-const getTasksCol = (database) =>
-  collection(database, ...FIRESTORE_ROOT, "tasks");
-
-const getTestsCol = (database) =>
-  collection(database, ...FIRESTORE_ROOT, "tests");
-
-const getTaskDoc = (database, id) =>
-  doc(database, ...FIRESTORE_ROOT, "tasks", id);
-
-const getTestDoc = (database, id) =>
-  doc(database, ...FIRESTORE_ROOT, "tests", id);
-
-// Cache Keys
-const CACHE_KEY_TASKS = `study-app-v5-${FAMILY_ID}-tasks`;
-const CACHE_KEY_TESTS = `study-app-v5-${FAMILY_ID}-tests`;
-const CACHE_KEY_PENDING_TASK_UPDATES = `study-app-v5-${FAMILY_ID}-pending-task-updates`;
-const IDLE_LIMIT_MS = 5 * 60 * 1000;
-const WAKE_GRACE_MS = 5 * 1000;
-
-const SUBJECT_CONFIG = {
-  math: {
-    id: "math",
-    label: "算数",
-    short: "算",
-    color: "text-blue-600",
-    bg: "bg-blue-500",
-    lightBg: "bg-blue-50",
-    border: "border-blue-200",
-    hex: "#2563eb",
-  },
-  japanese: {
-    id: "japanese",
-    label: "国語",
-    short: "国",
-    color: "text-rose-600",
-    bg: "bg-rose-500",
-    lightBg: "bg-rose-50",
-    border: "border-rose-200",
-    hex: "#e11d48",
-  },
-  science: {
-    id: "science",
-    label: "理科",
-    short: "理",
-    color: "text-amber-600",
-    bg: "bg-amber-500",
-    lightBg: "bg-amber-50",
-    border: "border-amber-200",
-    hex: "#d97706",
-  },
-  social: {
-    id: "social",
-    label: "社会",
-    short: "社",
-    color: "text-emerald-600",
-    bg: "bg-emerald-500",
-    lightBg: "bg-emerald-50",
-    border: "border-emerald-200",
-    hex: "#059669",
-  },
-};
-
-const TEST_TYPE_CONFIG = {
-  kumiwake: {
-    label: "組分け",
-    color: "text-purple-700",
-    activeClass: "bg-purple-600 text-white border-purple-600",
-  },
-  curriculum: {
-    label: "カリテ",
-    color: "text-slate-700",
-    activeClass: "bg-slate-600 text-white border-slate-600",
-  },
-  hantei: {
-    label: "判定",
-    color: "text-orange-700",
-    activeClass: "bg-orange-600 text-white border-orange-600",
-  },
-};
-
-const CURRICULUM_PRESETS = {
-  math: [
-    { category: "予習シリーズ", items: ["類題", "基本問題", "練習問題"] },
-    {
-      category: "演習問題集",
-      items: ["基本問題", "練習問題", "トレーニング", "実戦演習"],
-    },
-    { category: "計算", items: ["①", "②", "③", "④", "⑤", "⑥", "⑦"] },
-    {
-      category: "プリント",
-      items: [
-        "確認テストB",
-        "確認テストS",
-        "確認テストA",
-        "計算テストS",
-        "計算テストA",
-      ],
-    },
-  ],
-  japanese: [
-    { category: "予習シリーズ", items: ["基本問題", "発展問題", "言語知識"] },
-    { category: "漢字とことば", items: ["漢字練習", "漢字確認"] },
-    { category: "演習問題集", items: ["演習問題集"] },
-    { category: "練成問題", items: ["言語知識", "文章問題"] },
-  ],
-  science: [
-    { category: "予習シリーズ", items: ["要点チェック"] },
-    {
-      category: "演習問題集",
-      items: ["まとめてみよう", "基本問題", "練習問題", "発展問題"],
-    },
-    {
-      category: "プリント",
-      items: ["確認テストB", "確認テストS", "確認テストA"],
-    },
-    { category: "練成問題", items: ["トレーニング", "基本問題", "練習問題"] },
-  ],
-  social: [
-    { category: "予習シリーズ", items: ["要点チェック"] },
-    {
-      category: "演習問題集",
-      items: ["まとめてみよう", "練習問題", "発展問題"],
-    },
-    {
-      category: "プリント",
-      items: ["確認テストB", "確認テストS", "確認テストA"],
-    },
-    { category: "練成問題", items: ["トレーニング", "基本問題", "練習問題"] },
-  ],
-};
-
-const formatTime = (seconds) => {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = Math.floor(seconds % 60);
-  if (h > 0) return `${h}h${m}m`;
-  return `${m}m${s}s`;
-};
-
-const formatDateInput = (date) => {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-};
-
-const getDefaultTestDateRange = () => {
-  const end = new Date();
-  const start = new Date(end);
-  start.setMonth(start.getMonth() - 6);
-  return {
-    start: formatDateInput(start),
-    end: formatDateInput(end),
-  };
-};
-
-const parseTestDate = (date) => {
-  const [y, m, d] = date.replace(/-/g, "/").split("/").map(Number);
-  return new Date(y, (m || 1) - 1, d || 1);
-};
-
-// ==========================================
-// Local Storage Cache Helpers
-// ==========================================
-const getCache = (key) => {
-  try {
-    const d = localStorage.getItem(key);
-    return d ? JSON.parse(d) : null;
-  } catch {
-    return null;
-  }
-};
-const setCache = (key, val) => {
-  try {
-    localStorage.setItem(key, JSON.stringify(val));
-  } catch {}
-};
-
-const toMillis = (value) => {
-  if (!value) return 0;
-  if (typeof value === "number") return value;
-  if (value instanceof Date) return value.getTime();
-  if (typeof value.toMillis === "function") return value.toMillis();
-  if (typeof value.seconds === "number") {
-    return value.seconds * 1000 + Math.floor((value.nanoseconds || 0) / 1000000);
-  }
-  return 0;
-};
-
-const normalizeTask = (task) => ({
-  ...task,
-  currentDuration: Number(task.currentDuration || 0),
-  sessionStartTime: task.sessionStartTime ? toMillis(task.sessionStartTime) : null,
-  lastActivityAt: task.lastActivityAt ? toMillis(task.lastActivityAt) : undefined,
-  lastUpdatedAt: toMillis(task.lastUpdatedAt) || Date.now(),
-  history: Array.isArray(task.history)
-    ? task.history.map((h) => ({
-        ...h,
-        startAt: h.startAt ? toMillis(h.startAt) : undefined,
-        endAt: h.endAt ? toMillis(h.endAt) : undefined,
-      }))
-    : [],
-});
-
-const mergeTasksFromCloud = (localTasks, cloudTasks) => {
-  const localById = new Map(localTasks.map((t) => [t.id, normalizeTask(t)]));
-  const cloudById = new Map(cloudTasks.map((t) => [t.id, normalizeTask(t)]));
-  const merged = [];
-
-  cloudById.forEach((cloudTask, id) => {
-    const localTask = localById.get(id);
-    if (!localTask) {
-      merged.push(cloudTask);
-      return;
-    }
-
-    const localUpdated = toMillis(localTask.lastUpdatedAt);
-    const cloudUpdated = toMillis(cloudTask.lastUpdatedAt);
-    const localHasRunningState =
-      localTask.isRunning &&
-      !!localTask.sessionStartTime &&
-      (!cloudTask.isRunning ||
-        cloudTask.sessionStartTime !== localTask.sessionStartTime);
-    const shouldKeepLocal =
-      !!localTask.pendingSync ||
-      localUpdated > cloudUpdated ||
-      (localHasRunningState && localUpdated >= cloudUpdated - 30000);
-
-    merged.push(shouldKeepLocal ? localTask : cloudTask);
-  });
-
-  localById.forEach((localTask, id) => {
-    if (!cloudById.has(id) && localTask.pendingSync) {
-      merged.push(localTask);
-    }
-  });
-
-  return merged.sort((a, b) => toMillis(b.lastUpdatedAt) - toMillis(a.lastUpdatedAt));
-};
-
-const getPendingTaskUpdates = () =>
-  getCache(CACHE_KEY_PENDING_TASK_UPDATES) || {};
-
-const queuePendingTaskUpdate = (id, updates) => {
-  const pending = getPendingTaskUpdates();
-  pending[id] = { ...(pending[id] || {}), ...updates };
-  setCache(CACHE_KEY_PENDING_TASK_UPDATES, pending);
-};
-
-const clearPendingTaskUpdate = (id) => {
-  const pending = getPendingTaskUpdates();
-  delete pending[id];
-  setCache(CACHE_KEY_PENDING_TASK_UPDATES, pending);
-};
-
-// ==========================================
-// Helper: Generate Dummy Data
-// ==========================================
-const generateDummyTasks = () => {
-  const tasks = [];
-  const subjects = ["math", "japanese", "science", "social"];
-  const today = new Date();
-
-  [14, 13].forEach((unitNum) => {
-    const unit = `第${unitNum}回`;
-    subjects.forEach((subj) => {
-      const presets = CURRICULUM_PRESETS[subj];
-      presets.forEach((cat) => {
-        cat.items.forEach((item, idx) => {
-          const hasHistory = Math.random() > 0.3;
-          const history = [];
-
-          if (hasHistory) {
-            const entries = Math.floor(Math.random() * 3) + 1;
-            for (let i = 0; i < entries; i++) {
-              const daysAgo = Math.floor(Math.random() * 30);
-              const date = new Date(today);
-              date.setDate(today.getDate() - daysAgo);
-              const duration = (Math.floor(Math.random() * 40) + 10) * 60;
-              const startAt = new Date(date).setHours(
-                8 + Math.floor(Math.random() * 10),
-                Math.floor(Math.random() * 4) * 15,
-                0,
-                0,
-              );
-              const endAt = startAt + duration * 1000;
-              history.push({
-                id: Math.random().toString(36).substr(2, 9),
-                date: `${date.getMonth() + 1}/${date.getDate()}`,
-                duration,
-                memo: Math.random() > 0.7 ? "難しかった" : "",
-                startAt,
-                endAt,
-              });
-            }
-            history.sort((a, b) => {
-              const [ma, da] = a.date.split("/").map(Number);
-              const [mb, db] = b.date.split("/").map(Number);
-              return ma * 31 + da - (mb * 31 + db);
-            });
-          }
-
-          tasks.push({
-            id: `${unitNum}-${subj}-${idx}-${Math.random().toString(36).substr(2, 5)}`,
-            unit,
-            subject: subj,
-            category: cat.category,
-            title: item,
-            materialName: `${cat.category} - ${item}`,
-            status: hasHistory
-              ? Math.random() > 0.5
-                ? "completed"
-                : "in_progress"
-              : "not_started",
-            currentDuration: 0,
-            sessionStartTime: null,
-            isRunning: false,
-            lastUpdatedAt: Date.now(),
-            currentMemo: "",
-            history,
-            createdAt: `${today.getMonth() + 1}/${today.getDate()}`,
-          });
-        });
-      });
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+try {
+    enableIndexedDbPersistence(db).catch((err) => {
+        if (err.code !== 'failed-precondition')
+            console.warn("Offline persistence disabled");
     });
-  });
-  return tasks;
+}
+catch (e) { }
+const FAMILY_ID = 'oomine-study-2026';
+const getTasksCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tasks');
+const getTestsCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tests');
+const APP_VERSION = 'v1.64';
+const IDLE_LIMIT_SECONDS = 5 * 60;
+const TIMER_HEARTBEAT_MS = 30 * 1000;
+const DAILY_TARGET_SECONDS = 2 * 60 * 60;
+const isDocumentHidden = () => typeof document !== 'undefined' && document.hidden;
+// ==========================================
+// Constants & Master Data
+// ==========================================
+const CATEGORIES = {
+    SCHOOL: { id: 'school', label: '中学校', icon: GraduationCap, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100', hex: '#3b82f6' },
+    JUKU: { id: 'juku', label: '塾', icon: BookOpen, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100', hex: '#10b981' },
+    ETC: { id: 'etc', label: 'その他', icon: Laptop, color: 'text-purple-600', bg: 'bg-purple-50', border: 'border-purple-100', hex: '#a855f7' }
 };
-
-const INITIAL_TASKS = generateDummyTasks();
-
-const INITIAL_TESTS = [
-  {
-    id: "t20261109",
-    date: "2026/11/09",
-    name: "5年公開組分-07",
-    type: "kumiwake",
-    subjects: {
-      math: { score: 90, avg: 97.1, dev: 48.1, rank: "6082/10342" },
-      japanese: { score: 75, avg: 69.4, dev: 52.3, rank: "4080/10342" },
-      science: { score: 70, avg: 62.9, dev: 53.8, rank: "3805/10069" },
-      social: { score: 87, avg: 60.7, dev: 61.4, rank: "1279/10001" },
-    },
-    total4: { score: 322, avg: 290.7, dev: 53.4, rank: "3844/10001" },
-  },
-  {
-    id: "t20261005",
-    date: "2026/10/05",
-    name: "5年公開組分-06",
-    type: "kumiwake",
-    subjects: {
-      math: { score: 72, avg: 90.9, dev: 44.6, rank: "7317/10413" },
-      japanese: { score: 98, avg: 85.8, dev: 54.8, rank: "3473/10413" },
-      science: { score: 76, avg: 77.8, dev: 48.9, rank: "6301/10152" },
-      social: { score: 81, avg: 66.8, dev: 55.9, rank: "3457/10075" },
-    },
-    total4: { score: 327, avg: 322.1, dev: 50.5, rank: "5210/10075" },
-  },
-];
-
+const SUBJECT_DEFS = {
+    school: [
+        { id: 's_math', label: '数学', hex: '#3b82f6', isMajor: true },
+        { id: 's_japanese', label: '国語', hex: '#f43f5e', isMajor: true },
+        { id: 's_social', label: '社会', hex: '#10b981', isMajor: true },
+        { id: 's_science', label: '理科', hex: '#f59e0b', isMajor: true },
+        { id: 's_english', label: '英語', hex: '#8b5cf6', isMajor: true },
+        { id: 's_pe', label: '体育', hex: '#fb923c', isMajor: false },
+        { id: 's_tech', label: '技術', hex: '#64748b', isMajor: false },
+        { id: 's_music', label: '音楽', hex: '#ec4899', isMajor: false },
+        { id: 's_home', label: '家庭科', hex: '#06b6d4', isMajor: false }
+    ],
+    juku: [
+        { id: 'j_math', label: '数学', hex: '#2563eb' },
+        { id: 'j_japanese', label: '国語', hex: '#e11d48' },
+        { id: 'j_science', label: '理科', hex: '#d97706' },
+        { id: 'j_social', label: '社会', hex: '#059669' },
+        { id: 'j_english', label: '英語', hex: '#7c3aed' }
+    ],
+    etc: [
+        { id: 'e_news', label: '新聞', hex: '#475569' },
+        { id: 'e_manga', label: '歴史マンガ', hex: '#ea580c' },
+        { id: 'e_duolingo', label: 'Duolingo', hex: '#84cc16' },
+        { id: 'e_programming', label: 'プログラミング', hex: '#0ea5e9' }
+    ]
+};
 // ==========================================
-// Strict Anti-Cheat Timer Component
+// Helper Functions
 // ==========================================
-const StrictTimer = React.memo(
-  ({
-    task,
-    updateLocalTask,
-    syncTaskToCloud,
-    onSaveRecord,
-    pauseAllOtherTasks,
-  }) => {
-    const [localSeconds, setLocalSeconds] = useState(task.currentDuration);
-    const [showAutoPauseAlert, setShowAutoPauseAlert] = useState(false);
-    const timerRef = useRef(null);
+const formatDuration = (seconds) => {
+    if (!seconds || seconds < 0)
+        return "0分";
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    return h > 0 ? `${h}h ${m}m` : `${m}m ${s}s`;
+};
+const getTodayStr = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')}`;
+};
+const getDateStrFromTimestamp = (timestamp) => {
+    if (!timestamp)
+        return null;
+    const d = new Date(timestamp);
+    if (Number.isNaN(d.getTime()))
+        return null;
+    return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')}`;
+};
+const getHistoryMonth = (historyItem) => {
+    if (!historyItem?.date)
+        return null;
+    const parsed = new Date(historyItem.date);
+    if (!Number.isNaN(parsed.getTime()))
+        return parsed.getMonth() + 1;
+    const parts = String(historyItem.date).split('-');
+    return Number(parts[1]) || null;
+};
+const getMonthlyHistories = (task, selectedMonth) => {
+    return (task.history || []).filter((h) => getHistoryMonth(h) === selectedMonth);
+};
+const getMonthlyDuration = (task, selectedMonth) => {
+    return getMonthlyHistories(task, selectedMonth).reduce((sum, h) => sum + (h.duration || 0), 0);
+};
+const getLatestMonthlyTimestamp = (task, selectedMonth) => {
+    const histories = getMonthlyHistories(task, selectedMonth);
+    if (histories.length === 0)
+        return 0;
+    return Math.max(...histories.map((h) => h.endedAt || h.startedAt || new Date(h.date).getTime() || 0));
+};
+const shouldShowTaskInMonth = (task, selectedMonth) => {
+    if (task.isRunning)
+        return true;
+    if (getMonthlyHistories(task, selectedMonth).length > 0)
+        return true;
+    const hasAnyHistory = (task.history || []).length > 0;
+    if (hasAnyHistory)
+        return false;
+    if (!task.createdAt)
+        return false;
+    return getDateStrFromTimestamp(task.createdAt) === getTodayStr() && new Date(task.createdAt).getMonth() + 1 === selectedMonth;
+};
+const formatRecordDate = (timestamp) => {
+    if (!timestamp)
+        return '今月の記録なし';
+    return new Date(timestamp).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+};
+const formatClockTime = (ms) => {
+    if (!ms)
+        return '--:--';
+    const d = new Date(ms);
+    return `${d.getHours()}:${d.getMinutes().toString().padStart(2, '0')}`;
+};
+const getTaskMeta = (task) => {
+    const categoryInfo = Object.values(CATEGORIES).find(c => c.id === task?.categoryId);
+    const subjectInfo = SUBJECT_DEFS[task?.categoryId]?.find(s => s.id === task?.subjectId);
+    return {
+        categoryLabel: categoryInfo?.label || '学習',
+        subjectLabel: subjectInfo?.label || categoryInfo?.label || '学習',
+        color: subjectInfo?.hex || categoryInfo?.hex || '#94a3b8',
+        typeLabel: task?.type === 'homework' ? '宿題' : '自習'
+    };
+};
+const generateSampleData = () => {
+    const tasks = [];
+    const tests = [];
+    const now = new Date();
+    const startDate = new Date(2026, 0, 1);
+    const baseTasks = [
+        { catId: 'school', subId: 's_math', type: 'homework', title: '数学ワーク' },
+        { catId: 'school', subId: 's_english', type: 'homework', title: '英語ワーク' },
+        { catId: 'school', subId: 's_japanese', type: 'self', title: '漢字ドリル' },
+        { catId: 'juku', subId: 'j_math', type: 'homework', title: '塾演習' },
+        { catId: 'etc', subId: 'e_duolingo', type: 'self', title: 'Duolingo' },
+        { catId: 'etc', subId: 'e_programming', type: 'self', title: 'プログラミング' },
+        { catId: 'school', subId: 's_social', type: 'self', title: '歴史まとめ' }
+    ];
+    baseTasks.forEach((base, idx) => {
+        const history = [];
+        let loopDate = new Date(startDate);
+        while (loopDate <= now) {
+            if (Math.random() > 0.3) {
+                const dStr = `${loopDate.getFullYear()}-${(loopDate.getMonth() + 1).toString().padStart(2, '0')}-${loopDate.getDate().toString().padStart(2, '0')}`;
+                const duration = (Math.floor(Math.random() * 60) + 15) * 60;
+                const dummyStart = loopDate.getTime() + 1000 * 60 * 60 * 15; // ダミー:15時
+                history.push({
+                    id: `h-${dStr}-${idx}`,
+                    date: dStr,
+                    duration: duration,
+                    memo: "演習と復習",
+                    startedAt: dummyStart,
+                    endedAt: dummyStart + (duration * 1000)
+                });
+            }
+            loopDate.setDate(loopDate.getDate() + 1);
+        }
+        const lastUpdate = new Date(now.getTime() - Math.random() * 100000000).getTime();
+        tasks.push({
+            id: `sample-${idx}`, categoryId: base.catId, subjectId: base.subId, type: base.type, title: base.title,
+            history, currentDuration: 0, isRunning: false, sessionStartTime: null, lastUpdatedAt: lastUpdate
+        });
+    });
+    const testNames = ["1月実力", "3学期末", "3月模試", "4月診断", "1学期中間"];
+    const dates = ["2026-01-15", "2026-02-22", "2026-03-12", "2026-04-05", "2026-05-10"];
+    dates.forEach((date, i) => {
+        tests.push({
+            id: `st-${i}`,
+            category: i % 2 === 0 ? 'school' : 'juku',
+            subType: 'normal',
+            name: testNames[i],
+            date: date,
+            scores: {
+                s_math: 60 + (i * 8),
+                s_japanese: 70 + (i * 4),
+                s_english: 65 + (i * 7),
+                j_math: 55 + (i * 9),
+                j_english: 60 + (i * 6)
+            },
+            average: 65 + (i * 3),
+            rank: `${20 - i}位`
+        });
+    });
+    return { tasks, tests };
+};
+// ==========================================
+// Component: TodayTimeline (当日の学習タイムライン)
+// ==========================================
+const TodayTimeline = ({ tasks }) => {
+    const [selectedHistory, setSelectedHistory] = useState(null);
+    const [nowTick, setNowTick] = useState(Date.now());
+
+    useEffect(() => {
+        const hasRunning = tasks.some(t => t.isRunning && t.sessionStartTime);
+        if (!hasRunning)
+            return;
+        const interval = setInterval(() => setNowTick(Date.now()), 1000);
+        return () => clearInterval(interval);
+    }, [tasks]);
+
+    const todayHistories = useMemo(() => {
+        const todayStr = getTodayStr();
+        const histories = [];
+        tasks.forEach(t => {
+            const meta = getTaskMeta(t);
+            (t.history || []).forEach(h => {
+                if (h.date === todayStr && h.startedAt && h.endedAt) {
+                    histories.push({
+                        ...h,
+                        color: meta.color,
+                        subjectLabel: meta.subjectLabel,
+                        categoryLabel: meta.categoryLabel,
+                        typeLabel: meta.typeLabel,
+                        taskTitle: t.title || 'Untitled',
+                        isLive: false
+                    });
+                }
+            });
+            if (t.isRunning && t.sessionStartTime) {
+                const start = Number(t.sessionStartTime);
+                const startDate = new Date(start);
+                const startStr = `${startDate.getFullYear()}-${(startDate.getMonth() + 1).toString().padStart(2, '0')}-${startDate.getDate().toString().padStart(2, '0')}`;
+                if (startStr === todayStr) {
+                    const elapsed = Math.max(0, Math.floor((nowTick - start) / 1000));
+                    histories.push({
+                        id: `live-${t.id}`,
+                        date: todayStr,
+                        duration: elapsed,
+                        memo: '現在計測中',
+                        startedAt: start,
+                        endedAt: nowTick,
+                        color: meta.color,
+                        subjectLabel: meta.subjectLabel,
+                        categoryLabel: meta.categoryLabel,
+                        typeLabel: meta.typeLabel,
+                        taskTitle: t.title || 'Untitled',
+                        isLive: true,
+                        currentDuration: t.currentDuration || 0
+                    });
+                }
+            }
+        });
+        return histories.sort((a, b) => (a.startedAt || 0) - (b.startedAt || 0));
+    }, [tasks, nowTick]);
+
+    const completedTodaySeconds = useMemo(() => {
+        const todayStr = getTodayStr();
+        return tasks.reduce((sum, t) => {
+            return sum + (t.history || []).filter(h => h.date === todayStr).reduce((acc, h) => acc + (h.duration || 0), 0);
+        }, 0);
+    }, [tasks]);
+
+    const runningTodaySeconds = useMemo(() => {
+        const todayStr = getTodayStr();
+        return tasks.reduce((sum, t) => {
+            if (!t.isRunning || !t.sessionStartTime)
+                return sum;
+            const start = Number(t.sessionStartTime);
+            const d = new Date(start);
+            const startStr = `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')}`;
+            if (startStr !== todayStr)
+                return sum;
+            return sum + (t.currentDuration || 0) + Math.max(0, Math.floor((nowTick - start) / 1000));
+        }, 0);
+    }, [tasks, nowTick]);
+
+    const totalTodaySeconds = completedTodaySeconds + runningTodaySeconds;
+    const remainingSeconds = Math.max(0, DAILY_TARGET_SECONDS - totalTodaySeconds);
+    const goalPercent = Math.min(100, Math.round((totalTodaySeconds / DAILY_TARGET_SECONDS) * 100));
+    const runningTask = tasks.find(t => t.isRunning);
+    const goalMessage = remainingSeconds === 0
+        ? '今日の2時間目標は達成済みです。追加するなら苦手科目を短く積み増し。'
+        : runningTask
+            ? `このまま継続すると、残り ${formatDuration(remainingSeconds)} で2時間に到達します。`
+            : `2時間まで残り ${formatDuration(remainingSeconds)}。30分単位ならあと${Math.ceil(remainingSeconds / 1800)}コマです。`;
+
+    const minTime = todayHistories.length > 0 ? Math.min(...todayHistories.map(h => h.startedAt)) : nowTick - (60 * 60 * 1000);
+    const maxTime = todayHistories.length > 0 ? Math.max(...todayHistories.map(h => h.endedAt)) : nowTick + (60 * 60 * 1000);
+    const paddingMs = 15 * 60 * 1000;
+    const displayMinTime = minTime - paddingMs;
+    const displayMaxTime = maxTime + paddingMs;
+    const totalDurationMs = Math.max(1, displayMaxTime - displayMinTime);
+
+    const taskSummary = todayHistories.reduce((acc, h) => {
+        const key = `${h.categoryLabel}-${h.subjectLabel}-${h.taskTitle}`;
+        if (!acc[key]) {
+            acc[key] = { ...h, duration: 0, count: 0, latestAt: 0, hasLive: false };
+        }
+        acc[key].duration += (h.duration || 0) + (h.currentDuration || 0);
+        acc[key].count += h.isLive ? 0 : 1;
+        acc[key].latestAt = Math.max(acc[key].latestAt, h.endedAt || 0);
+        acc[key].hasLive = acc[key].hasLive || h.isLive;
+        return acc;
+    }, {});
+    const taskSummaryList = Object.values(taskSummary).sort((a, b) => b.latestAt - a.latestAt);
+
+    return (<div className="bg-white p-4 sm:p-6 rounded-[2rem] border border-slate-100 shadow-sm relative overflow-hidden text-left mb-6">
+      <div className="flex flex-col gap-4 mb-5 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h3 className="text-xs sm:text-sm font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
+            <Clock size={16}/> Today's Timeline
+          </h3>
+          <p className="mt-2 text-[10px] sm:text-xs font-bold text-slate-400">今日やったタスクと、2時間目標までの残りを表示</p>
+        </div>
+        <div className="text-xs sm:text-sm font-black font-mono text-blue-600 bg-blue-50 px-3 py-1.5 rounded-full shadow-sm flex items-center gap-1 self-start">
+          Total: {formatDuration(totalTodaySeconds)} / 2h
+        </div>
+      </div>
+
+      <div className="mb-5 rounded-[1.5rem] bg-slate-50 p-4 ring-1 ring-slate-100">
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">Daily Goal</div>
+          <div className="text-xs font-black text-slate-700">{goalPercent}%</div>
+        </div>
+        <div className="h-3 w-full overflow-hidden rounded-full bg-white shadow-inner ring-1 ring-slate-100">
+          <div className="h-full rounded-full bg-blue-600 transition-all" style={{ width: `${goalPercent}%` }}/>
+        </div>
+        <div className={`mt-3 text-xs font-black ${remainingSeconds === 0 ? 'text-emerald-600' : 'text-slate-600'}`}>{goalMessage}</div>
+      </div>
+
+      {todayHistories.length === 0 ? (<div className="rounded-[1.5rem] border-2 border-dashed border-slate-200 py-8 text-center">
+        <p className="text-sm font-black text-slate-300">今日はまだ保存済みの学習記録がありません</p>
+        <p className="mt-2 text-[10px] font-bold text-slate-300">START後、FINISHで保存するとここにタスクが出ます。</p>
+      </div>) : (<>
+        <div className="relative w-full h-9 sm:h-11 bg-slate-50 rounded-full overflow-hidden flex items-center border border-slate-100 shadow-inner">
+          {todayHistories.map((h, i) => {
+              const leftPercent = Math.max(0, ((h.startedAt - displayMinTime) / totalDurationMs) * 100);
+              const widthPercent = Math.max(2, Math.min(100 - leftPercent, ((h.endedAt - h.startedAt) / totalDurationMs) * 100));
+              return (<button key={`${h.id}-${i}`} type="button" onClick={() => setSelectedHistory(h)} className={`absolute h-full opacity-85 hover:opacity-100 active:scale-y-95 transition-all rounded-md border-r border-white/30 cursor-pointer ${h.isLive ? 'animate-pulse ring-2 ring-white/60' : ''}`} style={{
+                      left: `${leftPercent}%`,
+                      width: `${widthPercent}%`,
+                      backgroundColor: h.color,
+                  }} title={`${h.subjectLabel} / ${h.taskTitle}: ${formatClockTime(h.startedAt)} ~ ${h.isLive ? '計測中' : formatClockTime(h.endedAt)}`}/>);
+          })}
+        </div>
+        <div className="flex justify-between text-[10px] font-black text-slate-400 mt-2 px-1">
+          <span>{formatClockTime(displayMinTime)}</span>
+          <span>{formatClockTime(displayMaxTime)}</span>
+        </div>
+
+        <div className="mt-5 space-y-2">
+          <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">今日やったタスク</div>
+          {taskSummaryList.map((item, i) => (<button key={`${item.taskTitle}-${i}`} type="button" onClick={() => setSelectedHistory(item)} className="w-full rounded-2xl border border-slate-100 bg-white px-4 py-3 text-left shadow-sm hover:bg-slate-50 transition">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <div className="mb-1 flex flex-wrap items-center gap-1.5">
+                  <span className="rounded-full bg-slate-50 px-2 py-0.5 text-[9px] font-black text-slate-400">{item.categoryLabel}</span>
+                  <span className="rounded-full px-2 py-0.5 text-[9px] font-black text-white" style={{ backgroundColor: item.color }}>{item.subjectLabel}</span>
+                  {item.hasLive && <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[9px] font-black text-blue-600 ring-1 ring-blue-100">LIVE</span>}
+                </div>
+                <div className="truncate text-sm font-black text-slate-800">{item.taskTitle}</div>
+                <div className="mt-1 text-[10px] font-bold text-slate-400">{item.count > 0 ? `${item.count}回保存` : '現在計測中'} ・ 最終 {formatClockTime(item.latestAt)}</div>
+              </div>
+              <div className="shrink-0 text-right font-mono text-lg font-black tracking-tighter text-blue-600">{formatDuration(item.duration)}</div>
+            </div>
+          </button>))}
+        </div>
+      </>)}
+
+      {selectedHistory && (<div className="fixed inset-0 z-[120] flex items-end justify-center bg-slate-900/50 p-0 sm:items-center sm:p-4" onClick={() => setSelectedHistory(null)}>
+        <div className="w-full max-w-md rounded-t-[2rem] bg-white p-6 shadow-2xl sm:rounded-[2rem]" onClick={(e) => e.stopPropagation()}>
+          <div className="mb-4 flex items-start justify-between gap-4">
+            <div>
+              <div className="mb-2 flex flex-wrap items-center gap-1.5">
+                <span className="rounded-full bg-slate-50 px-2.5 py-1 text-[10px] font-black text-slate-500">{selectedHistory.categoryLabel}</span>
+                <span className="rounded-full px-2.5 py-1 text-[10px] font-black text-white" style={{ backgroundColor: selectedHistory.color }}>{selectedHistory.subjectLabel}</span>
+                {selectedHistory.isLive && <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-black text-blue-600">LIVE</span>}
+              </div>
+              <h4 className="text-xl font-black leading-tight text-slate-800">{selectedHistory.taskTitle}</h4>
+            </div>
+            <button onClick={() => setSelectedHistory(null)} className="rounded-2xl bg-slate-50 p-3 text-slate-400"><X size={20}/></button>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-2xl bg-slate-50 p-4">
+              <div className="mb-1 text-[9px] font-black uppercase tracking-widest text-slate-400">時間</div>
+              <div className="text-sm font-black text-slate-700">{formatClockTime(selectedHistory.startedAt)}〜{selectedHistory.isLive ? '計測中' : formatClockTime(selectedHistory.endedAt)}</div>
+            </div>
+            <div className="rounded-2xl bg-blue-50 p-4">
+              <div className="mb-1 text-[9px] font-black uppercase tracking-widest text-blue-300">学習時間</div>
+              <div className="font-mono text-lg font-black tracking-tighter text-blue-700">{formatDuration((selectedHistory.duration || 0) + (selectedHistory.currentDuration || 0))}</div>
+            </div>
+          </div>
+          <div className="mt-3 rounded-2xl bg-slate-50 p-4">
+            <div className="mb-1 text-[9px] font-black uppercase tracking-widest text-slate-400">内容</div>
+            <div className="text-sm font-bold leading-relaxed text-slate-600">{selectedHistory.memo || '詳細なし'}</div>
+          </div>
+        </div>
+      </div>)}
+    </div>);
+};
+const StrictTimer = ({ task, isAnyOtherRunning, onUpdate, onSave, onLiveUpdate }) => {
+    const [sessionElapsed, setSessionElapsed] = useState(0);
+    const [statusMessage, setStatusMessage] = useState(null);
+    const [idleRemaining, setIdleRemaining] = useState(IDLE_LIMIT_SECONDS);
     const lastActive = useRef(Date.now());
-    const lastResumeAt = useRef(Date.now());
-    const isRunning = task.isRunning;
+    const timerRef = useRef(null);
+    const heartbeatRef = useRef(0);
 
-    // 正確な現在秒数を計算するヘルパー（バックグラウンド等で表示が遅延しても正しい秒数を得る）
-    const getAccurateSeconds = useCallback(() => {
-      if (isRunning && task.sessionStartTime) {
-        return (
-          task.currentDuration +
-          Math.floor((Date.now() - task.sessionStartTime) / 1000)
-        );
-      }
-      return task.currentDuration;
-    }, [isRunning, task.sessionStartTime, task.currentDuration]);
+    const getAccurateElapsed = useCallback(() => {
+        if (!task.isRunning || !task.sessionStartTime)
+            return 0;
+        return Math.max(0, Math.floor((Date.now() - Number(task.sessionStartTime)) / 1000));
+    }, [task.isRunning, task.sessionStartTime]);
+
+    const getAccurateTotal = useCallback(() => {
+        return (task.currentDuration || 0) + getAccurateElapsed();
+    }, [task.currentDuration, getAccurateElapsed]);
+
+    const updateIdleRemaining = useCallback(() => {
+        if (typeof document !== 'undefined' && isDocumentHidden()) {
+            setIdleRemaining(IDLE_LIMIT_SECONDS);
+            return IDLE_LIMIT_SECONDS;
+        }
+        const remaining = Math.max(0, IDLE_LIMIT_SECONDS - Math.floor((Date.now() - lastActive.current) / 1000));
+        setIdleRemaining(remaining);
+        return remaining;
+    }, []);
+
+    const stopTimer = useCallback((reason = "") => {
+        if (!task.isRunning || !task.sessionStartTime)
+            return;
+        const now = Date.now();
+        const finalSecs = getAccurateTotal();
+        onUpdate(task.id, {
+            isRunning: false,
+            currentDuration: finalSecs,
+            sessionStartTime: null,
+            lastActivityAt: now,
+            lastUpdatedAt: now
+        }, true);
+        setSessionElapsed(0);
+        setIdleRemaining(IDLE_LIMIT_SECONDS);
+        if (reason)
+            setStatusMessage(reason);
+    }, [task.isRunning, task.sessionStartTime, task.id, getAccurateTotal, onUpdate]);
 
     useEffect(() => {
-      if (!isRunning) setLocalSeconds(task.currentDuration);
-      else setLocalSeconds(getAccurateSeconds());
-    }, [task.currentDuration, isRunning, getAccurateSeconds]);
+        if (timerRef.current)
+            clearInterval(timerRef.current);
+        if (task.isRunning && task.sessionStartTime) {
+            setSessionElapsed(getAccurateElapsed());
+            timerRef.current = setInterval(() => {
+                const now = Date.now();
+                const elapsed = getAccurateElapsed();
+                setSessionElapsed(elapsed);
+
+                const remaining = updateIdleRemaining();
+                if (!isDocumentHidden() && remaining === 0) {
+                    stopTimer("5分以上操作がなかったため一時停止しました。");
+                    return;
+                }
+
+                // 他端末に「計測中であること」を軽く知らせるためのハートビート。
+                // 経過時間そのものは sessionStartTime から各端末で再計算するため、毎秒のDB更新はしない。
+                if (!isDocumentHidden() && now - heartbeatRef.current > TIMER_HEARTBEAT_MS) {
+                    heartbeatRef.current = now;
+                    onUpdate(task.id, { lastUpdatedAt: now, lastActivityAt: lastActive.current }, true);
+                }
+            }, 1000);
+        }
+        else {
+            setSessionElapsed(0);
+            setIdleRemaining(IDLE_LIMIT_SECONDS);
+        }
+        return () => {
+            if (timerRef.current)
+                clearInterval(timerRef.current);
+        };
+    }, [task.isRunning, task.sessionStartTime, task.id, getAccurateElapsed, updateIdleRemaining, stopTimer, onUpdate]);
 
     useEffect(() => {
-      const handleActivity = () => {
+        const handleVisibilityChange = () => {
+            if (!isDocumentHidden() && task.isRunning && task.sessionStartTime) {
+                // タブ復帰・スマホスリープ復帰時も停止しない。Date.now()差分で表示だけ即補正する。
+                lastActive.current = Date.now();
+                setSessionElapsed(getAccurateElapsed());
+                setIdleRemaining(IDLE_LIMIT_SECONDS);
+                setStatusMessage(null);
+            }
+        };
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+    }, [task.isRunning, task.sessionStartTime, getAccurateElapsed]);
+
+    useEffect(() => {
+        const recordActivity = () => {
+            lastActive.current = Date.now();
+            setIdleRemaining(IDLE_LIMIT_SECONDS);
+        };
+        window.addEventListener('mousemove', recordActivity);
+        window.addEventListener('touchstart', recordActivity);
+        window.addEventListener('touchmove', recordActivity);
+        window.addEventListener('scroll', recordActivity);
+        window.addEventListener('click', recordActivity);
+        window.addEventListener('keydown', recordActivity);
+        return () => {
+            window.removeEventListener('mousemove', recordActivity);
+            window.removeEventListener('touchstart', recordActivity);
+            window.removeEventListener('touchmove', recordActivity);
+            window.removeEventListener('scroll', recordActivity);
+            window.removeEventListener('click', recordActivity);
+            window.removeEventListener('keydown', recordActivity);
+        };
+    }, []);
+
+    const handleStart = () => {
+        if (isAnyOtherRunning) {
+            alert("他の教科を計測中です。一度終了させてください。");
+            return;
+        }
         const now = Date.now();
         lastActive.current = now;
-        if (task.isRunning && now - (task.lastActivityAt || 0) > 1000) {
-          updateLocalTask(task.id, { lastActivityAt: now });
+        heartbeatRef.current = now;
+        setIdleRemaining(IDLE_LIMIT_SECONDS);
+        setStatusMessage(null);
+        onUpdate(task.id, {
+            isRunning: true,
+            sessionStartTime: now,
+            lastActivityAt: now,
+            lastUpdatedAt: now
+        }, true);
+    };
+
+    const handleSaveClick = () => {
+        const totalToSave = getAccurateTotal();
+        if (totalToSave < 10) {
+            alert("学習時間が短すぎます（10秒以上必要です）。");
+            return;
         }
-      };
-      window.addEventListener("mousemove", handleActivity);
-      window.addEventListener("keydown", handleActivity);
-      window.addEventListener("touchstart", handleActivity);
-      window.addEventListener("scroll", handleActivity);
-      return () => {
-        window.removeEventListener("mousemove", handleActivity);
-        window.removeEventListener("keydown", handleActivity);
-        window.removeEventListener("touchstart", handleActivity);
-        window.removeEventListener("scroll", handleActivity);
-      };
-    }, [task.id, task.isRunning, task.lastActivityAt, updateLocalTask]);
+        onSave({ ...task, currentDuration: totalToSave, isRunning: false, sessionStartTime: null }, totalToSave);
+    };
 
-    // Timer Loop & Idle Check
+    const totalSeconds = getAccurateTotal();
+    const formatIdleTime = (sec) => {
+        const m = Math.floor(sec / 60);
+        const s = sec % 60;
+        return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    };
+
     useEffect(() => {
-      if (isRunning) {
-        const startTime = task.sessionStartTime || Date.now();
-        const initialSec = task.currentDuration;
-
-        timerRef.current = setInterval(() => {
-          const now = Date.now();
-          const elapsed = Math.floor((now - startTime) / 1000);
-          const accurateSecs = initialSec + elapsed;
-
-          setLocalSeconds(accurateSecs);
-
-          if (elapsed > 0 && elapsed % 10 === 0) {
-            updateLocalTask(task.id, { lastUpdatedAt: now });
-          }
-
-          // バックグラウンド時（document.hidden === true）は自動停止の判定を行わない
-          if (
-            !document.hidden &&
-            now - lastResumeAt.current > WAKE_GRACE_MS &&
-            now - lastActive.current > IDLE_LIMIT_MS
-          ) {
-            updateLocalTask(task.id, {
-              isRunning: false,
-              currentDuration: accurateSecs,
-              sessionStartTime: null,
-              lastUpdatedAt: now,
-              pendingSync: true,
+        if (!onLiveUpdate)
+            return;
+        if (task.isRunning) {
+            onLiveUpdate({
+                taskId: task.id,
+                taskTitle: task.title,
+                sessionElapsed,
+                idleRemaining,
+                totalSeconds,
+                sessionStartTime: task.sessionStartTime
             });
-            syncTaskToCloud(task.id, {
-              isRunning: false,
-              currentDuration: accurateSecs,
-              sessionStartTime: null,
-              lastUpdatedAt: now,
-            });
-            setShowAutoPauseAlert(true);
-          }
-        }, 1000);
-      }
-      return () => {
-        if (timerRef.current) clearInterval(timerRef.current);
-      };
-    }, [
-      isRunning,
-      task.sessionStartTime,
-      task.currentDuration,
-      task.id,
-      updateLocalTask,
-      syncTaskToCloud,
-    ]);
-
-    // バックグラウンド・スリープから復帰した時の処理
-    useEffect(() => {
-      const handleVis = () => {
-        if (!document.hidden && task.isRunning) {
-          const now = Date.now();
-          lastActive.current = now; // 復帰時にアクティブ時間を更新し、即座に自動停止するのを防ぐ
-          lastResumeAt.current = now;
-          setLocalSeconds(getAccurateSeconds()); // 表示秒数も復帰時に即補正する
         }
-      };
-      document.addEventListener("visibilitychange", handleVis);
-      return () => document.removeEventListener("visibilitychange", handleVis);
-    }, [task.isRunning, getAccurateSeconds]);
+        else {
+            onLiveUpdate(null);
+        }
+        return () => onLiveUpdate(null);
+    }, [task.isRunning, task.id, task.title, task.sessionStartTime, sessionElapsed, idleRemaining, totalSeconds, onLiveUpdate]);
 
-    const handlePlay = async (e) => {
-      e?.stopPropagation();
-      lastActive.current = Date.now();
-      lastResumeAt.current = Date.now();
-
-      // タイマー排他制御：他のタイマーをすべてストップさせる
-      await pauseAllOtherTasks(task.id);
-
-      const startTime = Date.now();
-
-      updateLocalTask(task.id, {
-        isRunning: true,
-        sessionStartTime: startTime,
-        lastActivityAt: startTime,
-        lastUpdatedAt: startTime,
-        pendingSync: true,
-        status:
-          task.status === "not_started" || task.status === "completed"
-            ? "in_progress"
-            : task.status,
-      });
-
-      syncTaskToCloud(task.id, {
-        isRunning: true,
-        sessionStartTime: startTime,
-        lastActivityAt: startTime,
-        lastUpdatedAt: startTime,
-        status:
-          task.status === "not_started" || task.status === "completed"
-            ? "in_progress"
-            : task.status,
-      });
+    const getIdleColorClass = (sec) => {
+        if (isDocumentHidden())
+            return "text-blue-300";
+        if (sec <= 30)
+            return "text-rose-300 animate-pulse";
+        if (sec <= 60)
+            return "text-amber-300";
+        return "text-slate-300";
     };
 
-    const handlePauseClick = () => {
-      const accurateSecs = getAccurateSeconds();
-      const now = Date.now();
+    return (<div className="bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950 rounded-[2rem] p-6 sm:p-10 text-center shadow-2xl relative overflow-hidden border border-white/10 flex flex-col items-center justify-center">
+      <div className="absolute -top-24 -right-24 w-56 h-56 bg-blue-500/20 rounded-full blur-3xl"/>
+      <div className="absolute -bottom-28 -left-20 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl"/>
+      {statusMessage && (<div className="absolute top-4 left-4 right-4 bg-amber-400/95 text-slate-950 text-[10px] font-black py-2 px-3 rounded-2xl z-10 shadow-lg animate-in slide-in-from-top duration-300">
+           {statusMessage}
+        </div>)}
 
-      updateLocalTask(task.id, {
-        isRunning: false,
-        currentDuration: accurateSecs,
-        sessionStartTime: null,
-        lastActivityAt: now,
-        lastUpdatedAt: now,
-        pendingSync: true,
-      });
-
-      syncTaskToCloud(task.id, {
-        isRunning: false,
-        currentDuration: accurateSecs,
-        sessionStartTime: null,
-        lastActivityAt: now,
-        lastUpdatedAt: now,
-      });
-    };
-
-    const handleStopAndSave = () => {
-      const finalDuration = getAccurateSeconds(); // 古いlocalSecondsではなく正確な時間を再計算
-      const now = Date.now();
-
-      updateLocalTask(task.id, {
-        isRunning: false,
-        currentDuration: finalDuration,
-        sessionStartTime: null,
-        lastActivityAt: now,
-        lastUpdatedAt: now,
-        pendingSync: true,
-      });
-      syncTaskToCloud(task.id, {
-        isRunning: false,
-        currentDuration: finalDuration,
-        sessionStartTime: null,
-        lastActivityAt: now,
-        lastUpdatedAt: now,
-      });
-
-      setTimeout(() => {
-        onSaveRecord({
-          ...task,
-          currentDuration: finalDuration,
-          isRunning: false,
-          sessionStartTime: null,
-        });
-      }, 100);
-    };
-
-    return (
-      <div className="flex flex-col gap-3 md:gap-4 w-full relative">
-        <div className="flex items-center justify-between bg-slate-50 rounded-2xl md:rounded-3xl p-3 md:p-5 lg:p-6 border border-slate-200 shadow-inner w-full">
-          <div className="flex-1 text-center">
-            <span
-              className={`font-mono text-3xl md:text-4xl lg:text-5xl font-black tracking-widest ${isRunning ? "text-blue-600" : "text-slate-700"}`}
-            >
-              {formatTime(localSeconds)}
-            </span>
-            {isRunning && (
-              <div className="text-[9px] md:text-[10px] lg:text-xs text-blue-500 font-bold mt-1 md:mt-2 animate-pulse">
-                計測中 (サボり検知ON)
-              </div>
-            )}
-          </div>
-          <div className="flex items-center gap-2 md:gap-3 lg:gap-4 pr-2 md:pr-3">
-            {!isRunning ? (
-              <button
-                onClick={handlePlay}
-                className="w-12 h-12 md:w-14 md:h-14 lg:w-16 lg:h-16 flex items-center justify-center rounded-full bg-blue-600 text-white shadow-lg active:scale-95 hover:bg-blue-700 transition-all"
-              >
-                <Play
-                  className="ml-1 w-5 h-5 md:w-6 md:h-6 lg:w-8 lg:h-8"
-                  fill="currentColor"
-                />
-              </button>
-            ) : (
-              <button
-                onClick={handlePauseClick}
-                className="w-12 h-12 md:w-14 md:h-14 lg:w-16 lg:h-16 flex items-center justify-center rounded-full bg-amber-500 text-white shadow-lg active:scale-95 hover:bg-amber-600 transition-all"
-              >
-                <Pause
-                  className="w-5 h-5 md:w-6 md:h-6 lg:w-8 lg:h-8"
-                  fill="currentColor"
-                />
-              </button>
-            )}
-          </div>
-        </div>
-
-        {showAutoPauseAlert && (
-          <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/95 backdrop-blur-sm rounded-2xl md:rounded-3xl p-4 md:p-5 shadow-lg border border-amber-200 animate-in fade-in zoom-in-95">
-            <div className="text-center">
-              <div className="w-10 h-10 md:w-12 md:h-12 lg:w-14 lg:h-14 bg-amber-100 text-amber-500 rounded-full flex items-center justify-center mx-auto mb-2 md:mb-3">
-                <AlertTriangle className="w-5 h-5 md:w-6 md:h-6 lg:w-8 lg:h-8" />
-              </div>
-              <p className="text-xs md:text-sm lg:text-base font-bold text-slate-700 mb-3 md:mb-4">
-                5分以上操作がなかったため
-                <br />
-                自動的に一時停止しました
-              </p>
-              <button
-                onClick={() => setShowAutoPauseAlert(false)}
-                className="bg-amber-500 text-white px-5 py-2 md:px-6 md:py-2.5 lg:px-8 lg:py-3 rounded-xl md:rounded-2xl text-sm md:text-base lg:text-lg font-bold shadow-md active:scale-95 w-full"
-              >
-                確認
-              </button>
+      <div className="mb-8 flex flex-col items-center justify-center w-full relative z-10">
+        {task.isRunning ? (<>
+            <div className="mb-4 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-400/10 border border-blue-300/20 text-blue-200 text-[10px] sm:text-xs font-black uppercase tracking-widest">
+              <span className="w-2 h-2 rounded-full bg-blue-300 animate-pulse"/> Live Sync
             </div>
-          </div>
-        )}
+            <span className="text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-widest mb-2">現在の計測</span>
+            <div className="text-5xl sm:text-7xl font-mono font-black tracking-tighter text-white leading-none drop-shadow-sm">
+              {formatDuration(sessionElapsed)}
+            </div>
+            <div className={`mt-3 text-[10px] sm:text-xs font-black tracking-widest flex items-center gap-1.5 ${getIdleColorClass(idleRemaining)}`}>
+               <Clock size={12}/> {isDocumentHidden() ? 'バックグラウンド中も計測継続' : `操作なし停止まで: ${formatIdleTime(idleRemaining)}`}
+            </div>
+            <div className="mt-4 px-4 py-2 bg-white/10 border border-white/10 rounded-full text-xs sm:text-sm font-bold text-white/90 flex items-center gap-2 shadow-sm">
+              <History size={14}/> 累計: {formatDuration(totalSeconds)}
+            </div>
+          </>) : (<>
+            <span className="text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-widest mb-2">累計学習時間</span>
+            <div className="text-4xl sm:text-6xl font-mono font-black tracking-tighter text-white leading-none">
+              {formatDuration(task.currentDuration || 0)}
+            </div>
+          </>)}
+      </div>
 
-        <button
-          onClick={handleStopAndSave}
-          disabled={localSeconds === 0}
-          className="w-full bg-slate-800 text-white font-bold py-3.5 md:py-4 lg:py-5 text-base md:text-lg lg:text-xl rounded-2xl md:rounded-3xl shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2 md:gap-2.5 disabled:opacity-50 mt-2 md:mt-3"
-        >
-          <History className="w-[18px] h-[18px] md:w-5 md:h-5 lg:w-6 lg:h-6" />{" "}
-          計測を終了して記録を保存
+      <div className="flex gap-3 w-full max-w-sm relative z-10">
+        {!task.isRunning ? (<button onClick={handleStart} className="flex-1 bg-white text-slate-950 font-black py-4 sm:py-5 rounded-xl sm:rounded-2xl shadow-lg active:scale-95 transition flex items-center justify-center gap-2 text-sm sm:text-lg uppercase leading-none hover:bg-blue-50">
+            <Play size={20} fill="currentColor"/> START
+          </button>) : (<button onClick={() => stopTimer()} className="flex-1 bg-amber-400 text-slate-950 font-black py-4 sm:py-5 rounded-xl sm:rounded-2xl shadow-lg active:scale-95 transition flex items-center justify-center gap-2 text-sm sm:text-lg uppercase leading-none hover:bg-amber-300">
+            <Pause size={20} fill="currentColor"/> PAUSE
+          </button>)}
+        <button onClick={handleSaveClick} className="flex-1 bg-blue-600 text-white font-black py-4 sm:py-5 rounded-xl sm:rounded-2xl hover:bg-blue-500 transition flex items-center justify-center gap-2 text-sm sm:text-lg uppercase leading-none shadow-lg">
+          <Save size={20}/> FINISH
         </button>
       </div>
-    );
-  },
-);
-StrictTimer.displayName = "StrictTimer";
-
-// ==========================================
-// Generic Modals
-// ==========================================
-const ConfirmModal = ({ isOpen, onClose, onConfirm, title, message }) => {
-  if (!isOpen) return null;
-  return (
-    <div className="fixed inset-0 bg-slate-900/50 z-50 flex items-center justify-center p-6 backdrop-blur-sm animate-in fade-in">
-      <div className="bg-white w-full max-w-sm md:max-w-md lg:max-w-lg rounded-3xl md:rounded-[2rem] p-6 md:p-8 lg:p-10 shadow-2xl scale-100 animate-in zoom-in-95">
-        <div className="flex flex-col items-center text-center mb-6 md:mb-8">
-          <div className="w-16 h-16 md:w-18 md:h-18 lg:w-20 lg:h-20 bg-red-100 text-red-500 rounded-full flex items-center justify-center mb-4 md:mb-5">
-            <AlertTriangle className="w-8 h-8 md:w-10 md:h-10 lg:w-12 lg:h-12" />
-          </div>
-          <h3 className="text-xl md:text-2xl lg:text-3xl font-black text-slate-800 mb-2 md:mb-3">
-            {title}
-          </h3>
-          <p className="text-slate-500 text-sm md:text-base lg:text-lg whitespace-pre-wrap">
-            {message}
-          </p>
-        </div>
-        <div className="flex gap-3 md:gap-4">
-          <button
-            onClick={onClose}
-            className="flex-1 py-3 md:py-3.5 lg:py-4 rounded-xl md:rounded-2xl text-sm md:text-base lg:text-lg font-bold text-slate-500 bg-slate-100 hover:bg-slate-200 transition-colors"
-          >
-            キャンセル
-          </button>
-          <button
-            onClick={() => {
-              onConfirm();
-              onClose();
-            }}
-            className="flex-1 py-3 md:py-3.5 lg:py-4 rounded-xl md:rounded-2xl text-sm md:text-base lg:text-lg font-bold text-white bg-red-500 hover:bg-red-600 shadow-lg shadow-red-200 transition-colors"
-          >
-            実行する
-          </button>
-        </div>
-      </div>
-    </div>
-  );
+    </div>);
 };
 
-const CreateUnitOverlay = ({
-  isOpen,
-  onClose,
-  onCreate,
-}) => {
-  const [unitNumber, setUnitNumber] = useState("");
-  if (!isOpen) return null;
+const ActiveTimerSummary = ({ task, onUpdate }) => {
+    const [sessionElapsed, setSessionElapsed] = useState(0);
+    const [idleRemaining, setIdleRemaining] = useState(IDLE_LIMIT_SECONDS);
+    const lastActive = useRef(Date.now());
+    const timerRef = useRef(null);
 
-  return (
-    <div className="fixed inset-0 bg-slate-900/40 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
-      <div className="bg-white w-full max-w-sm md:max-w-md lg:max-w-xl rounded-3xl md:rounded-[2rem] p-6 md:p-8 lg:p-10 shadow-2xl animate-in zoom-in-95">
-        <div className="flex justify-between items-center mb-6 md:mb-8">
-          <h3 className="text-xl md:text-2xl lg:text-3xl font-black text-slate-800 flex items-center">
-            <Layers className="mr-2 md:mr-3 w-5 h-5 md:w-6 md:h-6 lg:w-7 lg:h-7 text-blue-600" />{" "}
-            新しい回を追加
-          </h3>
-          <button onClick={onClose}>
-            <X className="w-5 h-5 md:w-6 md:h-6 lg:w-7 lg:h-7 text-slate-400 hover:text-slate-600" />
-          </button>
-        </div>
-        <div className="mb-6 md:mb-8 bg-slate-50 rounded-2xl md:rounded-3xl p-4 md:p-6 lg:p-8 border border-slate-100 text-center">
-          <label className="block text-xs md:text-sm lg:text-base font-bold text-slate-400 mb-2 md:mb-3 uppercase tracking-wider">
-            Unit Number
-          </label>
-          <div className="flex items-center justify-center gap-3 md:gap-4">
-            <span className="text-2xl md:text-3xl lg:text-4xl font-black text-slate-300">
-              第
-            </span>
-            <input
-              type="number"
-              value={unitNumber}
-              onChange={(e) => setUnitNumber(e.target.value)}
-              placeholder="?"
-              className="w-24 md:w-28 lg:w-32 bg-white border-2 border-blue-100 rounded-xl md:rounded-2xl px-2 py-3 md:px-3 md:py-3 text-3xl md:text-4xl lg:text-5xl font-black text-center text-blue-600 focus:outline-none focus:border-blue-500"
-              autoFocus
-            />
-            <span className="text-2xl md:text-3xl lg:text-4xl font-black text-slate-300">
-              回
-            </span>
-          </div>
-        </div>
-        <button
-          onClick={() => {
-            if (parseInt(unitNumber) > 0) {
-              onCreate(parseInt(unitNumber));
-              setUnitNumber("");
-              onClose();
-            }
-          }}
-          disabled={!unitNumber}
-          className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold py-4 md:py-4 lg:py-5 text-base md:text-lg lg:text-xl rounded-xl md:rounded-2xl shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2 md:gap-3 disabled:opacity-50"
-        >
-          <Zap
-            className="w-5 h-5 md:w-5 md:h-5 lg:w-6 lg:h-6"
-            fill="currentColor"
-          />{" "}
-          カリキュラムを作成
-        </button>
-      </div>
-    </div>
-  );
-};
+    const getAccurateElapsed = useCallback(() => {
+        if (!task?.isRunning || !task?.sessionStartTime)
+            return 0;
+        return Math.max(0, Math.floor((Date.now() - Number(task.sessionStartTime)) / 1000));
+    }, [task?.isRunning, task?.sessionStartTime]);
 
-const AddCustomTaskModal = ({ isOpen, onClose, onAdd }) => {
-  const [title, setTitle] = useState("");
-  const [category, setCategory] = useState("予習シリーズ");
-  if (!isOpen) return null;
+    const stopFromSummary = useCallback((reason = "") => {
+        if (!task?.isRunning || !task?.sessionStartTime)
+            return;
+        const now = Date.now();
+        const finalSecs = (task.currentDuration || 0) + getAccurateElapsed();
+        onUpdate(task.id, {
+            isRunning: false,
+            currentDuration: finalSecs,
+            sessionStartTime: null,
+            lastActivityAt: now,
+            lastUpdatedAt: now
+        }, true);
+        setSessionElapsed(0);
+        setIdleRemaining(IDLE_LIMIT_SECONDS);
+        if (reason)
+            console.warn(reason);
+    }, [task, getAccurateElapsed, onUpdate]);
 
-  return (
-    <div className="fixed inset-0 bg-slate-900/40 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
-      <div className="bg-white w-full max-w-sm md:max-w-md lg:max-w-xl rounded-3xl md:rounded-[2rem] p-6 md:p-8 lg:p-10 shadow-2xl animate-in zoom-in-95">
-        <div className="flex justify-between items-center mb-4 md:mb-6">
-          <h3 className="text-lg md:text-2xl lg:text-3xl font-black text-slate-800">
-            タスクを追加
-          </h3>
-          <button onClick={onClose}>
-            <X className="w-5 h-5 md:w-6 md:h-6 lg:w-7 lg:h-7 text-slate-400 hover:text-slate-600" />
-          </button>
-        </div>
-        <div className="space-y-4 md:space-y-6">
-          <div>
-            <label className="block text-xs md:text-sm lg:text-base font-bold text-slate-400 mb-1 md:mb-2">
-              カテゴリ
-            </label>
-            <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              className="w-full bg-slate-50 border rounded-xl md:rounded-2xl px-3 py-2 md:px-4 md:py-3 text-sm md:text-base lg:text-lg font-bold"
-            >
-              <option value="予習シリーズ">予習シリーズ</option>
-              <option value="演習問題集">演習問題集</option>
-              <option value="練成問題">練成問題</option>
-              <option value="計算">計算</option>
-              <option value="漢字とことば">漢字とことば</option>
-              <option value="プリント">プリント</option>
-              <option value="その他">その他</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs md:text-sm lg:text-base font-bold text-slate-400 mb-1 md:mb-2">
-              タイトル
-            </label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="例: 追加問題..."
-              className="w-full bg-slate-50 border rounded-xl md:rounded-2xl px-3 py-2 md:px-4 md:py-3 text-sm md:text-base lg:text-lg font-bold"
-              autoFocus
-            />
-          </div>
-          <button
-            onClick={() => {
-              if (title) {
-                onAdd(title, category);
-                setTitle("");
-                setCategory("予習シリーズ");
-                onClose();
-              }
-            }}
-            disabled={!title}
-            className="w-full bg-blue-600 text-white font-bold py-3 md:py-4 lg:py-5 text-base md:text-lg lg:text-xl rounded-xl md:rounded-2xl shadow-lg mt-2 md:mt-3"
-          >
-            追加
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const TestResultModal = ({
-  isOpen,
-  onClose,
-  onSave,
-  initialData,
-}) => {
-  const [date, setDate] = useState("");
-  const [name, setName] = useState("");
-  const [type, setType] = useState("curriculum");
-  const [devs, setDevs] = useState({
-    math: "",
-    japanese: "",
-    science: "",
-    social: "",
-  });
-  const [totalDev, setTotalDev] = useState("");
-  const [totalRank, setTotalRank] = useState("");
-  const [errorMsg, setErrorMsg] = useState("");
-
-  useEffect(() => {
-    if (initialData) {
-      setDate(initialData.date.replace(/\//g, "-"));
-      setName(initialData.name);
-      setType(initialData.type);
-      setDevs({
-        math: initialData.subjects.math.dev.toString(),
-        japanese: initialData.subjects.japanese.dev.toString(),
-        science: initialData.subjects.science.dev.toString(),
-        social: initialData.subjects.social.dev.toString(),
-      });
-      setTotalDev(initialData.total4.dev.toString());
-      setTotalRank(initialData.total4.rank || "");
-      setErrorMsg("");
-    } else {
-      setDate(new Date().toISOString().split("T")[0]);
-      setName("");
-      setType("curriculum");
-      setDevs({ math: "", japanese: "", science: "", social: "" });
-      setTotalDev("");
-      setTotalRank("");
-      setErrorMsg("");
-    }
-  }, [initialData, isOpen]);
-
-  if (!isOpen) return null;
-
-  const handleSubmit = () => {
-    if (!name || !date) {
-      setErrorMsg("日付とテスト名は必須です。");
-      return;
-    }
-    if (totalDev === "" || Number.isNaN(Number(totalDev))) {
-      setErrorMsg("4科偏差値を入力してください。");
-      return;
-    }
-    const normalizeDev = (value) =>
-      value === "" || Number.isNaN(Number(value)) ? 0 : Number(value);
-    setErrorMsg("");
-
-    const resultData = {
-      id: initialData ? initialData.id : Date.now().toString(),
-      date: date.replace(/-/g, "/"),
-      name,
-      type,
-      subjects: {
-        math: {
-          score: initialData?.subjects.math.score || 0,
-          avg: initialData?.subjects.math.avg || 0,
-          dev: normalizeDev(devs.math),
-        },
-        japanese: {
-          score: initialData?.subjects.japanese.score || 0,
-          avg: initialData?.subjects.japanese.avg || 0,
-          dev: normalizeDev(devs.japanese),
-        },
-        science: {
-          score: initialData?.subjects.science.score || 0,
-          avg: initialData?.subjects.science.avg || 0,
-          dev: normalizeDev(devs.science),
-        },
-        social: {
-          score: initialData?.subjects.social.score || 0,
-          avg: initialData?.subjects.social.avg || 0,
-          dev: normalizeDev(devs.social),
-        },
-      },
-      total4: {
-        score: initialData?.total4.score || 0,
-        avg: initialData?.total4.avg || 0,
-        dev: normalizeDev(totalDev),
-        rank: totalRank,
-      },
-    };
-    onSave(resultData);
-    onClose();
-  };
-
-  return (
-    <div className="fixed inset-0 bg-slate-900/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
-      <div className="bg-white w-full max-w-md md:max-w-2xl lg:max-w-3xl rounded-3xl md:rounded-[2rem] p-5 md:p-8 shadow-2xl">
-        <div className="flex justify-between items-center mb-4 md:mb-6">
-          <div>
-            <p className="text-xs md:text-sm font-black text-blue-600 mb-1">
-              偏差値登録
-            </p>
-            <h3 className="text-xl md:text-3xl font-black text-slate-800">
-              {initialData ? "テスト結果を編集" : "テスト結果を追加"}
-            </h3>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-1 md:p-2 rounded-full bg-slate-100 text-slate-400 active:scale-95 hover:text-slate-600"
-          >
-            <X className="w-4 h-4 md:w-5 md:h-5" />
-          </button>
-        </div>
-        <div className="space-y-3 md:space-y-5">
-          <div className="grid grid-cols-2 gap-3 md:gap-5">
-            <div>
-              <label className="block text-xs md:text-sm lg:text-base font-bold text-slate-500 mb-1 md:mb-2">
-                実施日
-              </label>
-              <input
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl md:rounded-2xl px-3 py-2.5 md:px-4 md:py-3 text-base md:text-lg font-bold focus:outline-none focus:border-blue-400"
-              />
-            </div>
-            <div>
-              <label className="block text-xs md:text-sm lg:text-base font-bold text-slate-500 mb-1 md:mb-2">
-                種類
-              </label>
-              <select
-                value={type}
-                onChange={(e) => setType(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl md:rounded-2xl px-3 py-2.5 md:px-4 md:py-3 text-base md:text-lg font-bold focus:outline-none focus:border-blue-400"
-              >
-                {Object.entries(TEST_TYPE_CONFIG).map(([k, v]) => (
-                  <option key={k} value={k}>
-                    {v.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-          <div>
-            <label className="block text-xs md:text-sm lg:text-base font-bold text-slate-500 mb-1 md:mb-2">
-              テスト名
-            </label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="例: 第14回 カリテ"
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl md:rounded-2xl px-3 py-2.5 md:px-4 md:py-3 text-base md:text-lg font-bold focus:outline-none focus:border-blue-400"
-            />
-          </div>
-
-          <div className="border-t border-slate-100 pt-3 md:pt-5">
-            <h4 className="font-black text-slate-700 mb-2 md:mb-3 text-base md:text-lg">
-              各教科の偏差値
-            </h4>
-            <div className="grid grid-cols-4 gap-2 md:gap-3">
-              {["math", "japanese", "science", "social"].map(
-                (subj) => (
-                  <div key={subj}>
-                    <label
-                      className={`block text-xs md:text-sm lg:text-base text-center font-black ${SUBJECT_CONFIG[subj].color} mb-1 md:mb-2`}
-                    >
-                      {SUBJECT_CONFIG[subj].short}
-                    </label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      inputMode="decimal"
-                      placeholder="50.0"
-                      value={devs[subj]}
-                      onChange={(e) =>
-                        setDevs({ ...devs, [subj]: e.target.value })
-                      }
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl md:rounded-2xl px-1 py-2.5 md:px-2 md:py-3 text-base md:text-xl text-center font-black focus:outline-none focus:border-blue-400"
-                    />
-                  </div>
-                ),
-              )}
-            </div>
-          </div>
-          <div className="border-t border-slate-100 pt-3 md:pt-5">
-            <h4 className="font-black text-slate-700 mb-2 md:mb-3 text-base md:text-lg">
-              4科総合
-            </h4>
-            <div className="grid grid-cols-2 gap-3 md:gap-5">
-              <div>
-                <label className="block text-xs md:text-sm lg:text-base font-bold text-slate-500 mb-1 md:mb-2">
-                  4科偏差値
-                </label>
-                <input
-                  type="number"
-                  step="0.1"
-                  inputMode="decimal"
-                  placeholder="50.0"
-                  value={totalDev}
-                  onChange={(e) => setTotalDev(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl md:rounded-2xl px-3 py-2.5 md:px-4 md:py-3 text-base md:text-xl font-black focus:outline-none focus:border-blue-400"
-                />
-              </div>
-              <div>
-                <label className="block text-xs md:text-sm lg:text-base font-bold text-slate-500 mb-1 md:mb-2">
-                  順位 任意
-                </label>
-                <input
-                  type="text"
-                  value={totalRank}
-                  placeholder="例: 1234/10000"
-                  onChange={(e) => setTotalRank(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl md:rounded-2xl px-3 py-2.5 md:px-4 md:py-3 text-base md:text-lg font-bold focus:outline-none focus:border-blue-400"
-                />
-              </div>
-            </div>
-          </div>
-
-          {errorMsg && (
-            <div className="text-xs md:text-sm text-red-500 font-bold text-center mt-2 md:mt-3">
-              {errorMsg}
-            </div>
-          )}
-
-          <button
-            onClick={handleSubmit}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 md:py-4 text-base md:text-lg rounded-xl md:rounded-2xl shadow-lg mt-2 md:mt-4 active:scale-95 transition-colors"
-          >
-            {initialData ? "更新する" : "追加する"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// ==========================================
-// Views & Sub-components
-// ==========================================
-
-const TaskCard = ({ task, cycleStatus, setDetailTaskId }) => {
-  return (
-    <div
-      onClick={() => setDetailTaskId(task.id)}
-      className={`relative group rounded-xl md:rounded-2xl p-3 md:p-4 lg:p-5 shadow-sm border transition-all active:scale-[0.98] cursor-pointer flex flex-col gap-2 md:gap-3 overflow-hidden ${
-        task.status === "completed"
-          ? "opacity-60 bg-slate-50 border-slate-200"
-          : task.isRunning
-            ? "bg-blue-50/50 border-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.2)] ring-1 ring-blue-400"
-            : "bg-white border-slate-200 hover:border-blue-200 hover:-translate-y-0.5 hover:shadow-md"
-      }`}
-    >
-      {task.isRunning && (
-        <>
-          <div className="absolute inset-0 bg-blue-400/10 animate-pulse pointer-events-none" />
-          <div className="absolute top-0 left-0 bottom-0 w-1.5 bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)] pointer-events-none" />
-        </>
-      )}
-      <div className="flex items-start gap-2 md:gap-3 relative z-10">
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            cycleStatus(task);
-          }}
-          className="p-1 md:p-1.5 -ml-1 md:-ml-1.5 mt-0.5 rounded-full active:scale-90 flex-shrink-0"
-        >
-          {task.status === "completed" ? (
-            <CheckCircle
-              className="text-green-500 w-[18px] h-[18px] md:w-5 md:h-5 lg:w-6 lg:h-6"
-              fill="#f0fdf4"
-            />
-          ) : task.status === "in_progress" ? (
-            <Zap
-              className="text-blue-500 w-[18px] h-[18px] md:w-5 md:h-5 lg:w-6 lg:h-6"
-              fill="currentColor"
-            />
-          ) : (
-            <Circle className="text-slate-200 w-[18px] h-[18px] md:w-5 md:h-5 lg:w-6 lg:h-6" />
-          )}
-        </button>
-        <div className="flex-1 min-w-0 pt-0.5 md:pt-1">
-          <h4
-            className={`font-bold text-sm md:text-base lg:text-lg text-slate-800 leading-tight ${task.status === "completed" ? "line-through text-slate-400" : ""}`}
-          >
-            {task.title}
-          </h4>
-          <div className="flex flex-wrap items-center gap-2 md:gap-2 mt-1.5 md:mt-2">
-            <span className="text-[9px] md:text-[10px] lg:text-xs font-bold text-slate-400 bg-slate-100/80 backdrop-blur-sm px-1.5 py-0.5 md:px-2 md:py-0.5 lg:px-2 lg:py-1 rounded flex items-center gap-1">
-              <History className="w-2 h-2 md:w-2.5 md:h-2.5 lg:w-3 lg:h-3" />{" "}
-              {task.history.length}回
-            </span>
-            {task.currentDuration > 0 && (
-              <span
-                className={`text-[9px] md:text-[10px] lg:text-xs font-bold font-mono px-1.5 py-0.5 md:px-2 md:py-0.5 lg:px-2 lg:py-1 rounded flex items-center gap-1 backdrop-blur-sm ${task.isRunning ? "bg-blue-100/80 text-blue-700" : "bg-amber-50 text-amber-600"}`}
-              >
-                <Clock className="w-2 h-2 md:w-2.5 md:h-2.5 lg:w-3 lg:h-3" />{" "}
-                {formatTime(task.currentDuration)}
-              </span>
-            )}
-            {task.isRunning && (
-              <span className="text-[9px] md:text-[10px] lg:text-xs font-bold text-white bg-gradient-to-r from-blue-500 to-indigo-500 px-2 py-0.5 md:px-2 md:py-0.5 lg:px-3 lg:py-1 rounded shadow-sm flex items-center gap-1 animate-pulse">
-                <Play
-                  className="w-2 h-2 md:w-2.5 md:h-2.5 lg:w-3 lg:h-3"
-                  fill="currentColor"
-                />{" "}
-                計測中
-              </span>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const TaskDetailModal = ({
-  task,
-  onClose,
-  updateLocalTask,
-  syncTaskToCloud,
-  onSaveRecord,
-  onDelete,
-  pauseAllOtherTasks,
-}) => {
-  if (!task) return null;
-  const conf = SUBJECT_CONFIG[task.subject];
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
-      <div
-        className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"
-        onClick={onClose}
-      />
-      <div className="relative bg-slate-50 w-full max-w-md md:max-w-xl lg:max-w-3xl xl:max-w-4xl h-[90vh] sm:h-[85vh] md:h-[80vh] sm:rounded-3xl md:rounded-[2rem] rounded-t-3xl shadow-2xl flex flex-col animate-in slide-in-from-bottom-10">
-        <div className="bg-white px-5 py-4 md:px-7 md:py-5 lg:px-8 lg:py-6 rounded-t-3xl md:rounded-t-[2rem] border-b border-slate-200 flex justify-between items-start shrink-0">
-          <div>
-            <div className="flex items-center gap-2 md:gap-3 mb-1.5 md:mb-2">
-              <span
-                className={`text-[9px] md:text-[10px] lg:text-xs font-black px-1.5 py-0.5 md:px-2 md:py-0.5 rounded ${conf.lightBg} ${conf.color} border ${conf.border}`}
-              >
-                {conf.label}
-              </span>
-              <span className="text-[10px] md:text-[11px] lg:text-xs font-bold text-slate-400">
-                {task.unit} - {task.category}
-              </span>
-            </div>
-            <h3 className="text-lg md:text-xl lg:text-2xl font-black text-slate-800 leading-tight pr-4 md:pr-6">
-              {task.title}
-            </h3>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 md:p-2 bg-slate-100 rounded-full text-slate-400 active:scale-95"
-          >
-            <X className="w-[18px] h-[18px] md:w-5 md:h-5 lg:w-6 lg:h-6" />
-          </button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto px-5 py-5 md:px-7 md:py-7 lg:px-8 lg:py-8 space-y-6 md:space-y-7 lg:space-y-8 scroll-smooth pb-10 md:pb-12">
-          <div className="space-y-2 md:space-y-3">
-            <label className="text-[10px] md:text-[11px] lg:text-xs font-bold text-slate-400 uppercase tracking-wider px-1 md:px-2">
-              状態
-            </label>
-            <div className="flex gap-2 md:gap-3">
-              {[
-                {
-                  id: "not_started",
-                  label: "未着手",
-                  icon: Circle,
-                  active: "bg-slate-200 text-slate-700 border-slate-300",
-                },
-                {
-                  id: "in_progress",
-                  label: "勉強中",
-                  icon: Zap,
-                  active: "bg-blue-500 text-white border-blue-600",
-                },
-                {
-                  id: "completed",
-                  label: "完了",
-                  icon: CheckCircle,
-                  active: "bg-green-500 text-white border-green-600",
-                },
-              ].map((s) => (
-                <button
-                  key={s.id}
-                  onClick={() => {
-                    const now = Date.now();
-                    updateLocalTask(task.id, {
-                      status: s.id,
-                      lastUpdatedAt: now,
-                      pendingSync: true,
-                    });
-                    syncTaskToCloud(task.id, {
-                      status: s.id,
-                      lastUpdatedAt: now,
-                    });
-                  }}
-                  className={`flex-1 py-2.5 md:py-3 lg:py-4 rounded-xl md:rounded-2xl font-bold text-xs md:text-sm lg:text-base flex flex-col items-center justify-center gap-1 md:gap-1.5 border transition-all ${
-                    task.status === s.id
-                      ? s.active
-                      : "bg-white text-slate-400 border-slate-200 hover:bg-slate-50"
-                  }`}
-                >
-                  <s.icon className="w-4 h-4 md:w-5 md:h-5 lg:w-6 lg:h-6" />
-                  {s.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="space-y-2 md:space-y-3 bg-white p-4 md:p-5 lg:p-6 rounded-2xl md:rounded-3xl border border-slate-200 shadow-sm">
-            <label className="text-[10px] md:text-[11px] lg:text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1 md:gap-2">
-              <Clock className="w-3 h-3 md:w-4 md:h-4 lg:w-5 lg:h-5" />{" "}
-              計測タイマー (不正防止対応)
-            </label>
-            <StrictTimer
-              task={task}
-              updateLocalTask={updateLocalTask}
-              syncTaskToCloud={syncTaskToCloud}
-              onSaveRecord={onSaveRecord}
-              pauseAllOtherTasks={pauseAllOtherTasks}
-            />
-          </div>
-
-          <div className="space-y-2 md:space-y-3">
-            <label className="text-[10px] md:text-[11px] lg:text-xs font-bold text-slate-400 uppercase tracking-wider px-1 md:px-2">
-              メモ
-            </label>
-            <textarea
-              value={task.currentMemo}
-              onChange={(e) =>
-                updateLocalTask(task.id, {
-                  currentMemo: e.target.value,
-                  lastUpdatedAt: Date.now(),
-                  pendingSync: true,
-                })
-              }
-              onBlur={(e) => {
+    useEffect(() => {
+        if (timerRef.current)
+            clearInterval(timerRef.current);
+        if (task?.isRunning && task?.sessionStartTime) {
+            lastActive.current = Date.now();
+            setSessionElapsed(getAccurateElapsed());
+            timerRef.current = setInterval(() => {
                 const now = Date.now();
-                syncTaskToCloud(task.id, {
-                  currentMemo: e.currentTarget.value,
-                  lastUpdatedAt: now,
-                });
-              }}
-              placeholder="ここにつまづいた、次はこうする..."
-              className="w-full bg-white border border-slate-200 rounded-xl md:rounded-2xl p-3 md:p-4 lg:p-5 text-sm md:text-base font-medium text-slate-700 focus:outline-none focus:border-blue-500 resize-none h-20 md:h-28 lg:h-32 shadow-sm"
-            />
-          </div>
-
-          <div className="space-y-3 md:space-y-4 pt-2 md:pt-3">
-            <label className="text-[10px] md:text-[11px] lg:text-xs font-bold text-slate-400 uppercase tracking-wider px-1 md:px-2">
-              過去の履歴 ({task.history.length})
-            </label>
-            {task.history.length === 0 ? (
-              <div className="text-center py-6 md:py-8 text-slate-300 text-xs md:text-sm lg:text-base font-bold bg-white rounded-xl md:rounded-2xl border border-dashed border-slate-200">
-                記録なし
-              </div>
-            ) : (
-              <div className="space-y-2 md:space-y-3">
-                {[...task.history].reverse().map((h, i) => (
-                  <div
-                    key={h.id}
-                    className="bg-white border border-slate-200 rounded-xl md:rounded-2xl p-3 md:p-4 flex gap-3 md:gap-4"
-                  >
-                    <div className="flex flex-col items-center justify-center px-1 md:px-2 border-r border-slate-100 min-w-[2.5rem] md:min-w-[3.5rem]">
-                      <span className="text-[8px] md:text-[10px] lg:text-xs font-bold text-slate-400">
-                        回目
-                      </span>
-                      <span className="text-base md:text-lg lg:text-xl font-black text-slate-700">
-                        {task.history.length - i}
-                      </span>
-                    </div>
-                    <div className="flex-1 min-w-0 flex flex-col justify-center">
-                      <div className="flex justify-between items-center mb-1 md:mb-1.5">
-                        <span className="text-[9px] md:text-[10px] lg:text-xs font-bold text-slate-400 bg-slate-50 px-1.5 py-0.5 md:px-2 md:py-0.5 rounded">
-                          {h.date}
-                        </span>
-                        <span className="text-xs md:text-sm lg:text-base font-bold text-blue-600 font-mono flex items-center gap-1 md:gap-1.5">
-                          <Clock className="w-2.5 h-2.5 md:w-3.5 md:h-3.5 lg:w-4 lg:h-4" />
-                          {formatTime(h.duration)}
-                        </span>
-                      </div>
-                      {h.memo && (
-                        <p className="text-[10px] md:text-xs lg:text-sm text-slate-600 bg-slate-50 p-1.5 md:p-2 rounded md:rounded-lg mt-1 md:mt-1.5 truncate">
-                          {h.memo}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="p-4 md:p-5 lg:p-6 border-t border-slate-200 bg-white sm:rounded-b-3xl md:rounded-b-[2rem] shrink-0 flex gap-3 md:gap-4 pb-safe-bottom">
-          <button
-            onClick={onDelete}
-            className="text-red-500 bg-red-50 hover:bg-red-100 p-3 md:p-3.5 lg:p-4 rounded-xl md:rounded-2xl font-bold text-xs md:text-sm lg:text-base flex items-center justify-center gap-1.5 md:gap-2 transition-colors"
-          >
-            <Trash2 className="w-3.5 h-3.5 md:w-4 md:h-4 lg:w-5 lg:h-5" /> 削除
-          </button>
-          <button
-            onClick={onClose}
-            className="bg-slate-800 text-white font-bold py-3 md:py-3.5 lg:py-4 rounded-xl md:rounded-2xl text-sm md:text-base lg:text-lg flex-1 shadow-lg active:scale-95 transition-transform"
-          >
-            閉じる
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const SubjectSection = ({
-  unit,
-  subject,
-  tasks,
-  cycleStatus,
-  setDetailTaskId,
-  onAddCustomTask,
-}) => {
-  const [filter, setFilter] = useState("all");
-  const [isAddModalOpen, setAddModalOpen] = useState(false);
-
-  const subjTasks = tasks.filter(
-    (t) => t.unit === unit && t.subject === subject,
-  );
-  if (subjTasks.length === 0 && filter === "all") return null;
-
-  const totalDuration = subjTasks.reduce(
-    (acc, curr) =>
-      acc +
-      curr.currentDuration +
-      curr.history.reduce((hAcc, h) => hAcc + h.duration, 0),
-    0,
-  );
-  const completedCount = subjTasks.filter(
-    (t) => t.status === "completed",
-  ).length;
-  const progress =
-    subjTasks.length > 0
-      ? Math.round((completedCount / subjTasks.length) * 100)
-      : 0;
-
-  const conf = SUBJECT_CONFIG[subject];
-  const filteredTasks = subjTasks.filter((t) =>
-    filter === "all" ? true : t.status === filter || t.isRunning,
-  );
-
-  const tasksByCategory = {};
-  filteredTasks.forEach((task) => {
-    if (!tasksByCategory[task.category]) tasksByCategory[task.category] = [];
-    tasksByCategory[task.category].push(task);
-  });
-
-  return (
-    <div className="relative">
-      <div className="flex flex-col gap-2 md:gap-3 mb-3 md:mb-5">
-        <div className="flex flex-col px-3 py-3 md:px-4 md:py-4 lg:px-5 lg:py-5 bg-white rounded-xl md:rounded-2xl shadow-sm border border-slate-200">
-          <div className="flex justify-between items-center mb-2 md:mb-3">
-            <div className="flex items-center gap-2 md:gap-2.5">
-              <div
-                className={`w-2 h-6 md:w-2.5 md:h-7 rounded-full ${conf.bg}`}
-              />
-              <h3
-                className={`font-black text-lg md:text-xl lg:text-xl ${conf.color}`}
-              >
-                {conf.label}
-              </h3>
-            </div>
-            <div className="text-[10px] md:text-[11px] lg:text-xs font-bold text-slate-500 font-mono bg-slate-50 px-2 py-0.5 md:px-2.5 md:py-1 rounded">
-              計: {Math.floor(totalDuration / 3600)}h{" "}
-              {Math.floor((totalDuration % 3600) / 60)}m
-            </div>
-          </div>
-          <div className="flex items-center gap-2 md:gap-3">
-            <div className="flex-1 h-1.5 md:h-2 bg-slate-100 rounded-full overflow-hidden">
-              <div
-                className={`h-full ${conf.bg}`}
-                style={{ width: `${progress}%` }}
-              />
-            </div>
-            <span className="text-[10px] md:text-[11px] lg:text-xs font-bold text-slate-400 font-mono w-6 md:w-8 text-right">
-              {progress}%
-            </span>
-          </div>
-        </div>
-
-        <div className="flex items-center justify-between px-1">
-          <div className="flex gap-1 bg-white p-0.5 md:p-1 rounded-lg border border-slate-200">
-            {(["all", "not_started", "in_progress", "completed"]).map(
-              (f) => (
-                <button
-                  key={f}
-                  onClick={() => setFilter(f)}
-                  className={`px-2 py-1 md:px-3 md:py-1.5 text-[9px] md:text-[10px] lg:text-xs font-bold rounded-md transition-all ${filter === f ? "bg-slate-800 text-white" : "text-slate-400 hover:bg-slate-50"}`}
-                >
-                  {f === "all"
-                    ? "全て"
-                    : f === "not_started"
-                      ? "未着手"
-                      : f === "in_progress"
-                        ? "勉強中"
-                        : "完了"}
-                </button>
-              ),
-            )}
-          </div>
-          <button
-            onClick={() => setAddModalOpen(true)}
-            className="flex items-center gap-1 px-2 py-1 md:px-3 md:py-1.5 bg-white border border-slate-200 text-blue-600 rounded-lg text-[10px] md:text-xs lg:text-sm font-bold active:bg-blue-50 transition-colors"
-          >
-            <Plus className="w-3 h-3 md:w-3.5 md:h-3.5 lg:w-4 lg:h-4" /> 追加
-          </button>
-        </div>
-      </div>
-
-      <div className="space-y-4 md:space-y-5 lg:space-y-6 pl-1 md:pl-2 lg:pl-2.5 border-l-2 md:border-l-4 border-slate-100 ml-2 md:ml-3 lg:ml-4">
-        {Object.keys(tasksByCategory).length === 0 ? (
-          <div className="text-center py-6 md:py-8 text-slate-400 text-[10px] md:text-xs lg:text-sm font-bold">
-            タスクがありません
-          </div>
-        ) : (
-          Object.keys(tasksByCategory).map((cat) => (
-            <div key={cat} className="pl-3 md:pl-4 lg:pl-5">
-              <h4 className="text-[10px] md:text-[11px] lg:text-xs font-bold text-slate-400 mb-2 md:mb-3">
-                {cat}
-              </h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-3 md:gap-4 lg:gap-5">
-                {tasksByCategory[cat].map((task) => (
-                  <TaskCard
-                    key={task.id}
-                    task={task}
-                    cycleStatus={cycleStatus}
-                    setDetailTaskId={setDetailTaskId}
-                  />
-                ))}
-              </div>
-            </div>
-          ))
-        )}
-      </div>
-
-      <AddCustomTaskModal
-        isOpen={isAddModalOpen}
-        onClose={() => setAddModalOpen(false)}
-        unit={unit}
-        subject={subject}
-        onAdd={(title, category) =>
-          onAddCustomTask(unit, subject, title, category)
-        }
-      />
-    </div>
-  );
-};
-
-const ActiveStudyTimerPanel = ({ tasks }) => {
-  const runningTask = [...tasks]
-    .filter((task) => task.isRunning && task.sessionStartTime)
-    .sort(
-      (a, b) =>
-        (toMillis(b.lastUpdatedAt) || b.sessionStartTime || 0) -
-        (toMillis(a.lastUpdatedAt) || a.sessionStartTime || 0),
-    )[0];
-  const [now, setNow] = useState(Date.now());
-  const [lastVisibleActivityAt, setLastVisibleActivityAt] = useState(
-    Date.now(),
-  );
-
-  useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  useEffect(() => {
-    if (!runningTask) return;
-    const initialActivityAt = runningTask.lastActivityAt || Date.now();
-    setLastVisibleActivityAt(initialActivityAt);
-
-    const handleActivity = () => setLastVisibleActivityAt(Date.now());
-    window.addEventListener("mousemove", handleActivity);
-    window.addEventListener("keydown", handleActivity);
-    window.addEventListener("touchstart", handleActivity);
-    window.addEventListener("scroll", handleActivity);
-    return () => {
-      window.removeEventListener("mousemove", handleActivity);
-      window.removeEventListener("keydown", handleActivity);
-      window.removeEventListener("touchstart", handleActivity);
-      window.removeEventListener("scroll", handleActivity);
-    };
-  }, [runningTask?.id, runningTask?.lastActivityAt]);
-
-  if (!runningTask || !runningTask.sessionStartTime) return null;
-
-  const conf = SUBJECT_CONFIG[runningTask.subject];
-  const currentSeconds =
-    runningTask.currentDuration +
-    Math.floor((now - runningTask.sessionStartTime) / 1000);
-  const historyTotalSeconds = runningTask.history.reduce(
-    (sum, h) => sum + h.duration,
-    0,
-  );
-  const cumulativeSeconds = historyTotalSeconds + currentSeconds;
-  const remainingSeconds = Math.max(
-    0,
-    Math.floor((IDLE_LIMIT_MS - (now - lastVisibleActivityAt)) / 1000),
-  );
-  const remainingLabel = `${String(Math.floor(remainingSeconds / 60)).padStart(2, "0")}:${String(remainingSeconds % 60).padStart(2, "0")}`;
-
-  return (
-    <div className="bg-white rounded-3xl p-5 md:p-7 lg:p-8 shadow-md border border-blue-100 ring-1 ring-blue-50">
-      <div className="flex items-start gap-3 mb-4 md:mb-5">
-        <div
-          className={`w-2.5 h-2.5 rounded-full mt-2 ${conf.bg} animate-pulse`}
-        />
-        <div className="min-w-0">
-          <div className="text-[10px] md:text-xs font-bold text-slate-400 mb-0.5">
-            現在学習中
-          </div>
-          <h2 className="text-lg md:text-2xl lg:text-3xl font-black text-slate-900 leading-tight truncate">
-            {runningTask.title}
-          </h2>
-          <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px] md:text-xs font-bold text-slate-400">
-            <span
-              className={`${conf.lightBg} ${conf.color} border ${conf.border} rounded-full px-2 py-0.5`}
-            >
-              {conf.label}
-            </span>
-            <span>{runningTask.unit}</span>
-            <span>{runningTask.category}</span>
-          </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
-        <div className="rounded-2xl bg-blue-50 border border-blue-100 p-4 md:p-5 text-center">
-          <div className="text-[10px] md:text-xs font-black text-blue-400 mb-2">
-            現在
-          </div>
-          <div className="text-2xl md:text-3xl lg:text-4xl font-black text-blue-600 font-mono tracking-tight">
-            {formatTime(currentSeconds)}
-          </div>
-        </div>
-        <div className="rounded-2xl bg-slate-50 border border-slate-100 p-4 md:p-5 text-center">
-          <div className="text-[10px] md:text-xs font-black text-slate-400 mb-2">
-            停止まで
-          </div>
-          <div className="text-2xl md:text-3xl lg:text-4xl font-black text-slate-800 font-mono tracking-tight">
-            {remainingLabel}
-          </div>
-        </div>
-        <div className="rounded-2xl bg-slate-50 border border-slate-100 p-4 md:p-5 text-center">
-          <div className="text-[10px] md:text-xs font-black text-slate-400 mb-2">
-            累計
-          </div>
-          <div className="text-2xl md:text-3xl lg:text-4xl font-black text-slate-900 font-mono tracking-tight">
-            {formatTime(cumulativeSeconds)}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const TodayStudyTimeline = ({ tasks }) => {
-  const [now, setNow] = useState(Date.now());
-  const [showDetails, setShowDetails] = useState(false);
-  const todayLabel = new Date().toLocaleDateString("ja-JP", {
-    month: "numeric",
-    day: "numeric",
-  });
-  const todayAltLabel = `${new Date().getMonth() + 1}/${new Date().getDate()}`;
-
-  useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  const activeRunningTask = useMemo(() => {
-    return [...tasks]
-      .filter((task) => task.isRunning && task.sessionStartTime)
-      .sort(
-        (a, b) =>
-          (toMillis(b.lastUpdatedAt) || b.sessionStartTime || 0) -
-          (toMillis(a.lastUpdatedAt) || a.sessionStartTime || 0),
-      )[0];
-  }, [tasks]);
-
-  const sessions = useMemo(() => {
-    const list = [];
-
-    tasks.forEach((task) => {
-      task.history.forEach((h) => {
-        const isToday =
-          h.date === todayLabel ||
-          h.date === todayAltLabel ||
-          h.date.endsWith(`/${todayAltLabel}`);
-        if (!isToday || !h.duration) return;
-
-        const endAt = h.endAt || Date.now();
-        const startAt = h.startAt || endAt - h.duration * 1000;
-
-        list.push({
-          id: `${task.id}-${h.id}`,
-          subject: task.subject,
-          title: task.title,
-          unit: task.unit,
-          category: task.category,
-          duration: h.duration,
-          startAt,
-          endAt,
-        });
-      });
-
-      if (activeRunningTask?.id === task.id && task.sessionStartTime) {
-        const runningDuration =
-          task.currentDuration +
-          Math.floor((now - task.sessionStartTime) / 1000);
-        list.push({
-          id: `${task.id}-running`,
-          subject: task.subject,
-          title: task.title,
-          unit: task.unit,
-          category: task.category,
-          duration: runningDuration,
-          startAt: task.sessionStartTime,
-          endAt: now,
-          isRunning: true,
-        });
-      }
-    });
-
-    return list.sort((a, b) => a.startAt - b.startAt);
-  }, [tasks, todayLabel, todayAltLabel, now, activeRunningTask?.id]);
-
-  const displaySessions = useMemo(() => {
-    // 既存バグや同期遅延で複数教科のrunning履歴が重なった場合でも、
-    // 画面上は「同時に複数教科を勉強していない」前提で重複時間を除外して表示する。
-    // 後から始まった記録を優先し、前の記録は重なった時点で切る。
-    const normalized = [];
-
-    sessions.forEach((session) => {
-      const startAt = Math.min(session.startAt, session.endAt);
-      const endAt = Math.max(session.startAt, session.endAt);
-      if (endAt - startAt < 1000) return;
-
-      const nextSession = {
-        ...session,
-        startAt,
-        endAt,
-        duration: Math.max(1, Math.floor((endAt - startAt) / 1000)),
-      };
-
-      const preserved = [];
-
-      normalized.forEach((existing) => {
-        if (existing.endAt <= startAt || existing.startAt >= endAt) {
-          preserved.push(existing);
-          return;
-        }
-
-        if (existing.startAt < startAt) {
-          const leftEnd = startAt;
-          if (leftEnd - existing.startAt >= 1000) {
-            preserved.push({
-              ...existing,
-              endAt: leftEnd,
-              duration: Math.max(
-                1,
-                Math.floor((leftEnd - existing.startAt) / 1000),
-              ),
-            });
-          }
-        }
-
-        if (existing.endAt > endAt) {
-          const rightStart = endAt;
-          if (existing.endAt - rightStart >= 1000) {
-            preserved.push({
-              ...existing,
-              id: `${existing.id}-tail`,
-              startAt: rightStart,
-              duration: Math.max(
-                1,
-                Math.floor((existing.endAt - rightStart) / 1000),
-              ),
-            });
-          }
-        }
-      });
-
-      preserved.push(nextSession);
-      normalized.splice(
-        0,
-        normalized.length,
-        ...preserved.sort((a, b) => a.startAt - b.startAt || a.endAt - b.endAt),
-      );
-    });
-
-    return normalized
-      .filter((s) => s.endAt > s.startAt)
-      .map((s) => ({
-        ...s,
-        duration: Math.max(1, Math.floor((s.endAt - s.startAt) / 1000)),
-      }))
-      .sort((a, b) => a.startAt - b.startAt || a.endAt - b.endAt);
-  }, [sessions]);
-
-  const totalSeconds = displaySessions.reduce((sum, s) => sum + s.duration, 0);
-
-  const range = useMemo(() => {
-    const minute = 60 * 1000;
-    const pickStep = (span) => {
-      const steps = [5, 10, 30, 60].map((m) => m * minute);
-      return steps.find((candidate) => span / candidate <= 6) || steps[steps.length - 1];
-    };
-    const floorToStep = (value, step) =>
-      Math.floor(value / step) * step;
-    const ceilToStep = (value, step) =>
-      Math.ceil(value / step) * step;
-
-    if (displaySessions.length === 0) {
-      const base = new Date();
-      base.setHours(6, 0, 0, 0);
-      const end = new Date(base);
-      end.setHours(22, 0, 0, 0);
-      const step = 60 * minute;
-      return { start: base.getTime(), end: end.getTime(), step };
-    }
-
-    const minStart = Math.min(...displaySessions.map((s) => s.startAt));
-    const maxEnd = Math.max(...displaySessions.map((s) => s.endAt));
-    const studiedSpan = Math.max(1, maxEnd - minStart);
-
-    // 実績の前後に余白を持たせ、時刻目盛りは 5/10/30/60分単位のキリの良い時刻に揃える。
-    const rawPadding = Math.max(5 * minute, Math.min(15 * minute, studiedSpan * 0.15));
-    const minAxisSpan = 20 * minute;
-    let rawStart = minStart - rawPadding;
-    let rawEnd = maxEnd + rawPadding;
-
-    if (rawEnd - rawStart < minAxisSpan) {
-      const center = (minStart + maxEnd) / 2;
-      rawStart = center - minAxisSpan / 2;
-      rawEnd = center + minAxisSpan / 2;
-    }
-
-    let step = pickStep(rawEnd - rawStart);
-    let axisStart = floorToStep(rawStart, step);
-    let axisEnd = ceilToStep(rawEnd, step);
-
-    // 丸めた結果で目盛りが多すぎる場合は、もう一段粗い刻みにする。
-    step = pickStep(axisEnd - axisStart);
-    axisStart = floorToStep(rawStart, step);
-    axisEnd = ceilToStep(rawEnd, step);
-
-    const dayStart = new Date(minStart);
-    dayStart.setHours(0, 0, 0, 0);
-    const dayEnd = new Date(minStart);
-    dayEnd.setHours(23, 59, 59, 999);
-
-    axisStart = Math.max(dayStart.getTime(), axisStart);
-    axisEnd = Math.min(dayEnd.getTime(), axisEnd);
-
-    if (axisEnd - axisStart < minAxisSpan) {
-      axisEnd = Math.min(dayEnd.getTime(), ceilToStep(axisStart + minAxisSpan, step));
-      axisStart = Math.max(dayStart.getTime(), floorToStep(axisEnd - minAxisSpan, step));
-    }
-
-    return { start: axisStart, end: axisEnd, step };
-  }, [displaySessions]);
-
-  const axisLabels = useMemo(() => {
-    const labels = [];
-    for (let t = range.start; t <= range.end; t += range.step) {
-      labels.push(t);
-    }
-    if (labels.length === 0 || labels[labels.length - 1] !== range.end) {
-      labels.push(range.end);
-    }
-    return labels.filter(
-      (time, index, arr) => index === 0 || time - arr[index - 1] >= 60 * 1000,
-    );
-  }, [range]);
-
-  const formatClock = (time) => {
-    const d = new Date(time);
-    return `${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}`;
-  };
-
-  const groupedSessions = Object.keys(SUBJECT_CONFIG).map(
-    (subject) => ({
-      subject,
-      sessions: displaySessions.filter((s) => s.subject === subject),
-    }),
-  );
-
-  const getLeftPercent = (time) =>
-    ((time - range.start) / Math.max(1, range.end - range.start)) * 100;
-
-  return (
-    <div className="bg-white rounded-3xl p-4 md:p-7 lg:p-8 shadow-md border border-slate-200 overflow-hidden">
-      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 md:gap-4 mb-5 md:mb-6 min-w-0">
-        <div className="min-w-0">
-          <h2 className="text-sm md:text-base lg:text-lg font-black text-slate-800 flex items-center gap-1.5 md:gap-2">
-            <Clock className="text-blue-500 w-4 h-4 md:w-5 md:h-5 lg:w-6 lg:h-6 shrink-0" />
-            今日の学習タイムライン
-          </h2>
-          <p className="text-[10px] md:text-xs lg:text-sm font-bold text-slate-400 mt-1">
-            何時にどの教科を勉強したかを、実績時間に合わせた横軸で表示します
-          </p>
-          {sessions.length !== displaySessions.length && (
-            <p className="text-[10px] md:text-xs font-bold text-amber-500 mt-1">
-              重複していた時間帯は、後から始めた記録を優先して表示しています
-            </p>
-          )}
-        </div>
-        <div className="bg-blue-50 border border-blue-100 rounded-2xl px-4 py-3 text-right shrink-0 self-start sm:self-auto">
-          <div className="text-[10px] md:text-xs font-bold text-blue-400 mb-0.5">
-            本日の総勉強時間
-          </div>
-          <div className="text-2xl md:text-3xl lg:text-4xl font-black text-blue-600 font-mono">
-            {Math.floor(totalSeconds / 3600)}
-            <span className="text-xs md:text-sm text-blue-300 mx-0.5">h</span>
-            {Math.floor((totalSeconds % 3600) / 60)}
-            <span className="text-xs md:text-sm text-blue-300 ml-0.5">m</span>
-          </div>
-        </div>
-      </div>
-
-      {displaySessions.length === 0 ? (
-        <div className="text-center py-8 md:py-10 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-          <div className="text-sm md:text-base font-bold text-slate-400">
-            本日の学習記録はまだありません
-          </div>
-          <div className="text-[10px] md:text-xs text-slate-300 mt-1">
-            タイマーで記録を保存すると、ここに時間帯が表示されます
-          </div>
-        </div>
-      ) : (
-        <div className="min-w-0">
-          <div className="space-y-2.5 md:space-y-3 mt-3 min-w-0">
-            {groupedSessions.map(({ subject, sessions: subjectSessions }) => {
-              const conf = SUBJECT_CONFIG[subject];
-              return (
-                <div
-                  key={subject}
-                  className="flex items-center gap-2 md:gap-3 min-w-0"
-                >
-                  <div
-                    className={`w-6 md:w-9 text-xs md:text-sm font-black text-center shrink-0 ${conf.color}`}
-                  >
-                    {conf.short}
-                  </div>
-                  <div className="relative flex-1 min-w-0 h-9 md:h-12 bg-slate-50 rounded-xl border border-slate-100 overflow-hidden">
-                    {axisLabels.map((t, idx) => {
-                      const left = getLeftPercent(t);
-                      return (
-                        <div
-                          key={`${t}-${idx}-grid`}
-                          className="absolute top-0 bottom-0 w-px bg-slate-200/70"
-                          style={{ left: `${left}%` }}
-                        />
-                      );
-                    })}
-                    {subjectSessions.map((s) => {
-                      const left = Math.max(
-                        0,
-                        Math.min(99, getLeftPercent(s.startAt)),
-                      );
-                      const rawWidth =
-                        ((s.endAt - s.startAt) /
-                          Math.max(1, range.end - range.start)) *
-                        100;
-                      const width = Math.min(
-                        Math.max(3, rawWidth),
-                        Math.max(1, 100 - left),
-                      );
-                      return (
-                        <div
-                          key={s.id}
-                          className={`absolute top-1.5 bottom-1.5 ${conf.bg} text-white rounded-lg shadow-sm px-1.5 md:px-2 flex items-center overflow-hidden ${s.isRunning ? "animate-pulse ring-2 ring-blue-200" : ""}`}
-                          style={{ left: `${left}%`, width: `${width}%` }}
-                          title={`${conf.label} ${s.unit} ${s.title} ${formatClock(s.startAt)}-${formatClock(s.endAt)} ${formatTime(s.duration)}`}
-                        >
-                          <span className="text-[9px] md:text-xs font-black truncate">
-                            {formatClock(s.startAt)}{" "}
-                            {s.isRunning ? "計測中" : s.title}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          <div className="ml-8 md:ml-12 relative h-7 border-t border-slate-200 mt-3 min-w-0">
-            {axisLabels.map((t, idx) => {
-              const left = getLeftPercent(t);
-              const alignClass =
-                idx === 0
-                  ? "translate-x-0 text-left"
-                  : idx === axisLabels.length - 1
-                    ? "-translate-x-full text-right"
-                    : "-translate-x-1/2 text-center";
-              return (
-                <div
-                  key={`${t}-${idx}-bottom`}
-                  className={`absolute top-1.5 text-[9px] md:text-xs font-bold text-slate-400 whitespace-nowrap ${alignClass}`}
-                  style={{ left: `${left}%` }}
-                >
-                  {formatClock(t)}
-                </div>
-              );
-            })}
-          </div>
-
-          <div className="mt-4 flex justify-end">
-            <button
-              type="button"
-              onClick={() => setShowDetails((prev) => !prev)}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[10px] md:text-xs font-black text-slate-500 active:scale-95 transition-all hover:bg-slate-100"
-            >
-              <ChevronDown
-                className={`w-3.5 h-3.5 md:w-4 md:h-4 transition-transform ${showDetails ? "rotate-180" : ""}`}
-              />
-              {showDetails
-                ? "詳細を閉じる"
-                : `詳細を表示（${displaySessions.length}件）`}
-            </button>
-          </div>
-
-          {showDetails && (
-            <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2">
-              {displaySessions.map((s) => {
-                const conf = SUBJECT_CONFIG[s.subject];
-                return (
-                  <div
-                    key={`detail-${s.id}`}
-                    className="flex items-center justify-between gap-3 bg-slate-50 rounded-xl px-3 py-2 border border-slate-100 min-w-0"
-                  >
-                    <div className="min-w-0 flex items-center gap-2">
-                      <span
-                        className={`shrink-0 text-[10px] font-black text-white ${conf.bg} rounded px-1.5 py-0.5`}
-                      >
-                        {conf.short}
-                      </span>
-                      <span className="truncate text-xs md:text-sm font-bold text-slate-700">
-                        {s.unit} / {s.title}
-                      </span>
-                    </div>
-                    <div className="shrink-0 text-[10px] md:text-xs font-mono font-bold text-slate-500">
-                      {formatClock(s.startAt)}-{formatClock(s.endAt)} /{" "}
-                      {formatTime(s.duration)}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-};
-
-const DailyView = ({
-  tasks,
-  cycleStatus,
-  deleteUnitTasks,
-  setAddModalOpen,
-  selectedUnit,
-  setSelectedUnit,
-  unitsWithTasks,
-  onAddCustomTask,
-  setDetailTaskId,
-  setDeleteConfirmation,
-}) => {
-  const getStats = (targetTasks) => {
-    if (targetTasks.length === 0) return { progress: 0, totalTime: 0 };
-    const completed = targetTasks.filter(
-      (t) => t.status === "completed",
-    ).length;
-    const progress = Math.round((completed / targetTasks.length) * 100);
-    const totalTime = targetTasks.reduce(
-      (acc, curr) =>
-        acc +
-        curr.history.reduce((hAcc, h) => hAcc + h.duration, 0) +
-        curr.currentDuration,
-      0,
-    );
-    return { progress, totalTime };
-  };
-
-  const allStats = useMemo(() => {
-    const total = getStats(tasks);
-    const subjects = Object.keys(SUBJECT_CONFIG).map((subj) => ({
-      id: subj,
-      ...getStats(tasks.filter((t) => t.subject === subj)),
-    }));
-    return { total, subjects };
-  }, [tasks]);
-
-  return (
-    <div className="flex flex-col h-full">
-      <div className="sticky top-0 z-20 px-4 py-3 md:px-6 md:py-4 lg:px-8 lg:py-5 bg-white/80 backdrop-blur-md border-b border-slate-200">
-        <div className="flex gap-2 md:gap-3">
-          <button
-            onClick={() => setSelectedUnit(null)}
-            className={`px-4 py-2.5 md:px-5 md:py-3 lg:px-6 lg:py-3.5 rounded-xl md:rounded-2xl font-bold text-xs md:text-sm lg:text-base flex items-center justify-center transition-all ${!selectedUnit ? "bg-slate-800 text-white shadow-md" : "bg-white text-slate-500 border border-slate-200"}`}
-          >
-            <LayoutDashboard className="mr-1.5 w-[14px] h-[14px] md:w-4 md:h-4 lg:w-5 lg:h-5 lg:mr-2" />{" "}
-            全体
-          </button>
-          <div className="flex-1 relative">
-            <select
-              value={selectedUnit || ""}
-              onChange={(e) =>
-                e.target.value === "NEW"
-                  ? setAddModalOpen(true)
-                  : setSelectedUnit(e.target.value)
-              }
-              className={`w-full h-full appearance-none rounded-xl md:rounded-2xl font-bold text-xs md:text-sm lg:text-base pl-3 pr-8 md:pl-4 md:pr-9 focus:outline-none transition-all cursor-pointer ${selectedUnit ? "bg-blue-600 text-white shadow-md shadow-blue-200" : "bg-white border border-slate-200 text-slate-600"}`}
-            >
-              <option value="" disabled>
-                回を選択...
-              </option>
-              <optgroup label="学習中の回">
-                {unitsWithTasks.map((w) => (
-                  <option key={w} value={w} className="text-slate-800 bg-white">
-                    {w}
-                  </option>
-                ))}
-              </optgroup>
-              <optgroup label="アクション">
-                <option value="NEW" className="text-blue-600 bg-white">
-                  + 新しい回を追加
-                </option>
-              </optgroup>
-            </select>
-            <ChevronDown
-              className={`absolute right-3 md:right-4 top-1/2 -translate-y-1/2 pointer-events-none w-[14px] h-[14px] md:w-4 md:h-4 lg:w-5 lg:h-5 ${selectedUnit ? "text-white" : "text-slate-400"}`}
-            />
-          </div>
-        </div>
-      </div>
-
-      <div className="pt-4 px-4 md:px-6 lg:px-8 md:pt-6 lg:pt-8 space-y-6 md:space-y-8 lg:space-y-10 pb-32 md:pb-40">
-        {selectedUnit ? (
-          <div className="space-y-6 md:space-y-8 lg:space-y-10 animate-in fade-in slide-in-from-bottom-4">
-            {(() => {
-              const unitTasks = tasks.filter(
-                (t) => t.unit === selectedUnit,
-              );
-              const { progress, totalTime } = getStats(unitTasks);
-              return (
-                <div className="bg-white rounded-2xl md:rounded-3xl p-5 md:p-6 lg:p-8 shadow-sm border border-slate-200 relative overflow-hidden">
-                  <div className="flex justify-between items-end mb-3 md:mb-4">
-                    <div>
-                      <h2 className="text-xl md:text-2xl lg:text-3xl font-black text-slate-800">
-                        {selectedUnit}
-                      </h2>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-3xl md:text-4xl lg:text-5xl font-black text-slate-800 tracking-tight">
-                        {progress}
-                        <span className="text-sm md:text-lg lg:text-xl font-bold text-slate-400 ml-0.5 md:ml-1">
-                          %
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex justify-between items-center mb-1.5 md:mb-2">
-                    <span className="text-[10px] md:text-xs lg:text-sm font-bold text-slate-400">
-                      全体進捗
-                    </span>
-                    <span className="text-[10px] md:text-xs lg:text-sm font-bold font-mono text-blue-600">
-                      計 {Math.floor(totalTime / 3600)}h{" "}
-                      {Math.floor((totalTime % 3600) / 60)}m
-                    </span>
-                  </div>
-                  <div className="h-2 md:h-2.5 lg:h-3 bg-slate-100 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-blue-500 rounded-full"
-                      style={{ width: `${progress}%` }}
-                    />
-                  </div>
-                </div>
-              );
-            })()}
-
-            {Object.keys(SUBJECT_CONFIG).map((subj) => (
-              <SubjectSection
-                key={subj}
-                unit={selectedUnit}
-                subject={subj}
-                tasks={tasks}
-                cycleStatus={cycleStatus}
-                setDetailTaskId={setDetailTaskId}
-                onAddCustomTask={onAddCustomTask}
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="space-y-5 md:space-y-7 animate-in fade-in">
-            <div className="bg-white rounded-3xl p-5 md:p-7 lg:p-8 shadow-md border border-slate-200">
-              <h2 className="text-sm md:text-base lg:text-lg font-black text-slate-800 mb-3 md:mb-5 flex items-center gap-1.5 md:gap-2">
-                <Award className="text-blue-500 w-4 h-4 md:w-5 md:h-5 lg:w-6 lg:h-6" />{" "}
-                全期間サマリー
-              </h2>
-              <div className="flex justify-between items-end mb-4 md:mb-6 pb-4 md:pb-6 border-b border-slate-100">
-                <div>
-                  <div className="text-[10px] md:text-xs lg:text-sm text-slate-400 font-bold mb-0.5 md:mb-1">
-                    全体完了率
-                  </div>
-                  <div className="text-3xl md:text-4xl lg:text-5xl font-black text-slate-800">
-                    {allStats.total.progress}
-                    <span className="text-sm md:text-lg lg:text-xl text-slate-400 ml-0.5 md:ml-1">
-                      %
-                    </span>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="text-[10px] md:text-xs lg:text-sm text-slate-400 font-bold mb-0.5 md:mb-1">
-                    総勉強時間
-                  </div>
-                  <div className="text-xl md:text-2xl lg:text-3xl font-black text-blue-600 font-mono">
-                    {Math.floor(allStats.total.totalTime / 3600)}
-                    <span className="text-xs md:text-sm lg:text-base text-slate-400 mx-0.5 md:mx-1">
-                      h
-                    </span>
-                    {Math.floor((allStats.total.totalTime % 3600) / 60)}
-                    <span className="text-xs md:text-sm lg:text-base text-slate-400 ml-0.5 md:ml-1">
-                      m
-                    </span>
-                  </div>
-                </div>
-              </div>
-              <div className="space-y-2.5 md:space-y-3 lg:space-y-4">
-                {allStats.subjects.map((s) => {
-                  const conf = SUBJECT_CONFIG[s.id];
-                  return (
-                    <div
-                      key={s.id}
-                      className="flex items-center gap-2 md:gap-3 lg:gap-4"
-                    >
-                      <span
-                        className={`text-[10px] md:text-[11px] lg:text-xs font-bold w-6 md:w-8 lg:w-10 ${conf.color}`}
-                      >
-                        {conf.short}
-                      </span>
-                      <div className="flex-1 h-1.5 md:h-2 bg-slate-100 rounded-full overflow-hidden">
-                        <div
-                          className={`h-full ${conf.bg}`}
-                          style={{ width: `${s.progress}%` }}
-                        />
-                      </div>
-                      <span className="text-[10px] md:text-[11px] lg:text-xs font-bold text-slate-400 w-12 md:w-14 lg:w-16 text-right font-mono">
-                        {Math.floor(s.totalTime / 3600)}h
-                        {Math.floor((s.totalTime % 3600) / 60)}m
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            <ActiveStudyTimerPanel tasks={tasks} />
-
-            <TodayStudyTimeline tasks={tasks} />
-
-            <h3 className="font-bold text-slate-500 text-xs md:text-sm lg:text-base pl-1 md:pl-2">
-              学習回ごとの詳細
-            </h3>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-5 lg:gap-6">
-              {unitsWithTasks.map((unit) => {
-                const unitTasks = tasks.filter((t) => t.unit === unit);
-                const { progress, totalTime } = getStats(unitTasks);
-                const subjStats = Object.keys(SUBJECT_CONFIG).map((subj) => ({
-                  id: subj,
-                  ...getStats(
-                    unitTasks.filter((t) => t.subject === subj),
-                  ),
-                }));
-
-                return (
-                  <div
-                    key={unit}
-                    onClick={() => setSelectedUnit(unit)}
-                    className="bg-white rounded-2xl md:rounded-3xl p-4 md:p-5 lg:p-6 shadow-sm border border-slate-200 active:scale-[0.98] transition-all cursor-pointer relative"
-                  >
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setDeleteConfirmation({
-                          title: `「${unit}」の削除`,
-                          message: `本当に「${unit}」を削除しますか？\nタスクと履歴がすべて消去されます。`,
-                          onConfirm: () => deleteUnitTasks(unit),
-                        });
-                      }}
-                      className="absolute top-3 md:top-4 right-3 md:right-4 p-1.5 md:p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors z-10"
-                    >
-                      <Trash2 className="w-[14px] h-[14px] md:w-4 md:h-4 lg:w-5 lg:h-5" />
-                    </button>
-                    <div className="flex justify-between items-center mb-3 md:mb-4 pr-8 md:pr-8">
-                      <div className="font-black text-lg md:text-xl lg:text-2xl text-slate-800">
-                        {unit}
-                      </div>
-                      <div className="text-[10px] md:text-[11px] lg:text-xs font-bold text-slate-400 font-mono">
-                        {Math.floor(totalTime / 3600)}h{" "}
-                        {Math.floor((totalTime % 3600) / 60)}m
-                      </div>
-                    </div>
-                    <div className="mb-3 md:mb-4">
-                      <div className="flex justify-between text-[10px] md:text-[11px] lg:text-xs font-bold mb-1 md:mb-1.5">
-                        <span className="text-slate-400">全体進捗</span>
-                        <span className="text-blue-600">{progress}%</span>
-                      </div>
-                      <div className="h-1.5 md:h-2 bg-slate-100 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-blue-500 rounded-full"
-                          style={{ width: `${progress}%` }}
-                        />
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-4 gap-2 md:gap-3 pt-3 md:pt-4 border-t border-slate-50">
-                      {subjStats.map((s) => {
-                        const conf = SUBJECT_CONFIG[s.id];
-                        return (
-                          <div
-                            key={s.id}
-                            className="flex flex-col gap-1 md:gap-1.5"
-                          >
-                            <div className="flex justify-between items-center text-[9px] md:text-[10px] lg:text-[11px] font-bold">
-                              <span className={conf.color}>{conf.short}</span>
-                              <span className="text-slate-400">
-                                {s.progress}%
-                              </span>
-                            </div>
-                            <div className="h-1 md:h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                              <div
-                                className={`h-full ${conf.bg}`}
-                                style={{ width: `${s.progress}%` }}
-                              />
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
-
-const TestsView = ({ tests, onSaveTest, onDeleteTest }) => {
-  const [selectedSubjects, setSelectedSubjects] = useState(["4ko"]);
-  const [isModalOpen, setModalOpen] = useState(false);
-  const [editingTest, setEditingTest] = useState(null);
-  const [filterType, setFilterType] = useState("all");
-  const [dateRange, setDateRange] = useState(getDefaultTestDateRange);
-
-  const toggleSubject = (subj) => {
-    setSelectedSubjects((prev) =>
-      prev.includes(subj) ? prev.filter((s) => s !== subj) : [...prev, subj],
-    );
-  };
-
-  const filteredTests = useMemo(() => {
-    const start = parseTestDate(dateRange.start).getTime();
-    const endDate = parseTestDate(dateRange.end);
-    endDate.setHours(23, 59, 59, 999);
-    const end = endDate.getTime();
-
-    return [...tests].filter((t) => {
-      const time = parseTestDate(t.date).getTime();
-      const matchType = filterType === "all" || t.type === filterType;
-      return matchType && time >= start && time <= end;
-    });
-  }, [tests, filterType, dateRange]);
-
-  const chartData = useMemo(() => {
-    return [...filteredTests]
-      .sort(
-        (a, b) =>
-          parseTestDate(a.date).getTime() - parseTestDate(b.date).getTime(),
-      )
-      .map((t) => {
-        const dp = { name: t.date.slice(5), testName: t.name };
-        if (selectedSubjects.includes("4ko")) dp["4ko"] = t.total4.dev;
-        ["math", "japanese", "science", "social"].forEach((s) => {
-          if (selectedSubjects.includes(s))
-            dp[s] = t.subjects[s].dev;
-        });
-        return dp;
-      });
-  }, [filteredTests, selectedSubjects]);
-
-  const tableData = [...filteredTests].sort(
-    (a, b) => parseTestDate(b.date).getTime() - parseTestDate(a.date).getTime(),
-  );
-
-  const summary = useMemo(() => {
-    const sorted = [...filteredTests].sort(
-      (a, b) => parseTestDate(b.date).getTime() - parseTestDate(a.date).getTime(),
-    );
-    const latest = sorted[0];
-    const previous = sorted[1];
-    const best = filteredTests.reduce(
-      (hit, t) => (!hit || t.total4.dev > hit.total4.dev ? t : hit),
-      null,
-    );
-    return {
-      latest,
-      previous,
-      best,
-      delta:
-        latest && previous
-          ? Number((latest.total4.dev - previous.total4.dev).toFixed(1))
-          : null,
-      count: filteredTests.length,
-    };
-  }, [filteredTests]);
-
-  const resetDateRange = () => setDateRange(getDefaultTestDateRange());
-
-  return (
-    <div className="flex flex-col h-full bg-slate-50">
-      <div className="bg-white sticky top-0 z-20 px-4 py-4 md:px-6 md:py-5 lg:px-8 lg:py-6 border-b border-slate-200 shadow-sm space-y-3 md:space-y-4">
-        <div className="flex justify-between items-start gap-3">
-          <div>
-            <p className="text-xs md:text-sm font-black text-blue-600 mb-1">
-              成績推移
-            </p>
-            <h2 className="text-xl md:text-2xl lg:text-3xl font-black text-slate-800">
-              偏差値の変化を見る
-            </h2>
-          </div>
-          <button
-            onClick={() => {
-              setEditingTest(null);
-              setModalOpen(true);
-            }}
-            className="bg-blue-600 text-white px-3 py-2.5 md:px-4 md:py-3 rounded-xl md:rounded-2xl active:scale-95 font-black text-sm md:text-base flex items-center gap-1.5 shadow-lg shadow-blue-100"
-          >
-            <Plus className="w-4 h-4 md:w-5 md:h-5" />
-            追加
-          </button>
-        </div>
-
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3">
-          <div className="rounded-2xl bg-slate-900 text-white px-3 py-3 md:px-4 md:py-4">
-            <div className="text-[11px] md:text-xs font-bold text-slate-300">
-              最新4科
-            </div>
-            <div className="text-2xl md:text-3xl font-black mt-1">
-              {summary.latest ? summary.latest.total4.dev : "-"}
-            </div>
-          </div>
-          <div className="rounded-2xl bg-white border border-slate-200 px-3 py-3 md:px-4 md:py-4">
-            <div className="text-[11px] md:text-xs font-bold text-slate-400">
-              前回差
-            </div>
-            <div
-              className={`text-2xl md:text-3xl font-black mt-1 ${
-                summary.delta === null
-                  ? "text-slate-400"
-                  : summary.delta >= 0
-                    ? "text-rose-500"
-                    : "text-blue-500"
-              }`}
-            >
-              {summary.delta === null
-                ? "-"
-                : `${summary.delta > 0 ? "+" : ""}${summary.delta}`}
-            </div>
-          </div>
-          <div className="rounded-2xl bg-white border border-slate-200 px-3 py-3 md:px-4 md:py-4">
-            <div className="text-[11px] md:text-xs font-bold text-slate-400">
-              期間ベスト
-            </div>
-            <div className="text-2xl md:text-3xl font-black text-slate-800 mt-1">
-              {summary.best ? summary.best.total4.dev : "-"}
-            </div>
-          </div>
-          <div className="rounded-2xl bg-white border border-slate-200 px-3 py-3 md:px-4 md:py-4">
-            <div className="text-[11px] md:text-xs font-bold text-slate-400">
-              表示件数
-            </div>
-            <div className="text-2xl md:text-3xl font-black text-slate-800 mt-1">
-              {summary.count}
-            </div>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-3">
-          <div className="flex gap-1.5 md:gap-2 overflow-x-auto no-scrollbar">
-            <button
-              onClick={() => setFilterType("all")}
-              className={`px-4 py-2.5 md:px-5 md:py-3 rounded-xl text-sm md:text-base font-black border whitespace-nowrap ${filterType === "all" ? "bg-slate-800 text-white border-slate-800" : "bg-white border-slate-200 text-slate-500"}`}
-            >
-              全て
-            </button>
-            {Object.entries(TEST_TYPE_CONFIG).map(([k, v]) => (
-              <button
-                key={k}
-                onClick={() => setFilterType(k)}
-                className={`px-4 py-2.5 md:px-5 md:py-3 rounded-xl text-sm md:text-base font-black border whitespace-nowrap ${filterType === k ? v.activeClass : "bg-white border-slate-200 text-slate-500"}`}
-              >
-                {v.label}
-              </button>
-            ))}
-          </div>
-          <div className="grid grid-cols-[1fr_1fr_auto] gap-2">
-            <input
-              type="date"
-              value={dateRange.start}
-              onChange={(e) =>
-                setDateRange((prev) => ({ ...prev, start: e.target.value }))
-              }
-              className="bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-2 md:px-3 md:py-2.5 text-sm md:text-base font-bold"
-            />
-            <input
-              type="date"
-              value={dateRange.end}
-              onChange={(e) =>
-                setDateRange((prev) => ({ ...prev, end: e.target.value }))
-              }
-              className="bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-2 md:px-3 md:py-2.5 text-sm md:text-base font-bold"
-            />
-            <button
-              onClick={resetDateRange}
-              className="px-3 md:px-4 rounded-xl bg-slate-100 text-slate-600 font-black text-xs md:text-sm whitespace-nowrap"
-            >
-              半年
-            </button>
-          </div>
-        </div>
-        <div className="flex gap-1.5 md:gap-2 overflow-x-auto pb-0.5 md:pb-1 no-scrollbar">
-          <button
-            onClick={() => toggleSubject("4ko")}
-            className={`flex-1 py-2.5 px-3 md:py-3 md:px-4 rounded-xl text-sm md:text-base font-black whitespace-nowrap transition-colors ${selectedSubjects.includes("4ko") ? "bg-slate-800 text-white" : "bg-slate-100 text-slate-500"}`}
-          >
-            4科
-          </button>
-          {["math", "japanese", "science", "social"].map((s) => (
-            <button
-              key={s}
-              onClick={() => toggleSubject(s)}
-              className={`flex-1 py-2.5 px-3 md:py-3 md:px-4 rounded-xl text-sm md:text-base font-black whitespace-nowrap transition-colors ${selectedSubjects.includes(s) ? `${SUBJECT_CONFIG[s].bg} text-white` : "bg-slate-100 text-slate-500"}`}
-            >
-              {SUBJECT_CONFIG[s].label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="flex-1 overflow-y-auto px-3 py-4 md:px-6 md:py-6 lg:px-8 lg:py-8 space-y-5 md:space-y-6 lg:space-y-8 pb-20 md:pb-32">
-        <div className="bg-white p-4 md:p-6 lg:p-7 rounded-2xl md:rounded-3xl shadow-sm border border-slate-200 h-72 md:h-96 lg:h-[30rem] shrink-0">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart
-              data={chartData}
-              margin={{ top: 10, right: 12, left: -8, bottom: 8 }}
-            >
-              <CartesianGrid
-                strokeDasharray="3 3"
-                vertical={false}
-                stroke="#f1f5f9"
-              />
-              <XAxis
-                dataKey="name"
-                tick={{ fontSize: 12, fontWeight: 700 }}
-                axisLine={false}
-                tickLine={false}
-              />
-              <YAxis
-                domain={["auto", "auto"]}
-                tick={{ fontSize: 12, fontWeight: 700 }}
-                axisLine={false}
-                tickLine={false}
-              />
-              <Tooltip
-                contentStyle={{
-                  borderRadius: "12px",
-                  fontSize: "14px",
-                  padding: "8px 12px",
-                  fontWeight: 700,
-                }}
-              />
-              <ReferenceLine y={50} stroke="#cbd5e1" strokeDasharray="3 3" />
-              {selectedSubjects.includes("4ko") && (
-                <Line
-                  type="monotone"
-                  dataKey="4ko"
-                  name="4科"
-                  stroke="#334155"
-                  strokeWidth={2.5}
-                  dot={{ r: 3 }}
-                />
-              )}
-              {selectedSubjects.includes("math") && (
-                <Line
-                  type="monotone"
-                  dataKey="math"
-                  name={SUBJECT_CONFIG.math.label}
-                  stroke={SUBJECT_CONFIG.math.hex}
-                  strokeWidth={2}
-                  dot={false}
-                />
-              )}
-              {selectedSubjects.includes("japanese") && (
-                <Line
-                  type="monotone"
-                  dataKey="japanese"
-                  name={SUBJECT_CONFIG.japanese.label}
-                  stroke={SUBJECT_CONFIG.japanese.hex}
-                  strokeWidth={2}
-                  dot={false}
-                />
-              )}
-              {selectedSubjects.includes("science") && (
-                <Line
-                  type="monotone"
-                  dataKey="science"
-                  name={SUBJECT_CONFIG.science.label}
-                  stroke={SUBJECT_CONFIG.science.hex}
-                  strokeWidth={2}
-                  dot={false}
-                />
-              )}
-              {selectedSubjects.includes("social") && (
-                <Line
-                  type="monotone"
-                  dataKey="social"
-                  name={SUBJECT_CONFIG.social.label}
-                  stroke={SUBJECT_CONFIG.social.hex}
-                  strokeWidth={2}
-                  dot={false}
-                />
-              )}
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-
-        <div className="bg-white rounded-2xl md:rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
-          <h3 className="font-black text-slate-700 text-base md:text-lg lg:text-xl px-4 pt-4 pb-3 md:px-6 md:pt-6 md:pb-4 flex items-center gap-2">
-            <TrendingUp className="text-blue-500 w-5 h-5 md:w-6 md:h-6" />{" "}
-            偏差値履歴
-          </h3>
-          <table className="w-full text-center text-xs md:text-sm lg:text-base">
-            <thead className="text-slate-400 bg-slate-50 border-y border-slate-100">
-              <tr>
-                <th className="py-3 md:py-4 lg:py-5 pl-4 md:pl-6 text-left font-black">
-                  テスト名
-                </th>
-                <th className="py-3 md:py-4 lg:py-5 font-black">4科</th>
-                {["math", "japanese", "science", "social"].map(
-                  (s) => (
-                    <th
-                      key={s}
-                      className={`py-3 md:py-4 lg:py-5 font-black ${SUBJECT_CONFIG[s].color}`}
-                    >
-                      {SUBJECT_CONFIG[s].short}
-                    </th>
-                  ),
-                )}
-                <th className="py-3 w-14 md:w-20"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {tableData.length === 0 && (
-                <tr>
-                  <td
-                    colSpan={7}
-                    className="py-10 text-center text-slate-400 font-bold"
-                  >
-                    この期間の成績データはありません。
-                  </td>
-                </tr>
-              )}
-              {tableData.map((t) => (
-                <tr
-                  key={t.id}
-                  className="border-b border-slate-50 hover:bg-slate-50 transition-colors group"
-                >
-                  <td className="py-3 md:py-4 lg:py-5 pl-4 md:pl-6 text-left">
-                    <div className="text-[11px] md:text-xs text-slate-400 font-bold">
-                      {t.date}
-                    </div>
-                    <div className="font-black text-slate-700 truncate max-w-[110px] md:max-w-none">
-                      {t.name}
-                    </div>
-                  </td>
-                  <td className="py-3 md:py-4 lg:py-5 font-black text-slate-800 bg-slate-50/50 text-base md:text-lg">
-                    {t.total4.dev}
-                  </td>
-                  {["math", "japanese", "science", "social"].map(
-                    (s) => (
-                      <td
-                        key={s}
-                        className={`py-3 md:py-4 lg:py-5 font-black ${t.subjects[s].dev >= 60 ? "text-rose-500" : "text-slate-600"}`}
-                      >
-                        {t.subjects[s].dev}
-                      </td>
-                    ),
-                  )}
-                  <td className="py-3 md:py-4 lg:py-5 pr-2 md:pr-4">
-                    <div className="flex flex-col md:flex-row gap-1 md:gap-1.5 items-end md:items-center justify-end opacity-100">
-                      <button
-                        onClick={() => {
-                          setEditingTest(t);
-                          setModalOpen(true);
-                        }}
-                        className="p-1.5 md:p-2 text-slate-400 hover:text-blue-500 bg-white rounded-lg shadow-sm border border-slate-200"
-                      >
-                        <Edit2 className="w-3.5 h-3.5 md:w-4 md:h-4" />
-                      </button>
-                      <button
-                        onClick={() => onDeleteTest(t.id)}
-                        className="p-1.5 md:p-2 text-slate-400 hover:text-red-500 bg-white rounded-lg shadow-sm border border-slate-200"
-                      >
-                        <Trash2 className="w-3.5 h-3.5 md:w-4 md:h-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-      <TestResultModal
-        isOpen={isModalOpen}
-        onClose={() => setModalOpen(false)}
-        onSave={onSaveTest}
-        initialData={editingTest}
-      />
-    </div>
-  );
-};
-
-const AchievementsView = ({ tasks }) => {
-  const [dateRange, setDateRange] = useState({
-    start: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000)
-      .toISOString()
-      .split("T")[0],
-    end: new Date().toISOString().split("T")[0],
-  });
-  const [selectedSubjects, setSelectedSubjects] = useState([
-    "math",
-    "japanese",
-    "science",
-    "social",
-  ]);
-
-  const toggleSubject = (subj) => {
-    setSelectedSubjects((prev) =>
-      prev.includes(subj) ? prev.filter((s) => s !== subj) : [...prev, subj],
-    );
-  };
-
-  const setPresetRange = (days) => {
-    const end = new Date();
-    const start = new Date();
-    start.setDate(end.getDate() - days);
-    setDateRange({
-      start: start.toISOString().split("T")[0],
-      end: end.toISOString().split("T")[0],
-    });
-  };
-
-  const { chartData, pieData, maxStats } = useMemo(() => {
-    const start = new Date(dateRange.start);
-    const end = new Date(dateRange.end);
-    end.setHours(23, 59, 59, 999);
-    const dateMap = new Map();
-    const totalBySubject = {
-      math: 0,
-      japanese: 0,
-      science: 0,
-      social: 0,
-    };
-
-    tasks.forEach((task) => {
-      task.history.forEach((h) => {
-        const [m, d] = h.date.split("/").map(Number);
-        const hDate = new Date(new Date().getFullYear(), m - 1, d);
-        if (new Date().getMonth() < 3 && m > 9)
-          hDate.setFullYear(hDate.getFullYear() - 1);
-        if (hDate >= start && hDate <= end) {
-          const key = `${m}/${d}`;
-          if (!dateMap.has(key))
-            dateMap.set(key, {
-              name: key,
-              math: 0,
-              japanese: 0,
-              science: 0,
-              social: 0,
-              total: 0,
-            });
-          const entry = dateMap.get(key);
-          const mins = Math.floor(h.duration / 60);
-          entry[task.subject] += mins;
-          entry.total += mins;
-          totalBySubject[task.subject] += mins;
-        }
-      });
-    });
-
-    const data = [];
-    const loopDate = new Date(start);
-    const diffDays = Math.ceil(
-      Math.abs(end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24),
-    );
-    for (let i = 0; i <= diffDays; i++) {
-      const key = `${loopDate.getMonth() + 1}/${loopDate.getDate()}`;
-      data.push(
-        dateMap.has(key)
-          ? dateMap.get(key)
-          : {
-              name: key,
-              math: 0,
-              japanese: 0,
-              science: 0,
-              social: 0,
-              total: 0,
-            },
-      );
-      loopDate.setDate(loopDate.getDate() + 1);
-    }
-
-    const totalMins = Object.values(totalBySubject).reduce((a, b) => a + b, 0);
-    const pData = Object.entries(totalBySubject)
-      .filter(([k, v]) => selectedSubjects.includes(k) && v > 0)
-      .map(([k, v]) => ({
-        name: SUBJECT_CONFIG[k].label,
-        value: v,
-        color: SUBJECT_CONFIG[k].hex,
-        percent: totalMins > 0 ? Math.round((v / totalMins) * 100) : 0,
-      }));
-
-    let maxTotal = { val: 0, date: "-" };
-    const maxSubj = {
-      math: { val: 0, date: "-" },
-      japanese: { val: 0, date: "-" },
-      science: { val: 0, date: "-" },
-      social: { val: 0, date: "-" },
-    };
-    for (const d of dateMap.values()) {
-      if (d.total > maxTotal.val) maxTotal = { val: d.total, date: d.name };
-      ["math", "japanese", "science", "social"].forEach((s) => {
-        if (d[s] > maxSubj[s].val) maxSubj[s] = { val: d[s], date: d.name };
-      });
-    }
-    return {
-      chartData: data,
-      pieData: pData,
-      maxStats: { total: maxTotal, subjects: maxSubj },
-    };
-  }, [tasks, dateRange, selectedSubjects]);
-
-  return (
-    <div className="flex flex-col h-full bg-slate-50">
-      <div className="bg-white sticky top-0 z-20 px-4 py-3 md:px-6 md:py-4 lg:px-8 lg:py-4 border-b border-slate-200 shadow-sm space-y-2.5 md:space-y-3">
-        <div className="flex gap-2 md:gap-3">
-          <div className="flex-1 flex justify-between items-center bg-slate-50 p-1.5 md:p-2 lg:p-2.5 rounded-lg md:rounded-xl border border-slate-200">
-            <div className="flex gap-1.5 md:gap-2 items-center">
-              <CalendarIcon className="text-slate-400 ml-1 w-[14px] h-[14px] md:w-4 md:h-4 lg:w-5 lg:h-5" />
-              <input
-                type="date"
-                value={dateRange.start}
-                onChange={(e) =>
-                  setDateRange((prev) => ({ ...prev, start: e.target.value }))
+                setSessionElapsed(getAccurateElapsed());
+                if (isDocumentHidden()) {
+                    setIdleRemaining(IDLE_LIMIT_SECONDS);
+                    return;
                 }
-                className="bg-transparent text-[10px] md:text-xs lg:text-sm font-bold text-slate-600 outline-none w-20 md:w-28 lg:w-32"
-              />
-              <span className="text-slate-300">-</span>
-              <input
-                type="date"
-                value={dateRange.end}
-                onChange={(e) =>
-                  setDateRange((prev) => ({ ...prev, end: e.target.value }))
-                }
-                className="bg-transparent text-[10px] md:text-xs lg:text-sm font-bold text-slate-600 outline-none w-20 md:w-28 lg:w-32"
-              />
-            </div>
-          </div>
+                const remaining = Math.max(0, IDLE_LIMIT_SECONDS - Math.floor((now - lastActive.current) / 1000));
+                setIdleRemaining(remaining);
+                if (remaining === 0)
+                    stopFromSummary("5分以上操作がなかったため一時停止しました。");
+            }, 1000);
+        }
+        else {
+            setSessionElapsed(0);
+            setIdleRemaining(IDLE_LIMIT_SECONDS);
+        }
+        return () => {
+            if (timerRef.current)
+                clearInterval(timerRef.current);
+        };
+    }, [task?.id, task?.isRunning, task?.sessionStartTime, getAccurateElapsed, stopFromSummary]);
 
-          <div className="flex gap-2 md:gap-2.5 lg:gap-3">
-            {[
-              { l: "1週間", d: 7 },
-              { l: "2週間", d: 14 },
-              { l: "1ヶ月", d: 30 },
-            ].map((r) => (
-              <button
-                key={r.l}
-                onClick={() => setPresetRange(r.d)}
-                className="flex-1 py-1.5 md:py-2 lg:py-2.5 px-2 md:px-3 lg:px-4 bg-white border border-slate-100 text-xs md:text-[13px] lg:text-sm font-bold rounded-lg md:rounded-xl text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition-colors shadow-sm"
-              >
-                {r.l}
-              </button>
-            ))}
+    useEffect(() => {
+        const recordActivity = () => {
+            lastActive.current = Date.now();
+            setIdleRemaining(IDLE_LIMIT_SECONDS);
+        };
+        window.addEventListener('mousemove', recordActivity);
+        window.addEventListener('touchstart', recordActivity);
+        window.addEventListener('touchmove', recordActivity);
+        window.addEventListener('scroll', recordActivity);
+        window.addEventListener('click', recordActivity);
+        window.addEventListener('keydown', recordActivity);
+        return () => {
+            window.removeEventListener('mousemove', recordActivity);
+            window.removeEventListener('touchstart', recordActivity);
+            window.removeEventListener('touchmove', recordActivity);
+            window.removeEventListener('scroll', recordActivity);
+            window.removeEventListener('click', recordActivity);
+            window.removeEventListener('keydown', recordActivity);
+        };
+    }, []);
+
+    useEffect(() => {
+        const handleVisibilityChange = () => {
+            if (!isDocumentHidden() && task?.isRunning && task?.sessionStartTime) {
+                lastActive.current = Date.now();
+                setSessionElapsed(getAccurateElapsed());
+                setIdleRemaining(IDLE_LIMIT_SECONDS);
+            }
+        };
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+    }, [task?.isRunning, task?.sessionStartTime, getAccurateElapsed]);
+
+    if (!task?.isRunning || !task?.sessionStartTime)
+        return null;
+
+    const totalSeconds = (task.currentDuration || 0) + sessionElapsed;
+    const categoryInfo = Object.values(CATEGORIES).find(c => c.id === task.categoryId);
+    const subjectInfo = SUBJECT_DEFS[task.categoryId]?.find(s => s.id === task.subjectId);
+    const subjectLabel = subjectInfo?.label || categoryInfo?.label || '学習';
+    const startedTime = new Date(Number(task.sessionStartTime)).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+    const formatIdleTime = (sec) => {
+        const m = Math.floor(sec / 60);
+        const s = sec % 60;
+        return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    };
+
+    return (<div className="relative overflow-hidden rounded-[2rem] sm:rounded-[2.5rem] bg-gradient-to-br from-blue-600 via-indigo-600 to-slate-950 p-5 sm:p-6 text-left text-white shadow-2xl shadow-blue-200/50 ring-1 ring-white/20">
+      <div className="absolute -right-16 -top-16 h-40 w-40 rounded-full bg-white/10 blur-2xl"/>
+      <div className="absolute -left-12 bottom-0 h-32 w-32 rounded-full bg-cyan-300/20 blur-2xl"/>
+      <div className="relative z-10 flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0">
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-blue-50 ring-1 ring-white/20">
+              <span className="h-2 w-2 rounded-full bg-emerald-300 animate-pulse"/> LIVE TIMER
+            </span>
+            <span className="rounded-full bg-white/10 px-3 py-1.5 text-[10px] font-black text-blue-50 ring-1 ring-white/15">他端末同期中</span>
+            <span className="rounded-full bg-white/10 px-3 py-1.5 text-[10px] font-black text-blue-50 ring-1 ring-white/15">{APP_VERSION}</span>
           </div>
+          <div className="text-xs font-black uppercase tracking-widest text-blue-100/80">現在計測中</div>
+          <div className="mt-1 truncate text-2xl sm:text-3xl font-black tracking-tight">{subjectLabel} / {task.title || 'Untitled'}</div>
+          <div className="mt-2 text-xs font-bold text-blue-100/80">開始 {startedTime} ・ Firestore Live Sync</div>
         </div>
 
-        <div className="flex gap-1.5 md:gap-2 overflow-x-auto pb-0.5 md:pb-1 no-scrollbar">
-          {["math", "japanese", "science", "social"].map((s) => (
-            <button
-              key={s}
-              onClick={() => toggleSubject(s)}
-              className={`flex-1 py-1.5 px-2 md:py-2 md:px-3 rounded-lg md:rounded-xl text-[10px] md:text-xs lg:text-sm font-bold whitespace-nowrap transition-colors ${selectedSubjects.includes(s) ? `${SUBJECT_CONFIG[s].bg} text-white` : "bg-slate-100 text-slate-400"}`}
-            >
-              {SUBJECT_CONFIG[s].short}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="flex-1 overflow-y-auto px-3 py-4 md:px-6 md:py-6 lg:px-8 lg:py-8 space-y-4 md:space-y-6 lg:space-y-8 pb-20 md:pb-32">
-        <div className="bg-white p-3 md:p-5 lg:p-6 rounded-2xl md:rounded-3xl shadow-sm border border-slate-200 h-52 md:h-80 lg:h-[28rem] shrink-0">
-          <h3 className="text-[10px] md:text-sm lg:text-base font-bold text-slate-500 mb-1 md:mb-3 flex items-center gap-1 md:gap-1.5">
-            <BarChart2 className="w-3 h-3 md:w-4 md:h-4 lg:w-5 lg:h-5" />{" "}
-            学習時間 (分)
-          </h3>
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart
-              data={chartData}
-              margin={{ top: 5, right: 5, left: -25, bottom: 0 }}
-            >
-              <CartesianGrid
-                strokeDasharray="3 3"
-                vertical={false}
-                stroke="#f1f5f9"
-              />
-              <XAxis
-                dataKey="name"
-                tick={{ fontSize: 9 }}
-                axisLine={false}
-                tickLine={false}
-                interval="preserveStartEnd"
-                minTickGap={15}
-              />
-              <YAxis tick={{ fontSize: 9 }} axisLine={false} tickLine={false} />
-              <Tooltip
-                cursor={{ fill: "#f8fafc" }}
-                contentStyle={{
-                  borderRadius: "8px",
-                  fontSize: "10px",
-                  padding: "4px 8px",
-                }}
-              />
-              {selectedSubjects.includes("math") && (
-                <Bar
-                  dataKey="math"
-                  name={SUBJECT_CONFIG.math.label}
-                  stackId="a"
-                  fill={SUBJECT_CONFIG.math.hex}
-                />
-              )}
-              {selectedSubjects.includes("japanese") && (
-                <Bar
-                  dataKey="japanese"
-                  name={SUBJECT_CONFIG.japanese.label}
-                  stackId="a"
-                  fill={SUBJECT_CONFIG.japanese.hex}
-                />
-              )}
-              {selectedSubjects.includes("science") && (
-                <Bar
-                  dataKey="science"
-                  name={SUBJECT_CONFIG.science.label}
-                  stackId="a"
-                  fill={SUBJECT_CONFIG.science.hex}
-                />
-              )}
-              {selectedSubjects.includes("social") && (
-                <Bar
-                  dataKey="social"
-                  name={SUBJECT_CONFIG.social.label}
-                  stackId="a"
-                  fill={SUBJECT_CONFIG.social.hex}
-                />
-              )}
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-
-        <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-5 lg:gap-6">
-          <div className="bg-white p-3 md:p-5 lg:p-6 rounded-2xl md:rounded-3xl shadow-sm border border-slate-200 min-h-[12rem] md:min-h-[14rem] lg:min-h-[16rem] flex flex-col lg:col-span-1">
-            <h3 className="text-[10px] md:text-sm lg:text-base font-bold text-slate-500 mb-1 md:mb-3 flex items-center gap-1 md:gap-1.5">
-              <PieChartIcon className="w-3 h-3 md:w-4 md:h-4 lg:w-5 lg:h-5" />{" "}
-              比率
-            </h3>
-            {pieData.length > 0 ? (
-              <>
-                <div className="flex-1 w-full relative mb-1 md:mb-3 min-h-[80px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={pieData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={20}
-                        outerRadius={35}
-                        paddingAngle={2}
-                        dataKey="value"
-                      >
-                        {pieData.map((e, i) => (
-                          <Cell key={i} fill={e.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip
-                        contentStyle={{
-                          borderRadius: "8px",
-                          fontSize: "9px",
-                          padding: "2px 4px",
-                        }}
-                        itemStyle={{ padding: 0 }}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-                <div className="flex flex-col gap-1 md:gap-2">
-                  {pieData.map((d) => (
-                    <div
-                      key={d.name}
-                      className="flex justify-between items-center text-[9px] md:text-xs lg:text-sm"
-                    >
-                      <div className="flex items-center gap-1 md:gap-1.5">
-                        <div
-                          className="w-1.5 h-1.5 md:w-2 md:h-2 lg:w-2.5 lg:h-2.5 rounded-full"
-                          style={{ backgroundColor: d.color }}
-                        />
-                        <span className="font-bold text-slate-600">
-                          {d.name}
-                        </span>
-                      </div>
-                      <span className="font-mono font-bold text-slate-700">
-                        {Math.floor(d.value / 60)}h{d.value % 60}m{" "}
-                        <span className="text-slate-400 font-normal">
-                          ({d.percent}%)
-                        </span>
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </>
-            ) : (
-              <div className="text-[10px] md:text-xs lg:text-sm text-slate-300 mt-4 md:mt-6 text-center">
-                データなし
-              </div>
-            )}
+        <div className="grid grid-cols-3 gap-2 sm:gap-3 lg:min-w-[420px]">
+          <div className="rounded-3xl bg-white/15 p-4 text-center ring-1 ring-white/20 backdrop-blur-xl">
+            <div className="mb-2 text-[9px] font-black uppercase tracking-widest text-blue-100/80">今回</div>
+            <div className="font-mono text-2xl sm:text-3xl font-black tracking-tighter">{formatDuration(sessionElapsed)}</div>
           </div>
-
-          <div className="space-y-3 md:space-y-5 lg:space-y-6 lg:col-span-2 flex flex-col justify-between">
-            <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl md:rounded-3xl p-3 md:p-5 lg:p-6 text-white shadow-md flex-1 flex flex-col justify-center">
-              <div className="text-[9px] md:text-xs lg:text-sm text-slate-300 font-bold mb-0.5 md:mb-1.5">
-                期間内ベスト(1日)
-              </div>
-              <div className="text-xl md:text-3xl lg:text-4xl font-black">
-                {Math.floor(maxStats.total.val / 60)}
-                <span className="text-[10px] md:text-sm lg:text-base font-normal opacity-70">
-                  h
-                </span>
-                {maxStats.total.val % 60}
-                <span className="text-[10px] md:text-sm lg:text-base font-normal opacity-70">
-                  m
-                </span>
-              </div>
-              <div className="text-[9px] md:text-xs lg:text-sm text-slate-400 text-right mt-0.5 md:mt-1.5">
-                {maxStats.total.date}
-              </div>
+          <div className="rounded-3xl bg-white/10 p-4 text-center ring-1 ring-white/15 backdrop-blur-xl">
+            <div className="mb-2 text-[9px] font-black uppercase tracking-widest text-blue-100/80">停止まで</div>
+            <div className={`font-mono text-2xl sm:text-3xl font-black tracking-tighter ${idleRemaining <= 30 && !isDocumentHidden() ? 'text-rose-200 animate-pulse' : 'text-white'}`}>
+              {isDocumentHidden() ? '--:--' : formatIdleTime(idleRemaining)}
             </div>
-            <div className="bg-white rounded-2xl md:rounded-3xl p-2.5 md:p-5 lg:p-6 border border-slate-200 shadow-sm flex-1 flex flex-col justify-center">
-              <div className="text-[9px] md:text-xs lg:text-sm text-slate-400 font-bold mb-1.5 md:mb-3">
-                科目別ベスト
-              </div>
-              <div className="space-y-1 md:space-y-2">
-                {["math", "japanese", "science", "social"].map(
-                  (s) =>
-                    selectedSubjects.includes(s) &&
-                    maxStats.subjects[s].val > 0 && (
-                      <div
-                        key={s}
-                        className="flex justify-between items-center text-[9px] md:text-xs lg:text-sm"
-                      >
-                        <span
-                          className={`font-bold ${SUBJECT_CONFIG[s].color}`}
-                        >
-                          {SUBJECT_CONFIG[s].short}
-                        </span>
-                        <span className="font-mono font-bold">
-                          {maxStats.subjects[s].val}m{" "}
-                          <span className="text-[8px] md:text-[10px] lg:text-xs text-slate-300 font-normal">
-                            ({maxStats.subjects[s].date})
-                          </span>
-                        </span>
-                      </div>
-                    ),
-                )}
-              </div>
-            </div>
+          </div>
+          <div className="rounded-3xl bg-white/10 p-4 text-center ring-1 ring-white/15 backdrop-blur-xl">
+            <div className="mb-2 text-[9px] font-black uppercase tracking-widest text-blue-100/80">累計</div>
+            <div className="font-mono text-2xl sm:text-3xl font-black tracking-tighter">{formatDuration(totalSeconds)}</div>
           </div>
         </div>
       </div>
-    </div>
-  );
+    </div>);
 };
 
 // ==========================================
-// User Authentication (Login View)
-// ==========================================
-const LoginForm = ({
-  onLogin,
-  onSampleMode,
-}) => {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!email || !password) {
-      setError("メールアドレスとパスワードを入力してください");
-      return;
-    }
-    try {
-      await onLogin(email, password);
-    } catch (err) {
-      setError(err.message);
-    }
-  };
-
-  return (
-    <div className="flex h-screen items-center justify-center bg-slate-50 px-4">
-      <div className="w-full max-w-sm md:max-w-md lg:max-w-lg bg-white rounded-3xl md:rounded-[2rem] shadow-xl p-8 md:p-10 lg:p-12">
-        <div className="text-center mb-8 md:mb-10">
-          <div className="w-16 h-16 md:w-18 md:h-18 lg:w-20 lg:h-20 bg-blue-100 text-blue-600 rounded-2xl md:rounded-3xl flex items-center justify-center mx-auto mb-4 md:mb-6">
-            <Award className="w-8 h-8 md:w-9 md:h-9 lg:w-10 lg:h-10" />
-          </div>
-          <h1 className="text-2xl md:text-3xl lg:text-4xl font-black text-slate-800 tracking-tight">
-            Level Up Study
-          </h1>
-          <div className="inline-flex items-center rounded-full bg-blue-50 px-3 py-1 mt-3 text-xs md:text-sm font-black text-blue-600 ring-1 ring-blue-100">
-            {APP_VERSION}
-          </div>
-          <p className="text-sm md:text-base lg:text-lg text-slate-500 mt-2 md:mt-3 font-bold">
-            学習管理へログイン
-          </p>
-        </div>
-
-        <form
-          onSubmit={handleSubmit}
-          className="space-y-4 md:space-y-6 mb-6 md:mb-8"
-        >
-          <div>
-            <label className="block text-xs md:text-sm lg:text-base font-bold text-slate-500 mb-1.5 md:mb-2 ml-1">
-              メールアドレス
-            </label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl md:rounded-2xl px-4 py-3 md:px-5 md:py-4 text-sm md:text-base lg:text-lg font-medium text-slate-700 focus:outline-none focus:border-blue-500"
-              placeholder="family@example.com"
-            />
-          </div>
-          <div>
-            <label className="block text-xs md:text-sm lg:text-base font-bold text-slate-500 mb-1.5 md:mb-2 ml-1">
-              パスワード
-            </label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl md:rounded-2xl px-4 py-3 md:px-5 md:py-4 text-sm md:text-base lg:text-lg font-medium text-slate-700 focus:outline-none focus:border-blue-500"
-              placeholder="••••••••"
-            />
-          </div>
-          {error && (
-            <div className="text-xs md:text-sm lg:text-base text-red-500 font-bold px-1">
-              {error}
-            </div>
-          )}
-          <button
-            type="submit"
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 md:py-4 lg:py-5 text-base md:text-lg lg:text-xl rounded-xl md:rounded-2xl shadow-lg shadow-blue-200 active:scale-95 transition-all flex justify-center items-center gap-2 md:gap-3 mt-2 md:mt-4"
-          >
-            <LogIn className="w-[18px] h-[18px] md:w-5 md:h-5 lg:w-6 lg:h-6" />{" "}
-            ログイン
-          </button>
-        </form>
-
-        <div className="relative flex items-center py-4 md:py-6">
-          <div className="flex-grow border-t border-slate-100"></div>
-          <span className="flex-shrink-0 mx-4 text-slate-400 text-xs md:text-sm lg:text-base font-bold">
-            または
-          </span>
-          <div className="flex-grow border-t border-slate-100"></div>
-        </div>
-
-        <button
-          onClick={onSampleMode}
-          className="w-full bg-white border-2 border-slate-200 hover:border-slate-300 text-slate-600 font-bold py-3.5 md:py-4 lg:py-5 text-base md:text-lg lg:text-xl rounded-xl md:rounded-2xl active:scale-95 transition-all flex justify-center items-center gap-2 md:gap-3"
-        >
-          <FlaskConical className="w-[18px] h-[18px] md:w-5 md:h-5 lg:w-6 lg:h-6" />{" "}
-          サンプルデータで試す
-        </button>
-      </div>
-    </div>
-  );
-};
-
-// ==========================================
-// Main Application Entry
+// Main Application Component
 // ==========================================
 export default function App() {
-  const [user, setUser] = useState(null);
-  const [isAuthChecking, setIsAuthChecking] = useState(true);
-  const [syncState, setSyncState] = useState("synced");
-  const [lastSync, setLastSync] = useState(
-    new Date().toLocaleTimeString("ja-JP", {
-      hour: "2-digit",
-      minute: "2-digit",
-    }),
-  );
-  const [isSampleMode, setIsSampleMode] = useState(false);
-
-  const [activeTab, setActiveTab] = useState("daily");
-  const [tasks, setTasks] = useState([]);
-  const [tests, setTests] = useState([]);
-
-  const [isAddModalOpen, setAddModalOpen] = useState(false);
-  const [selectedUnit, setSelectedUnit] = useState(null);
-  const [detailTaskId, setDetailTaskId] = useState(null);
-
-  const [confirmModalData, setConfirmModalData] = useState(null);
-
-  const tasksRef = useRef([]);
-  const globalLastActivityAtRef = useRef(Date.now());
-  const lastActivityLocalUpdateAtRef = useRef(0);
-  const lastVisibilityResumeAtRef = useRef(Date.now());
-
-  useEffect(() => {
-    tasksRef.current = tasks;
-  }, [tasks]);
-
-  // Authentication & Initialization
-  useEffect(() => {
-    if (!auth) {
-      setIsSampleMode(true);
-      setTasks(INITIAL_TASKS);
-      setTests(INITIAL_TESTS);
-      setIsAuthChecking(false);
-      return;
-    }
-
-    const unsubscribe = onAuthStateChanged(auth, (u) => {
-      setUser(u);
-      setIsAuthChecking(false);
+    const [user, setUser] = useState(null);
+    const [isSampleMode, setIsSampleMode] = useState(false);
+    const [isMobileView, setIsMobileView] = useState(false);
+    const [activeTab, setActiveTab] = useState('daily');
+    const [activeCategory, setActiveCategory] = useState('school');
+    // カテゴリ連動用の選択中の教科State
+    const [selectedSubjectId, setSelectedSubjectId] = useState('');
+    const [tasks, setTasks] = useState([]);
+    const [tests, setTests] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [selectedTaskId, setSelectedTaskId] = useState(null);
+    const [isAddingTask, setIsAddingTask] = useState(false);
+    const [isAddingTest, setIsAddingTest] = useState(false);
+    const [editingTest, setEditingTest] = useState(null);
+    const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
+    const [startDate, setStartDate] = useState(() => {
+        const d = new Date();
+        d.setDate(d.getDate() - 7);
+        return d.toISOString().split('T')[0];
     });
-
-    return () => unsubscribe();
-  }, []);
-
-  const handleEmailLogin = async (email, pass) => {
-    if (!auth) return;
-    setIsAuthChecking(true);
-    try {
-      await signInWithEmailAndPassword(auth, email, pass);
-    } catch (e) {
-      setIsAuthChecking(false);
-      throw new Error(
-        "ログインに失敗しました。メールアドレスとパスワードを確認してください。",
-      );
-    }
-  };
-
-  const handleLogout = () => {
-    if (!auth) return;
-    setConfirmModalData({
-      title: "ログアウト",
-      message: "本当にログアウトしますか？",
-      onConfirm: async () => {
-        await signOut(auth);
-        setTasks([]);
-        setTests([]);
-        setIsSampleMode(false);
-      },
-    });
-  };
-
-  const fetchData = useCallback(
-    async (isSilent = false) => {
-      const dbInstance = getSafeDb();
-      if (!dbInstance || !auth?.currentUser || isSampleMode) {
-        if (!dbInstance && !isSilent)
-          console.warn(
-            "Firebase未設定のため、データ取得をスキップしサンプルモードで動作します",
-          );
-        return;
-      }
-
-      if (!isSilent) setSyncState("syncing");
-
-      try {
-        const taskSnap = await getDocs(query(getTasksCol(dbInstance)));
-        const testSnap = await getDocs(query(getTestsCol(dbInstance)));
-
-        const fetchedTasks = taskSnap.docs.map((doc) => {
-          const data = doc.data();
-          return { ...normalizeTask({ id: doc.id, ...data }), pendingSync: false };
+    const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
+    const [visibleSubjects, setVisibleSubjects] = useState(['s_math', 's_english', 'j_math', 'average']);
+    const [liveTimerInfo, setLiveTimerInfo] = useState(null);
+    const isAnyTaskRunning = useMemo(() => tasks.some(t => t.isRunning), [tasks]);
+    const runningTask = useMemo(() => tasks.find(t => t.isRunning) || null, [tasks]);
+    const todayTaskSummaries = useMemo(() => {
+        const todayStr = getTodayStr();
+        return tasks.flatMap(task => {
+            const meta = getTaskMeta(task);
+            const todayHistories = (task.history || []).filter(h => h.date === todayStr);
+            const totalDuration = todayHistories.reduce((sum, h) => sum + (h.duration || 0), 0);
+            const latestTimestamp = todayHistories.length > 0
+                ? Math.max(...todayHistories.map(h => h.endedAt || h.startedAt || 0))
+                : 0;
+            if (todayHistories.length === 0 && !task.isRunning)
+                return [];
+            return [{
+                    task,
+                    ...meta,
+                    count: todayHistories.length,
+                    totalDuration,
+                    latestTimestamp,
+                    isRunning: task.isRunning
+                }];
+        }).sort((a, b) => {
+            if (a.isRunning !== b.isRunning)
+                return a.isRunning ? -1 : 1;
+            return (b.latestTimestamp || 0) - (a.latestTimestamp || 0);
         });
-        const fetchedTests = testSnap.docs.map((doc) => {
-          const data = doc.data();
-          return { id: doc.id, ...data };
-        });
-
-        setTasks((prev) => {
-          const mergedTasks = mergeTasksFromCloud(prev, fetchedTasks);
-          setCache(CACHE_KEY_TASKS, mergedTasks);
-          return mergedTasks;
-        });
-        setTests(fetchedTests);
-
-        setCache(CACHE_KEY_TESTS, fetchedTests);
-
-        setSyncState("synced");
-        setLastSync(
-          new Date().toLocaleTimeString("ja-JP", {
-            hour: "2-digit",
-            minute: "2-digit",
-          }),
-        );
-      } catch (err) {
-        console.error(err);
-        setSyncState("offline");
-        const ctTasks = getCache(CACHE_KEY_TASKS);
-        const ctTests = getCache(CACHE_KEY_TESTS);
-        if (ctTasks) setTasks(ctTasks.map(normalizeTask));
-        if (ctTests) setTests(ctTests);
-      }
-    },
-    [user, isSampleMode],
-  );
-
-  useEffect(() => {
-    if (user && !isSampleMode) {
-      const ctTasks = getCache(CACHE_KEY_TASKS);
-      const ctTests = getCache(CACHE_KEY_TESTS);
-      if (ctTasks) setTasks(ctTasks.map(normalizeTask));
-      if (ctTests) setTests(ctTests);
-      fetchData();
-    }
-  }, [user, fetchData, isSampleMode]);
-
-  useEffect(() => {
-    if (!isSampleMode && tasks.length > 0) {
-      setCache(CACHE_KEY_TASKS, tasks);
-      setCache(CACHE_KEY_TESTS, tests);
-    }
-  }, [tasks, tests, isSampleMode]);
-
-  // タブ切替・スリープ復帰・ブラウザ戻る復帰時の補正。
-  // lastUpdatedAt の古さだけで稼働中タイマーを停止すると、
-  // 画面遷移・別タブ・スリープ中に停止したように見えるため、
-  // 復帰時は「操作が再開された」とみなし、無操作判定の基準だけを更新する。
-  useEffect(() => {
-    const markVisibleAgain = () => {
-      if (document.hidden) return;
-      const now = Date.now();
-      globalLastActivityAtRef.current = now;
-      lastActivityLocalUpdateAtRef.current = now;
-      lastVisibilityResumeAtRef.current = now;
-
-      setTasks((prev) => {
-        let changed = false;
-        const next = prev.map((t) => {
-          if (t.isRunning && t.sessionStartTime) {
-            changed = true;
-            return { ...t, lastActivityAt: now, lastUpdatedAt: now };
-          }
-          return t;
-        });
-        return changed ? next : prev;
-      });
-    };
-
-    document.addEventListener("visibilitychange", markVisibleAgain);
-    window.addEventListener("focus", markVisibleAgain);
-    window.addEventListener("pageshow", markVisibleAgain);
-    return () => {
-      document.removeEventListener("visibilitychange", markVisibleAgain);
-      window.removeEventListener("focus", markVisibleAgain);
-      window.removeEventListener("pageshow", markVisibleAgain);
-    };
-  }, []);
-
-  useEffect(() => {
-    const persistRunningSnapshot = () => {
-      setCache(CACHE_KEY_TASKS, tasksRef.current.map(normalizeTask));
-    };
-
-    document.addEventListener("visibilitychange", persistRunningSnapshot);
-    window.addEventListener("pagehide", persistRunningSnapshot);
-    window.addEventListener("beforeunload", persistRunningSnapshot);
-    return () => {
-      document.removeEventListener("visibilitychange", persistRunningSnapshot);
-      window.removeEventListener("pagehide", persistRunningSnapshot);
-      window.removeEventListener("beforeunload", persistRunningSnapshot);
-    };
-  }, []);
-
-  // ==========================================
-  // Cloud Sync Optimizations
-  // ==========================================
-
-  const updateLocalTask = useCallback((id, updates) => {
-    setTasks((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, ...updates } : t)),
-    );
-  }, []);
-
-  const syncTaskToCloud = useCallback(
-    async (id, cloudUpdates) => {
-      const dbInstance = getSafeDb();
-      if (!dbInstance || !auth?.currentUser || isSampleMode) return;
-      try {
-        const taskRef = getTaskDoc(dbInstance, id);
-        const { pendingSync, ...safeCloudUpdates } = cloudUpdates;
-        await updateDoc(taskRef, safeCloudUpdates);
-        clearPendingTaskUpdate(id);
-        updateLocalTask(id, { pendingSync: false });
-        setSyncState("synced");
-        setLastSync(
-          new Date().toLocaleTimeString("ja-JP", {
-            hour: "2-digit",
-            minute: "2-digit",
-          }),
-        );
-      } catch (e) {
-        queuePendingTaskUpdate(id, cloudUpdates);
-        updateLocalTask(id, { pendingSync: true });
-        setSyncState("offline");
-      }
-    },
-    [isSampleMode, updateLocalTask],
-  );
-
-  const flushPendingTaskUpdates = useCallback(async () => {
-    const dbInstance = getSafeDb();
-    if (!dbInstance || !auth?.currentUser || isSampleMode) return;
-
-    const pending = getPendingTaskUpdates();
-    const entries = Object.entries(pending);
-    if (entries.length === 0) return;
-
-    setSyncState("syncing");
-    try {
-      for (const [id, updates] of entries) {
-        const { pendingSync, ...safeCloudUpdates } = updates;
-        await updateDoc(getTaskDoc(dbInstance, id), safeCloudUpdates);
-        clearPendingTaskUpdate(id);
-        updateLocalTask(id, { pendingSync: false });
-      }
-      setSyncState("synced");
-      setLastSync(
-        new Date().toLocaleTimeString("ja-JP", {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
-      );
-    } catch (e) {
-      setSyncState("offline");
-    }
-  }, [isSampleMode, updateLocalTask]);
-
-  useEffect(() => {
-    const retry = () => flushPendingTaskUpdates();
-    window.addEventListener("online", retry);
-    window.addEventListener("focus", retry);
-    window.addEventListener("pageshow", retry);
-    retry();
-    return () => {
-      window.removeEventListener("online", retry);
-      window.removeEventListener("focus", retry);
-      window.removeEventListener("pageshow", retry);
-    };
-  }, [flushPendingTaskUpdates]);
-
-  // グローバル操作監視：詳細モーダルを閉じていても、操作があれば稼働中タイマーの無操作判定をリセットする
-  useEffect(() => {
-    const handleGlobalActivity = () => {
-      const now = Date.now();
-      globalLastActivityAtRef.current = now;
-
-      // マウス移動等で過剰に再描画しないよう、ローカル更新は1秒に1回まで
-      if (now - lastActivityLocalUpdateAtRef.current < 1000) return;
-      lastActivityLocalUpdateAtRef.current = now;
-
-      setTasks((prev) => {
-        let changed = false;
-        const next = prev.map((t) => {
-          if (t.isRunning && t.sessionStartTime) {
-            changed = true;
-            return { ...t, lastActivityAt: now };
-          }
-          return t;
-        });
-        return changed ? next : prev;
-      });
-    };
-
-    window.addEventListener("mousemove", handleGlobalActivity);
-    window.addEventListener("keydown", handleGlobalActivity);
-    window.addEventListener("touchstart", handleGlobalActivity);
-    window.addEventListener("scroll", handleGlobalActivity);
-    return () => {
-      window.removeEventListener("mousemove", handleGlobalActivity);
-      window.removeEventListener("keydown", handleGlobalActivity);
-      window.removeEventListener("touchstart", handleGlobalActivity);
-      window.removeEventListener("scroll", handleGlobalActivity);
-    };
-  }, []);
-
-  // グローバルタイマー制御：
-  // 1) 稼働中タイマーは常に最新1件だけに補正
-  // 2) 詳細画面を閉じていても、5分無操作で自動停止
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const now = Date.now();
-      const currentTasks = tasksRef.current;
-      const runningTasks = currentTasks.filter(
-        (t) => t.isRunning && t.sessionStartTime,
-      );
-      if (runningTasks.length === 0) return;
-
-      const latestRunningTask = [...runningTasks].sort(
-        (a, b) =>
-          (toMillis(b.lastUpdatedAt) || b.sessionStartTime || 0) -
-          (toMillis(a.lastUpdatedAt) || a.sessionStartTime || 0),
-      )[0];
-
-      const updatesToSync = [];
-
-      runningTasks.forEach((t) => {
-        const idleBase =
-          t.lastActivityAt ||
-          globalLastActivityAtRef.current ||
-          t.sessionStartTime ||
-          now;
-        const shouldForceStopBecauseDuplicated = t.id !== latestRunningTask.id;
-        const shouldStopBecauseIdle =
-          !document.hidden &&
-          t.id === latestRunningTask.id &&
-          now - lastVisibilityResumeAtRef.current > WAKE_GRACE_MS &&
-          now - idleBase >= IDLE_LIMIT_MS;
-
-        if (shouldForceStopBecauseDuplicated || shouldStopBecauseIdle) {
-          const elapsed = t.sessionStartTime
-            ? Math.max(0, Math.floor((now - t.sessionStartTime) / 1000))
-            : 0;
-          updatesToSync.push({
-            id: t.id,
-            updates: {
-              isRunning: false,
-              currentDuration: t.currentDuration + elapsed,
-              sessionStartTime: null,
-              lastActivityAt: now,
-              lastUpdatedAt: now,
-              pendingSync: true,
-            },
-          });
-        }
-      });
-
-      if (updatesToSync.length === 0) return;
-
-      setTasks((prev) =>
-        prev.map((t) => {
-          const hit = updatesToSync.find((u) => u.id === t.id);
-          return hit ? { ...t, ...hit.updates } : t;
-        }),
-      );
-
-      updatesToSync.forEach(({ id, updates }) => {
-        syncTaskToCloud(id, updates);
-      });
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [syncTaskToCloud]);
-
-  const saveTestToCloud = async (testResult) => {
-    setTests((prev) => {
-      const existing = prev.find((t) => t.id === testResult.id);
-      if (existing) {
-        return prev.map((t) => (t.id === testResult.id ? testResult : t));
-      }
-      return [testResult, ...prev];
-    });
-
-    const dbInstance = getSafeDb();
-    if (!dbInstance || !auth?.currentUser || isSampleMode) return;
-    try {
-      const testRef = getTestDoc(dbInstance, testResult.id);
-      await setDoc(
-        testRef,
-        {
-          ...testResult,
-          updatedAt: serverTimestamp(),
-        },
-        { merge: true },
-      );
-      setSyncState("synced");
-      setLastSync(
-        new Date().toLocaleTimeString("ja-JP", {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
-      );
-    } catch (e) {
-      setSyncState("offline");
-    }
-  };
-
-  const deleteTestFromCloud = (id) => {
-    setConfirmModalData({
-      title: "テスト記録の削除",
-      message:
-        "本当にこのテスト記録を削除しますか？\nこの操作は取り消せません。",
-      onConfirm: async () => {
-        setTests((prev) => prev.filter((t) => t.id !== id));
-        const dbInstance = getSafeDb();
-        if (!dbInstance || !auth?.currentUser || isSampleMode) return;
+    }, [tasks]);
+    // カテゴリが変更されたら、対象カテゴリの先頭の教科を初期選択する
+    useEffect(() => {
+        const subjects = SUBJECT_DEFS[activeCategory] || [];
+        setSelectedSubjectId(subjects[0]?.id || '');
+    }, [activeCategory]);
+    const fetchData = useCallback(async (silent = false) => {
+        if (isSampleMode || !auth.currentUser)
+            return;
+        if (!silent)
+            setLoading(true);
         try {
-          const testRef = getTestDoc(dbInstance, id);
-          await deleteDoc(testRef);
-          setSyncState("synced");
-          setLastSync(
-            new Date().toLocaleTimeString("ja-JP", {
-              hour: "2-digit",
-              minute: "2-digit",
-            }),
-          );
-        } catch (e) {
-          setSyncState("offline");
+            const taskSnap = await getDocs(getTasksCol());
+            const testSnap = await getDocs(getTestsCol());
+            setTasks(taskSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+            setTests(testSnap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()));
         }
-      },
-    });
-  };
-
-  // ==========================================
-
-  const cycleStatus = (task) => {
-    const now = Date.now();
-    const next =
-      task.status === "not_started"
-        ? "in_progress"
-        : task.status === "in_progress"
-          ? "completed"
-          : "not_started";
-    const updates = { status: next, lastUpdatedAt: now, pendingSync: true };
-    updateLocalTask(task.id, updates);
-    syncTaskToCloud(task.id, { status: next, lastUpdatedAt: now });
-  };
-
-  const saveHistoryRecord = async (task) => {
-    if (task.currentDuration === 0) return;
-    const endAt = Date.now();
-    const startAt =
-      task.sessionStartTime || endAt - task.currentDuration * 1000;
-    const newHistory = {
-      id: endAt.toString(),
-      date: new Date().toLocaleDateString("ja-JP", {
-        month: "numeric",
-        day: "numeric",
-      }),
-      duration: task.currentDuration,
-      memo: task.currentMemo,
-      startAt,
-      endAt,
-    };
-
-    const updates = {
-      history: [...task.history, newHistory],
-      currentDuration: 0,
-      currentMemo: "",
-      isRunning: false,
-      sessionStartTime: null,
-      lastActivityAt: Date.now(),
-      lastUpdatedAt: Date.now(),
-      pendingSync: true,
-      status: task.status === "not_started" ? "in_progress" : task.status,
-    };
-    const cloudUpdates = {
-      ...updates,
-      pendingSync: false,
-    };
-
-    updateLocalTask(task.id, updates);
-    if (!isSampleMode) {
-      await syncTaskToCloud(task.id, cloudUpdates);
-    }
-    setDetailTaskId(null);
-  };
-
-  // タイマー排他制御：指定したタスク以外の稼働中タスクをすべてストップさせる
-  const pauseAllOtherTasks = useCallback(
-    async (currentTaskId) => {
-      const now = Date.now();
-      let tasksToPause = [];
-
-      setTasks((prev) => {
-        tasksToPause = prev.filter(
-          (t) => t.isRunning && t.id !== currentTaskId,
-        );
-        if (tasksToPause.length === 0) return prev;
-
-        return prev.map((t) => {
-          if (t.isRunning && t.id !== currentTaskId) {
-            const elapsed = t.sessionStartTime
-              ? Math.floor((now - t.sessionStartTime) / 1000)
-              : 0;
-            return {
-              ...t,
-              isRunning: false,
-              currentDuration: t.currentDuration + elapsed,
-              sessionStartTime: null,
-              lastActivityAt: now,
-              lastUpdatedAt: now,
-              pendingSync: true,
-            };
-          }
-          return t;
-        });
-      });
-
-      if (tasksToPause.length > 0) {
-        const dbInstance = getSafeDb();
-        if (dbInstance && auth?.currentUser && !isSampleMode) {
-          try {
-            const batch = writeBatch(dbInstance);
-            tasksToPause.forEach((t) => {
-              const elapsed = t.sessionStartTime
-                ? Math.floor((now - t.sessionStartTime) / 1000)
-                : 0;
-              batch.update(getTaskDoc(dbInstance, t.id), {
-                isRunning: false,
-                currentDuration: t.currentDuration + elapsed,
-                sessionStartTime: null,
-                lastActivityAt: now,
-                lastUpdatedAt: now,
-              });
-            });
-            await batch.commit();
-            setTasks((prev) =>
-              prev.map((t) =>
-                tasksToPause.some((paused) => paused.id === t.id)
-                  ? { ...t, pendingSync: false }
-                  : t,
-              ),
-            );
-          } catch (e) {
-            tasksToPause.forEach((t) => {
-              const elapsed = t.sessionStartTime
-                ? Math.floor((now - t.sessionStartTime) / 1000)
-                : 0;
-              queuePendingTaskUpdate(t.id, {
-                isRunning: false,
-                currentDuration: t.currentDuration + elapsed,
-                sessionStartTime: null,
-                lastActivityAt: now,
-                lastUpdatedAt: now,
-              });
-            });
-            console.error("Batch update failed", e);
-          }
+        catch (err) {
+            console.error("Fetch Error:", err);
         }
-      }
-    },
-    [isSampleMode],
-  );
-
-  const addUnitWithPresets = async (unitNumber) => {
-    const unitName = `第${unitNumber}回`;
-    const newTasks = [];
-    Object.keys(SUBJECT_CONFIG).forEach((subject) => {
-      CURRICULUM_PRESETS[subject].forEach((preset) => {
-        preset.items.forEach((item, index) => {
-          newTasks.push({
-            id:
-              Date.now().toString() +
-              Math.random().toString(36).substr(2, 9) +
-              index,
-            unit: unitName,
-            subject: subject,
-            category: preset.category,
-            title: item,
-            materialName: `${preset.category} - ${item}`,
-            status: "not_started",
-            currentDuration: 0,
-            sessionStartTime: null,
-            isRunning: false,
-            lastUpdatedAt: Date.now(),
-            currentMemo: "",
-            history: [],
-            createdAt: new Date().toISOString(),
-          });
+        finally {
+            if (!silent)
+                setLoading(false);
+        }
+    }, [isSampleMode]);
+    useEffect(() => {
+        const unsub = onAuthStateChanged(auth, (u) => {
+            if (!isSampleMode) {
+                setUser(u);
+                if (u)
+                    fetchData();
+                else
+                    setLoading(false);
+            }
         });
-      });
-    });
+        return () => unsub();
+    }, [isSampleMode, fetchData]);
+    useEffect(() => {
+        if (user && !isSampleMode)
+            fetchData(true);
+    }, [user, isSampleMode, fetchData]);
 
-    setTasks((prev) => [...newTasks, ...prev]);
-    setSelectedUnit(unitName);
-
-    const dbInstance = getSafeDb();
-    if (!dbInstance || !auth?.currentUser || isSampleMode) return;
-    const batch = writeBatch(dbInstance);
-    newTasks.forEach((t) =>
-      batch.set(getTaskDoc(dbInstance, t.id), {
-        ...t,
-        lastUpdatedAt: Date.now(),
-      }),
-    );
-    await batch.commit();
-  };
-
-  const deleteUnitTasks = async (unit) => {
-    const toDelete = tasks.filter((t) => t.unit === unit);
-    setTasks((prev) => prev.filter((t) => t.unit !== unit));
-    if (selectedUnit === unit) setSelectedUnit(null);
-
-    const dbInstance = getSafeDb();
-    if (!dbInstance || !auth?.currentUser || isSampleMode) return;
-    const batch = writeBatch(dbInstance);
-    toDelete.forEach((t) => batch.delete(getTaskDoc(dbInstance, t.id)));
-    await batch.commit();
-  };
-
-  const onAddCustomTask = async (
-    unit,
-    subject,
-    title,
-    category,
-  ) => {
-    const newTask = {
-      id: Date.now().toString(),
-      unit,
-      subject,
-      category,
-      title,
-      materialName: `${category} - ${title}`,
-      status: "not_started",
-      currentDuration: 0,
-      sessionStartTime: null,
-      isRunning: false,
-      lastUpdatedAt: Date.now(),
-      currentMemo: "",
-      history: [],
-      createdAt: new Date().toISOString(),
+    // 他端末で開始・停止されたタイマーを即時反映するため、Firestoreをリアルタイム購読する。
+    useEffect(() => {
+        if (!user || isSampleMode)
+            return;
+        const unsubTasks = onSnapshot(getTasksCol(), (snap) => {
+            setTasks(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+            setLoading(false);
+        }, (err) => {
+            console.error("Task realtime sync error:", err);
+        });
+        const unsubTests = onSnapshot(getTestsCol(), (snap) => {
+            setTests(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()));
+        }, (err) => {
+            console.error("Test realtime sync error:", err);
+        });
+        return () => {
+            unsubTasks();
+            unsubTests();
+        };
+    }, [user, isSampleMode]);
+    const handleLogin = async (e) => {
+        e.preventDefault();
+        const fd = new FormData(e.currentTarget);
+        try {
+            setLoading(true);
+            await signInWithEmailAndPassword(auth, fd.get('email'), fd.get('password'));
+        }
+        catch (err) {
+            alert("ログイン失敗。");
+        }
+        finally {
+            setLoading(false);
+        }
     };
-    setTasks((prev) => [...prev, newTask]);
-
-    const dbInstance = getSafeDb();
-    if (!dbInstance || !auth?.currentUser || isSampleMode) return;
-    await setDoc(getTaskDoc(dbInstance, newTask.id), {
-      ...newTask,
-      lastUpdatedAt: Date.now(),
-    });
-  };
-
-  const unitsWithTasks = useMemo(
-    () =>
-      Array.from(new Set(tasks.map((t) => t.unit))).sort((a, b) => {
-        const numA = parseInt(a.replace("第", "").replace("回", "")) || 0;
-        const numB = parseInt(b.replace("第", "").replace("回", "")) || 0;
-        return numB - numA;
-      }),
-    [tasks],
-  );
-
-  // --- Routing / Auth Gate ---
-  if (isAuthChecking)
-    return (
-      <div className="flex h-screen items-center justify-center bg-slate-50 text-slate-400 font-bold">
-        起動中...
-      </div>
-    );
-
-  if (!user && !isSampleMode) {
-    return (
-      <LoginForm
-        onLogin={handleEmailLogin}
-        onSampleMode={() => {
-          setIsSampleMode(true);
-          setTasks(INITIAL_TASKS);
-          setTests(INITIAL_TESTS);
-        }}
-      />
-    );
-  }
-
-  return (
-    <div className="flex flex-col h-screen w-full bg-slate-50 font-sans text-slate-900 max-w-[1600px] mx-auto shadow-2xl overflow-x-hidden relative">
-      {isSampleMode && (
-        <div className="bg-amber-100 text-amber-800 text-[10px] md:text-xs lg:text-sm font-bold text-center py-1 md:py-2 flex items-center justify-center gap-1.5 z-40 relative">
-          <AlertTriangle className="w-3 h-3 md:w-4 md:h-4 lg:w-5 lg:h-5" />
-          サンプルモード表示中（データは保存されません）
+    const toggleSampleMode = () => {
+        if (!isSampleMode) {
+            const { tasks: sTasks, tests: sTests } = generateSampleData();
+            setTasks(sTasks);
+            setTests(sTests);
+            setIsSampleMode(true);
+            setLoading(false);
+        }
+        else {
+            setIsSampleMode(false);
+            setIsMobileView(false);
+            setTasks([]);
+            setTests([]);
+            setLoading(true);
+            fetchData();
+        }
+    };
+    const handleUpdateLocalTask = useCallback(async (id, updates, syncToCloud = false) => {
+        const updatesWithTimestamp = { ...updates };
+        setTasks(prev => prev.map(t => t.id === id ? { ...t, ...updatesWithTimestamp } : t));
+        if (syncToCloud && !isSampleMode && user) {
+            try {
+                await updateDoc(doc(getTasksCol(), id), updatesWithTimestamp);
+            }
+            catch (err) {
+                console.error("Task sync failed:", err);
+            }
+        }
+    }, [isSampleMode, user]);
+    const handleSaveRecord = async (task, totalSeconds) => {
+        const memo = prompt("学習内容：") || "";
+        const now = Date.now();
+        const startedAt = task.sessionStartTime || (now - (totalSeconds * 1000));
+        const endedAt = now;
+        const historyItem = {
+            id: now.toString(),
+            date: getTodayStr(),
+            duration: totalSeconds,
+            memo,
+            startedAt,
+            endedAt
+        };
+        const updatedHistory = [...(task.history || []), historyItem];
+        const updates = { history: updatedHistory, currentDuration: 0, isRunning: false, sessionStartTime: null, lastUpdatedAt: now };
+        handleUpdateLocalTask(task.id, updates);
+        if (!isSampleMode && user) {
+            try {
+                await updateDoc(doc(getTasksCol(), task.id), updates);
+            }
+            catch (e) {
+                alert("保存に失敗しました。");
+            }
+        }
+        setSelectedTaskId(null);
+    };
+    const handleAddTask = async (e) => {
+        e.preventDefault();
+        const fd = new FormData(e.currentTarget);
+        const newTask = {
+            categoryId: activeCategory,
+            subjectId: selectedSubjectId, // Stateを使用して教科をセット
+            type: fd.get('type'),
+            title: fd.get('detail'),
+            history: [], currentDuration: 0, isRunning: false, sessionStartTime: null,
+            createdAt: Date.now(), lastUpdatedAt: Date.now()
+        };
+        if (isSampleMode) {
+            setTasks(prev => [{ id: `s-${Date.now()}`, ...newTask }, ...prev]);
+        }
+        else {
+            try {
+                await addDoc(getTasksCol(), newTask);
+                fetchData(true);
+            }
+            catch (e) {
+                alert("追加に失敗しました。");
+            }
+        }
+        setIsAddingTask(false);
+    };
+    const handleSaveTest = async (e) => {
+        e.preventDefault();
+        const fd = new FormData(e.currentTarget);
+        const testCat = fd.get('testCategory');
+        const subType = fd.get('testSubType');
+        const scores = {};
+        const relevantSubjects = [...SUBJECT_DEFS.school, ...SUBJECT_DEFS.juku];
+        relevantSubjects.forEach(s => {
+            const val = fd.get(`score_${s.id}`);
+            if (val !== null && val !== "")
+                scores[s.id] = Number(val);
+        });
+        const testData = {
+            name: fd.get('name'), date: fd.get('date'),
+            category: testCat, subType, scores,
+            average: Number(fd.get('average')), rank: fd.get('rank'),
+            lastUpdatedAt: Date.now()
+        };
+        if (isSampleMode) {
+            if (editingTest)
+                setTests(prev => prev.map(t => t.id === editingTest.id ? { ...t, ...testData } : t));
+            else
+                setTests(prev => [{ id: `st-${Date.now()}`, ...testData }, ...prev]);
+        }
+        else {
+            try {
+                if (editingTest)
+                    await setDoc(doc(getTestsCol(), editingTest.id), testData, { merge: true });
+                else
+                    await addDoc(getTestsCol(), testData);
+                fetchData(true);
+            }
+            catch (e) {
+                alert("保存に失敗しました。");
+            }
+        }
+        setIsAddingTest(false);
+        setEditingTest(null);
+    };
+    const handleDeleteTest = async (id) => {
+        if (!confirm("成績を削除しますか？"))
+            return;
+        if (isSampleMode)
+            setTests(prev => prev.filter(t => t.id !== id));
+        else {
+            try {
+                await deleteDoc(doc(getTestsCol(), id));
+                fetchData(true);
+            }
+            catch (e) {
+                alert("削除に失敗しました。");
+            }
+        }
+    };
+    const toggleSubjectVisibility = (subId) => {
+        setVisibleSubjects(prev => prev.includes(subId) ? prev.filter(id => id !== subId) : [...prev, subId]);
+    };
+    const bulkSelectSubjects = (type) => {
+        const major5 = SUBJECT_DEFS.school.filter(s => s.isMajor).map(s => s.id);
+        const sub4 = SUBJECT_DEFS.school.filter(s => !s.isMajor).map(s => s.id);
+        const juku5 = SUBJECT_DEFS.juku.map(s => s.id);
+        switch (type) {
+            case 'all':
+                setVisibleSubjects(['average', ...major5, ...sub4, ...juku5]);
+                break;
+            case 'none':
+                setVisibleSubjects([]);
+                break;
+            case 'school_major':
+                setVisibleSubjects(prev => Array.from(new Set([...prev, ...major5])));
+                break;
+            case 'school_sub':
+                setVisibleSubjects(prev => Array.from(new Set([...prev, ...sub4])));
+                break;
+            case 'juku':
+                setVisibleSubjects(prev => Array.from(new Set([...prev, ...juku5])));
+                break;
+        }
+    };
+    const getSortedTasks = (categoryTasks) => {
+        const subjectOrder = SUBJECT_DEFS[activeCategory]?.map(s => s.id) || [];
+        return categoryTasks.sort((a, b) => {
+            const idxA = subjectOrder.indexOf(a.subjectId);
+            const idxB = subjectOrder.indexOf(b.subjectId);
+            if (idxA !== idxB) {
+                return (idxA === -1 ? 99 : idxA) - (idxB === -1 ? 99 : idxB);
+            }
+            return b.lastUpdatedAt - a.lastUpdatedAt;
+        });
+    };
+    const stats = useMemo(() => {
+        const sDate = new Date(startDate);
+        const eDate = new Date(endDate);
+        eDate.setHours(23, 59, 59, 999);
+        const rangeHistory = [];
+        tasks.forEach(t => {
+            (t.history || []).forEach((h) => {
+                const d = new Date(h.date);
+                if (d >= sDate && d <= eDate)
+                    rangeHistory.push({ ...h, categoryId: t.categoryId, subjectId: t.subjectId });
+            });
+        });
+        const totalSec = rangeHistory.reduce((acc, h) => acc + h.duration, 0);
+        const dailyMap = new Map();
+        // 指定期間の日付をすべて初期化 (データがない日もX軸に表示するため)
+        let loopDate = new Date(sDate);
+        while (loopDate <= eDate) {
+            const dStr = `${loopDate.getFullYear()}-${(loopDate.getMonth() + 1).toString().padStart(2, '0')}-${loopDate.getDate().toString().padStart(2, '0')}`;
+            dailyMap.set(dStr, { name: dStr.split('-').slice(1).join('/'), school: 0, juku: 0, etc: 0 });
+            loopDate.setDate(loopDate.getDate() + 1);
+        }
+        rangeHistory.forEach(h => {
+            if (!dailyMap.has(h.date))
+                dailyMap.set(h.date, { name: h.date.split('-').slice(1).join('/'), school: 0, juku: 0, etc: 0 });
+            dailyMap.get(h.date)[h.categoryId] += Math.round(h.duration / 60);
+        });
+        const breakdown = Object.values(CATEGORIES).map(cat => {
+            const items = rangeHistory.filter(h => h.categoryId === cat.id);
+            const catSec = items.reduce((acc, h) => acc + h.duration, 0);
+            const subjects = (SUBJECT_DEFS[cat.id] || []).map(s => {
+                const sSec = tasks.filter(t => t.subjectId === s.id).reduce((acc, t) => acc + (t.history || []).filter(h => {
+                    const d = new Date(h.date);
+                    return d >= sDate && d <= eDate;
+                }).reduce((sum, h) => sum + h.duration, 0), 0);
+                return { ...s, duration: sSec, percent: catSec > 0 ? Math.round((sSec / catSec) * 100) : 0 };
+            }).filter(s => s.duration > 0);
+            return { ...cat, duration: catSec, subjects, percent: totalSec > 0 ? Math.round((catSec / totalSec) * 100) : 0 };
+        });
+        return { totalSec, breakdown, dailyData: Array.from(dailyMap.values()).sort((a, b) => new Date(a.name).getTime() - new Date(b.name).getTime()) };
+    }, [tasks, startDate, endDate]);
+    const filteredTests = useMemo(() => {
+        const sDate = new Date(startDate);
+        const eDate = new Date(endDate);
+        eDate.setHours(23, 59, 59, 999);
+        return tests.filter(t => { const d = new Date(t.date); return d >= sDate && d <= eDate; });
+    }, [tests, startDate, endDate]);
+    const allChartSubjects = useMemo(() => [
+        { id: 'average', label: '学年平均', hex: '#94a3b8' },
+        ...SUBJECT_DEFS.school.filter(s => s.isMajor).map(s => ({ ...s, label: `${s.label}(中)` })),
+        ...SUBJECT_DEFS.school.filter(s => !s.isMajor).map(s => ({ ...s, label: `${s.label}(中)` })),
+        ...SUBJECT_DEFS.juku.map(s => ({ ...s, label: `${s.label}(塾)` }))
+    ], []);
+    // モーダル等のCSS制御用
+    const modalOverlayClass = isMobileView
+        ? "absolute inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4"
+        : "fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4";
+    const taskDetailOverlayClass = isMobileView
+        ? "absolute inset-0 z-[100] flex items-end justify-center p-0"
+        : "fixed inset-0 z-[100] flex items-end lg:items-center justify-center p-0 sm:p-4";
+    if (loading && !isSampleMode)
+        return <div className="h-screen flex items-center justify-center bg-slate-50 font-black text-blue-600 animate-pulse uppercase tracking-[0.2em]">Syncing System...</div>;
+    if (!user && !isSampleMode)
+        return (<div className="h-screen bg-slate-100 flex items-center justify-center p-4 text-center">
+      <div className="w-full max-w-sm bg-white rounded-[2.5rem] shadow-2xl p-8 space-y-6">
+        <div className="mx-auto w-20 h-20 bg-blue-600 rounded-3xl flex items-center justify-center text-white shadow-xl shadow-blue-100">
+           <GraduationCap size={40}/>
         </div>
-      )}
-      <header className="bg-white/80 backdrop-blur-xl pt-4 md:pt-6 lg:pt-8 sticky top-0 z-30 border-b border-slate-100">
-        <div className="h-14 md:h-16 lg:h-20 flex items-center justify-between px-5 md:px-8 lg:px-10">
-          <div>
-            <h1 className="font-black text-lg md:text-2xl lg:text-3xl text-slate-800 tracking-tight flex items-center gap-2 md:gap-3">
-              Level Up Study
-              <span className="bg-blue-100 text-blue-600 px-2 py-0.5 md:px-3 md:py-1 rounded text-[10px] md:text-sm lg:text-base">
-                {APP_VERSION}
-              </span>
-            </h1>
+        <h1 className="text-2xl font-black tracking-tighter uppercase leading-tight">Level Up JH</h1>
+        <form onSubmit={handleLogin} className="space-y-4 text-left">
+           <input name="email" type="email" required placeholder="メールアドレス" className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold focus:ring-2 focus:ring-blue-600 transition outline-none text-sm leading-none"/>
+           <input name="password" type="password" required placeholder="パスワード" className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold focus:ring-2 focus:ring-blue-600 transition outline-none text-sm leading-none"/>
+           <button type="submit" className="w-full bg-blue-600 text-white font-black py-4 rounded-2xl shadow-xl active:scale-95 transition text-md uppercase leading-none">LOGIN</button>
+        </form>
+        <button onClick={toggleSampleMode} className="text-slate-400 font-bold hover:text-blue-600 transition flex items-center justify-center gap-2 w-full text-xs uppercase leading-none"><FlaskConical size={14}/> サンプルデータでお試し</button>
+      </div>
+    </div>);
+    return (<div className={isMobileView
+            ? "min-h-screen bg-slate-800 p-4 sm:p-8 flex justify-center items-center font-sans selection:bg-blue-100"
+            : "min-h-screen bg-slate-50 text-slate-900 lg:pl-72 pb-24 lg:pb-0 font-sans selection:bg-blue-100 overflow-x-hidden text-left"}>
+      <div className={isMobileView
+            ? "w-full max-w-[400px] h-[800px] bg-slate-50 rounded-[3rem] shadow-2xl relative overflow-hidden border-[12px] border-slate-900 text-slate-900 flex flex-col text-left"
+            : "w-full h-full contents"}>
+        
+        {/* --- Sidebar (PC) --- */}
+        <aside className={isMobileView
+            ? "hidden"
+            : "hidden lg:flex flex-col fixed inset-y-0 left-0 w-72 bg-white border-r border-slate-100 p-8 z-40 text-left"}>
+          <div className="flex items-center gap-3 mb-4 text-left">
+            <div className="bg-gradient-to-br from-blue-600 to-indigo-700 p-3 rounded-2xl text-white shadow-xl shadow-blue-200"><Trophy size={24}/></div>
+            <h1 className="text-xl font-black tracking-tighter leading-none uppercase">Level Up<br /><span className="text-blue-600 text-md uppercase leading-none">Study JH</span></h1>
           </div>
-          <div className="flex items-center gap-2 md:gap-4 lg:gap-6">
-            {!isSampleMode ? (
-              <div className="flex items-center gap-2 md:gap-4">
-                <div className="flex flex-col items-end mr-1 md:mr-2">
-                  <div className="text-[9px] md:text-xs lg:text-sm text-slate-400 font-bold mb-0.5 md:mb-1 flex items-center gap-1 md:gap-1.5">
-                    {syncState === "syncing" ? (
-                      <RefreshCw className="w-2.5 h-2.5 md:w-3.5 md:h-3.5 lg:w-4 lg:h-4 animate-spin text-blue-500" />
-                    ) : syncState === "offline" ? (
-                      <CloudOff className="w-2.5 h-2.5 md:w-3.5 md:h-3.5 lg:w-4 lg:h-4 text-red-400" />
-                    ) : (
-                      <Cloud className="w-2.5 h-2.5 md:w-3.5 md:h-3.5 lg:w-4 lg:h-4 text-green-500" />
-                    )}
-                    {lastSync} 同期
-                  </div>
-                  <button
-                    onClick={() => fetchData(false)}
-                    className="text-[10px] md:text-xs lg:text-sm bg-slate-100 hover:bg-slate-200 text-slate-600 px-2 py-1 md:px-3 md:py-1.5 rounded font-bold transition-colors flex items-center gap-1 active:scale-95"
-                  >
-                    手動更新
-                  </button>
-                </div>
-                <button
-                  onClick={handleLogout}
-                  className="text-slate-400 hover:text-slate-600 p-1 md:p-2"
-                  title="ログアウト"
-                >
-                  <LogOut className="w-4 h-4 md:w-5 md:h-5 lg:w-6 lg:h-6" />
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={() => {
-                  setIsSampleMode(false);
-                  fetchData(true);
-                }}
-                className="text-[10px] md:text-xs lg:text-sm bg-slate-800 text-white px-3 py-1.5 md:px-4 md:py-2 rounded font-bold transition-colors active:scale-95"
-              >
-                データに戻る
-              </button>
-            )}
-            <button
-              onClick={() => {
-                if (!isSampleMode) {
-                  setIsSampleMode(true);
-                  setTasks(generateDummyTasks());
-                  setTests(INITIAL_TESTS);
-                } else {
-                  setIsSampleMode(false);
-                  fetchData(true);
-                }
-              }}
-              className={`text-[10px] md:text-xs lg:text-sm px-2 py-2 md:px-3 md:py-2.5 rounded-lg font-bold transition-colors flex items-center gap-1 md:gap-2 active:scale-95 ${isSampleMode ? "bg-amber-500 text-white" : "bg-slate-100 text-slate-500 hover:bg-slate-200"}`}
-              title="サンプル表示"
-            >
-              <FlaskConical className="w-3.5 h-3.5 md:w-4 md:h-4 lg:w-5 lg:h-5" />
+          <div className="mb-8 rounded-2xl bg-slate-50 px-4 py-3 text-left ring-1 ring-slate-100">
+            <div className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">Release</div>
+            <div className="mt-1 flex items-center justify-between">
+              <span className="text-sm font-black text-slate-800">{APP_VERSION}</span>
+              <span className="rounded-full bg-blue-100 px-2 py-1 text-[9px] font-black text-blue-700">Timer Sync</span>
+            </div>
+          </div>
+          <nav className="flex-1 space-y-2">
+            {[{ id: 'daily', label: '学習記録', icon: Zap }, { id: 'stats', label: '実績分析', icon: BarChart2 }, { id: 'tests', label: '成績推移', icon: TrendingUp }].map(item => (<button key={item.id} onClick={() => setActiveTab(item.id)} className={`w-full flex items-center gap-4 px-6 py-4 rounded-3xl font-black transition-all leading-none ${activeTab === item.id ? 'bg-blue-600 text-white shadow-2xl' : 'text-slate-400 hover:bg-slate-50'}`}>
+                <item.icon size={20}/> {item.label}
+              </button>))}
+          </nav>
+          <button onClick={toggleSampleMode} className={`mt-8 w-full flex items-center justify-between p-4 rounded-2xl border-2 transition-all leading-none ${isSampleMode ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-slate-50 border-slate-100 text-slate-400'}`}>
+            <span className="text-[10px] font-black uppercase tracking-wider leading-none">Sample Mode</span>
+            <FlaskConical size={16}/>
+          </button>
+          
+          {isSampleMode && (<button onClick={() => setIsMobileView(true)} className="mt-4 w-full flex items-center justify-between p-4 rounded-2xl bg-slate-900 text-white font-black transition-all leading-none shadow-xl">
+              <span className="text-[10px] uppercase tracking-wider">スマホプレビュー</span>
+              <Smartphone size={16}/>
+            </button>)}
+
+          {!isSampleMode && <button onClick={() => signOut(auth)} className="mt-4 flex items-center gap-2 text-xs font-black text-slate-300 hover:text-rose-500 transition px-4 leading-none"><LogOut size={14}/> LOGOUT</button>}
+        </aside>
+
+        {/* --- Mobile Header --- */}
+        <header className={isMobileView
+            ? "bg-white border-b border-slate-100 p-4 sticky top-0 z-40 flex justify-between items-center px-6 leading-none shrink-0"
+            : "lg:hidden bg-white border-b border-slate-100 p-4 sticky top-0 z-40 flex justify-between items-center px-6 leading-none"}>
+          <div className="flex items-center gap-2 leading-none text-left">
+            <Trophy className="text-blue-600" size={20}/>
+            <h1 className="text-sm font-black tracking-tighter uppercase leading-none">Study JH</h1>
+          </div>
+          <div className="flex items-center">
+            {isSampleMode && isMobileView && (<button onClick={() => setIsMobileView(false)} className="p-2 rounded-xl bg-slate-100 text-slate-600 flex items-center gap-1 leading-none mr-2">
+                <Monitor size={14}/>
+                <span className="text-[9px] font-black uppercase">PC</span>
+              </button>)}
+            <span className="mr-2 rounded-full bg-blue-50 px-2.5 py-1 text-[9px] font-black text-blue-700 ring-1 ring-blue-100">{APP_VERSION}</span>
+            <button onClick={toggleSampleMode} className={`p-2 rounded-xl border leading-none ${isSampleMode ? 'bg-amber-100 border-amber-200 text-amber-600' : 'bg-slate-50 border-slate-100 text-slate-400'}`}>
+              <FlaskConical size={18}/>
             </button>
           </div>
+        </header>
+
+        {/* --- Main Container --- */}
+        <div className={isMobileView ? "flex-1 overflow-y-auto pb-24 no-scrollbar relative" : ""}>
+          <main className="p-4 sm:p-6 lg:p-10 max-w-6xl mx-auto space-y-6 sm:space-y-10">
+            {(activeTab === 'stats' || activeTab === 'tests') && (<div className="bg-white/80 backdrop-blur-xl p-4 sm:p-6 rounded-[2rem] shadow-sm border border-white flex flex-wrap items-center gap-4 justify-center lg:sticky lg:top-4 z-30 transition-all text-left">
+                  <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-xl shrink-0 overflow-hidden leading-none">
+                     <CalendarIcon className="text-slate-400" size={14}/>
+                     <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="bg-transparent border-none p-0 text-[10px] font-bold outline-none leading-none"/>
+                     <span className="text-slate-300 mx-1">/</span>
+                     <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="bg-transparent border-none p-0 text-[10px] font-bold outline-none leading-none"/>
+                  </div>
+                  <div className="flex gap-1 overflow-x-auto no-scrollbar whitespace-nowrap">
+                     {[7, 14, 30, 0].map(days => (<button key={days} onClick={() => {
+                    const d = new Date();
+                    if (days === 0)
+                        setStartDate("2026-01-01");
+                    else {
+                        d.setDate(d.getDate() - days);
+                        setStartDate(d.toISOString().split('T')[0]);
+                    }
+                    setEndDate(new Date().toISOString().split('T')[0]);
+                }} className="px-3 py-2 bg-slate-100 hover:bg-blue-50 hover:text-blue-600 rounded-lg text-[9px] font-black transition-all whitespace-nowrap leading-none">
+                         {days === 30 ? '1月' : days === 14 ? '2週' : days === 7 ? '1週' : '全'}
+                       </button>))}
+                     {!isSampleMode && <button onClick={() => fetchData()} className="p-2 bg-blue-50 text-blue-600 rounded-lg ml-2 leading-none"><RefreshCw size={14}/></button>}
+                  </div>
+               </div>)}
+
+            {activeTab === 'daily' && (<div className="space-y-8 animate-in fade-in duration-500">
+            <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-slate-950 via-blue-950 to-indigo-700 p-4 sm:p-5 shadow-2xl shadow-blue-200/40 ring-1 ring-white/20 lg:sticky lg:top-4 z-30">
+              <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full bg-blue-400/25 blur-2xl"/>
+              <div className="relative z-10 flex items-center justify-between">
+                <button onClick={() => setSelectedMonth(m => m === 1 ? 12 : m - 1)} className="p-2 bg-white/10 hover:bg-white/20 rounded-xl transition leading-none text-white ring-1 ring-white/15"><ChevronLeft size={20}/></button>
+                <div className="flex-1 text-center">
+                  <div className="text-[10px] font-black uppercase tracking-[0.22em] text-blue-100/80">Monthly Clean View</div>
+                  <h2 className="mt-1 text-xl sm:text-3xl font-black text-white tracking-tight leading-none">{selectedMonth}月の学習記録</h2>
+                  <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-[10px] font-black text-blue-50 ring-1 ring-white/15">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-300 animate-pulse"/> {APP_VERSION} / Monthly Clean View
+                  </div>
+                </div>
+                <button onClick={() => setSelectedMonth(m => m === 12 ? 1 : m + 1)} className="p-2 bg-white/10 hover:bg-white/20 rounded-xl transition leading-none text-white ring-1 ring-white/15"><ChevronRight size={20}/></button>
+              </div>
+            </div>
+
+            <div className={`grid gap-3 sm:gap-4 text-center ${isMobileView ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-4'}`}>
+              <div className={`${isMobileView ? '' : 'md:col-span-1'} bg-gradient-to-br from-blue-600 to-indigo-700 p-3 sm:p-6 rounded-[1.5rem] sm:rounded-[2rem] text-white shadow-xl relative overflow-hidden text-center flex flex-col justify-center min-h-[70px] sm:min-h-[120px]`}>
+                 <p className="text-[9px] sm:text-[10px] font-black opacity-70 mb-1 sm:mb-2 uppercase tracking-widest leading-none">Monthly</p>
+                 <p className="text-2xl sm:text-4xl font-black font-mono leading-none tracking-tighter">
+                   {formatDuration(tasks.reduce((sum, t) => sum + getMonthlyDuration(t, selectedMonth), 0))}
+                 </p>
+              </div>
+              <div className={`${isMobileView ? 'grid grid-cols-3 gap-2' : 'md:col-span-3 grid grid-cols-3 gap-2 sm:gap-4'} text-center`}>
+                 {Object.values(CATEGORIES).map(cat => {
+                const catTotal = tasks.filter(t => t.categoryId === cat.id).reduce((sum, t) => sum + getMonthlyDuration(t, selectedMonth), 0);
+                return (<div key={cat.id} onClick={() => setActiveCategory(cat.id)} className={`cursor-pointer transition-all bg-white/90 backdrop-blur-xl p-2 sm:p-4 rounded-[1.5rem] sm:rounded-[2rem] border-2 shadow-sm hover:shadow-xl flex flex-col items-center justify-center min-h-[70px] sm:min-h-[120px] text-center leading-none ${activeCategory === cat.id ? 'border-blue-400 shadow-blue-100 scale-105 z-10 ring-4 ring-blue-50' : 'border-slate-100 hover:border-blue-200'}`}>
+                        <cat.icon size={16} className={`sm:w-6 sm:h-6 ${cat.color}`}/>
+                        <p className="text-[9px] sm:text-sm font-black text-slate-600 mt-1.5 sm:mt-3 uppercase leading-none">{cat.label}</p>
+                        <p className="text-xs sm:text-lg font-black font-mono text-slate-800 mt-1 sm:mt-2 w-full text-center leading-none tracking-tighter whitespace-nowrap">{formatDuration(catTotal)}</p>
+                     </div>);
+            })}
+              </div>
+            </div>
+
+            <div className="space-y-6 text-center">
+              <div className="bg-white p-5 sm:p-6 rounded-[2rem] border border-slate-100 shadow-sm text-left">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between mb-4">
+                  <div>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Today Done</p>
+                    <h3 className="text-lg sm:text-xl font-black text-slate-800 tracking-tight">今日やった作業</h3>
+                  </div>
+                  <div className="text-xs font-black text-blue-600">
+                    {formatDuration(todayTaskSummaries.reduce((sum, item) => sum + item.totalDuration, 0))}
+                  </div>
+                </div>
+                {todayTaskSummaries.length === 0 ? (<div className="rounded-2xl border-2 border-dashed border-slate-100 py-8 text-center">
+                    <p className="text-xs font-black text-slate-300">今日はまだ記録がありません</p>
+                  </div>) : (<div className={`grid gap-3 ${isMobileView ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'}`}>
+                    {todayTaskSummaries.map(item => (<button key={item.task.id} onClick={() => setSelectedTaskId(item.task.id)} className={`rounded-2xl border p-4 text-left transition active:scale-95 ${item.isRunning ? 'border-blue-200 bg-blue-50 shadow-blue-100' : 'border-slate-100 bg-slate-50 hover:bg-white hover:shadow-md'}`}>
+                        <div className="mb-3 flex items-center justify-between gap-2">
+                          <span className="rounded-full px-2.5 py-1 text-[9px] font-black text-white" style={{ backgroundColor: item.color }}>{item.subjectLabel}</span>
+                          <span className={`text-[9px] font-black ${item.isRunning ? 'text-blue-600' : 'text-slate-400'}`}>{item.isRunning ? '計測中' : `${item.count}回`}</span>
+                        </div>
+                        <div className="truncate text-sm font-black text-slate-800">{item.task.title || 'Untitled'}</div>
+                        <div className="mt-3 flex items-center justify-between border-t border-white pt-3">
+                          <span className="text-[10px] font-bold text-slate-400">{item.typeLabel}</span>
+                          <span className="font-mono text-base font-black text-blue-600">{formatDuration(item.totalDuration)}</span>
+                        </div>
+                      </button>))}
+                  </div>)}
+              </div>
+
+              {/* 当日のタイムライン */}
+              <TodayTimeline tasks={tasks}/>
+
+              <ActiveTimerSummary task={runningTask} onUpdate={handleUpdateLocalTask}/>
+
+              <div className="flex gap-2 bg-slate-100 p-1.5 rounded-[1.75rem] w-full max-w-md mx-auto shadow-inner overflow-hidden leading-none text-center">
+                    {Object.values(CATEGORIES).map(cat => (<button key={cat.id} onClick={() => setActiveCategory(cat.id)} className={`flex-1 flex items-center justify-center gap-1.5 py-3 rounded-2xl text-[10px] font-black transition-all leading-none ${activeCategory === cat.id ? 'bg-white text-slate-900 shadow-md' : 'text-slate-400'}`}>
+                        <cat.icon size={14}/> {cat.label}
+                      </button>))}
+                  </div>
+
+                  <div className="flex justify-center">
+                    <button onClick={() => setIsAddingTask(true)} className="bg-white border-2 border-dashed border-blue-200 text-blue-600 font-black px-6 py-4 rounded-[1.75rem] flex items-center gap-2 hover:bg-blue-50 active:scale-95 transition-all shadow-sm text-xs leading-none">
+                      <PlusCircle size={20}/> 項目を追加
+                    </button>
+                  </div>
+
+                  <div className="space-y-8 pb-10 text-left">
+                    {tasks.filter(t => t.categoryId === activeCategory && shouldShowTaskInMonth(t, selectedMonth)).length === 0 ? (<div className="py-16 text-center border-2 border-dashed border-slate-200 rounded-3xl">
+                        <p className="text-slate-300 font-black text-sm uppercase">記録が見つかりません</p>
+                      </div>) : (SUBJECT_DEFS[activeCategory]?.map(subject => {
+                const subjectTasks = tasks.filter(t => t.categoryId === activeCategory && t.subjectId === subject.id && shouldShowTaskInMonth(t, selectedMonth));
+                if (subjectTasks.length === 0)
+                    return null;
+                return (<div key={subject.id} className="space-y-4">
+                            <div className="flex items-center gap-2 px-2">
+                               <div className="w-1.5 h-4 rounded-full" style={{ backgroundColor: subject.hex }}/>
+                               <h3 className="font-black text-slate-700 text-base sm:text-lg leading-none">{subject.label}</h3>
+                            </div>
+                            <div className={`gap-3 sm:gap-4 ${isMobileView ? 'grid grid-cols-1' : 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'}`}>
+                              {subjectTasks.sort((a, b) => getLatestMonthlyTimestamp(b, selectedMonth) - getLatestMonthlyTimestamp(a, selectedMonth)).map(task => {
+                        const monthlyHistories = getMonthlyHistories(task, selectedMonth);
+                        const monthlyTime = getMonthlyDuration(task, selectedMonth);
+                        const latestMonthlyTimestamp = getLatestMonthlyTimestamp(task, selectedMonth);
+                        return (<div key={task.id} onClick={() => setSelectedTaskId(task.id)} className={`p-4 sm:p-6 rounded-[1.5rem] sm:rounded-[2rem] border shadow-sm hover:shadow-xl transition-all cursor-pointer relative overflow-hidden text-left group ${task.isRunning ? 'bg-gradient-to-br from-blue-600 to-indigo-800 text-white border-blue-400 shadow-blue-200' : 'bg-white border-slate-100'}`}>
+                                    <div className="flex justify-between items-start mb-2 sm:mb-3 text-left">
+                                      <div className="flex items-center gap-1.5 sm:gap-2 leading-none text-left">
+                                        <span className={`text-[8px] sm:text-[9px] font-black px-2 py-0.5 rounded-full leading-none ${CATEGORIES[task.categoryId.toUpperCase()].bg} ${CATEGORIES[task.categoryId.toUpperCase()].color}`}>{task.type === 'homework' ? '宿題' : '自習'}</span>
+                                      </div>
+                                      {task.isRunning && <div className="rounded-full bg-white/15 px-2 py-1 text-[8px] font-black text-white ring-1 ring-white/20">LIVE</div>}
+                                    </div>
+                                    <div className={`text-[9px] sm:text-[10px] font-bold mb-2 sm:mb-3 ${task.isRunning ? 'text-blue-100/80' : 'text-slate-400'}`}>
+                                       {task.isRunning ? '現在計測中' : `${formatRecordDate(latestMonthlyTimestamp)} 記録`}
+                                    </div>
+                                    <h4 className={`font-black text-base sm:text-lg mb-3 sm:mb-4 truncate leading-tight text-left ${task.isRunning ? 'text-white' : 'text-slate-800'}`}>{task.title || "Untitled"}</h4>
+                                    <div className={`flex justify-between items-end border-t pt-3 sm:pt-4 leading-none text-left ${task.isRunning ? 'border-white/15' : 'border-slate-50'}`}>
+                                       <div className={`text-[9px] sm:text-[10px] font-black flex items-center gap-1 uppercase leading-none text-left ${task.isRunning ? 'text-blue-100/80' : 'text-slate-300'}`}><History size={12}/> {monthlyHistories.length}回</div>
+                                       <p className={`text-lg sm:text-xl font-black font-mono tracking-tighter leading-none text-left ${task.isRunning ? 'text-white' : 'text-blue-600'}`}>{formatDuration(monthlyTime)}</p>
+                                    </div>
+                                  </div>);
+                    })}
+                            </div>
+                          </div>);
+            }))}
+                  </div>
+                </div>
+              </div>)}
+
+            {activeTab === 'stats' && (<div className="space-y-8 sm:space-y-10 animate-in slide-in-from-bottom-5 duration-500 text-center">
+                
+                {/* 追加: 当日の学習タイムラインを実績分析画面にも表示 */}
+                <TodayTimeline tasks={tasks}/>
+
+                <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden text-center text-left">
+                   <h3 className="text-lg font-black mb-6 flex items-center justify-center gap-2 leading-none text-center"><BarChart2 className="text-blue-600" size={20}/> 学習推移 (分)</h3>
+                   <div className="h-64 sm:h-80 w-full text-center">
+                      <ResponsiveContainer width="100%" height="100%">
+                         <BarChart data={stats.dailyData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9"/>
+                            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 9, fontWeight: '900', fill: '#cbd5e1' }}/>
+                            <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 9, fontWeight: '900', fill: '#cbd5e1' }}/>
+                            <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', fontSize: '10px' }}/>
+                            <Legend iconType="circle" wrapperStyle={{ paddingTop: '10px', fontSize: '10px', fontWeight: '900' }}/>
+                            <Bar dataKey="school" name="中学校" stackId="a" fill="#3b82f6"/>
+                            <Bar dataKey="juku" name="塾" stackId="a" fill="#10b981"/>
+                            <Bar dataKey="etc" name="その他" stackId="a" fill="#8b5cf6"/>
+                         </BarChart>
+                      </ResponsiveContainer>
+                   </div>
+                </div>
+
+                <div className={`grid gap-6 text-center text-left ${isMobileView ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-2'}`}>
+                   <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm text-center">
+                  <h3 className="text-lg font-black mb-6 flex items-center justify-center gap-2 leading-none text-center text-center"><PieChartIcon className="text-indigo-600" size={20}/> 学習比率</h3>
+                  <div className="h-56 sm:h-64 text-center">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie data={stats.breakdown} innerRadius="60%" outerRadius="85%" paddingAngle={5} dataKey="duration" nameKey="label">
+                          {stats.breakdown.map((e) => <Cell key={e.id} fill={e.hex} stroke="none"/>)}
+                        </Pie>
+                        <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', fontSize: '14px', fontWeight: 'bold' }}/>
+                        <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px', fontSize: '12px', fontWeight: '900' }}/>
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="flex justify-center gap-2 sm:gap-4 mt-2 sm:mt-4 flex-wrap leading-none">
+                    {stats.breakdown.map(d => (<div key={d.id} className="flex flex-col items-center p-3 sm:p-4 bg-slate-50 rounded-xl sm:rounded-2xl min-w-[70px] sm:min-w-[90px] leading-none text-center">
+                         <div className="w-2 h-2 sm:w-3 sm:h-3 rounded-full mb-2 leading-none text-center" style={{ backgroundColor: d.hex }}/>
+                         <span className="text-sm sm:text-base font-black text-slate-800 font-mono leading-none">{d.percent}%</span>
+                      </div>))}
+                  </div>
+               </div>
+
+               <div className="space-y-4 text-left">
+                      {stats.breakdown.map(cat => (<div key={cat.id} className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm relative overflow-hidden group text-left">
+                           <h4 className={`font-black text-[10px] ${cat.color} uppercase mb-4 tracking-widest flex items-center gap-2 leading-none text-left`}>
+                             <Award size={14}/> {cat.label}の内訳
+                           </h4>
+                           <div className="space-y-4 text-left">
+                              {cat.subjects.map((s) => (<div key={s.id} className="space-y-1.5 text-left leading-none">
+                                   <div className="flex justify-between text-[10px] font-black leading-none text-left text-left">
+                                      <span className="text-slate-600 truncate text-left">{s.label}</span>
+                                      <span className="text-slate-400 font-mono text-left text-left">{formatDuration(s.duration)}</span>
+                                   </div>
+                                   <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden text-left leading-none text-left">
+                                      <div className={`h-full rounded-full ${cat.id === 'school' ? 'bg-blue-600' : cat.id === 'juku' ? 'bg-emerald-500' : 'bg-purple-500'}`} style={{ width: `${s.percent}%` }}/>
+                                   </div>
+                                </div>))}
+                           </div>
+                        </div>))}
+                   </div>
+                </div>
+              </div>)}
+
+            {activeTab === 'tests' && (<div className="space-y-10 animate-in zoom-in-95 duration-500 pb-10 text-center text-left">
+                <div className={`flex items-center gap-4 px-4 text-center leading-none text-center ${isMobileView ? 'flex-col' : 'flex-col sm:flex-row justify-between'}`}>
+                  <h3 className="text-2xl font-black text-slate-800 tracking-tight flex items-center justify-center gap-2 leading-none text-center text-center">
+                    <TrendingUp className="text-rose-500" size={24}/> Score Trends
+                  </h3>
+                  <button onClick={() => { setEditingTest(null); setIsAddingTest(true); }} className="w-full sm:w-auto bg-rose-500 text-white font-black px-8 py-3 rounded-2xl shadow-xl active:scale-95 transition text-sm uppercase leading-none">成績登録</button>
+                </div>
+
+                <div className="bg-white p-4 sm:p-8 rounded-[2rem] border border-slate-100 shadow-sm space-y-6 text-left overflow-x-hidden leading-none text-left">
+                   <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-50 pb-4 leading-none text-left">
+                      <div className="flex items-center gap-2 text-slate-400 leading-none text-left text-left">
+                         <ListFilter size={16}/>
+                         <span className="text-[10px] font-black uppercase leading-none text-left">教科選択</span>
+                      </div>
+                      <div className="flex gap-1 leading-none text-left">
+                         <button onClick={() => bulkSelectSubjects('all')} className="px-2 py-1 bg-slate-900 text-white rounded-lg text-[9px] font-black leading-none">全</button>
+                         <button onClick={() => bulkSelectSubjects('none')} className="px-2 py-1 bg-slate-100 text-slate-400 rounded-lg text-[9px] font-black leading-none">無</button>
+                      </div>
+                   </div>
+
+                   <div className="flex flex-col gap-4 text-left leading-none text-left">
+                      <div className="text-left leading-none text-left text-left">
+                        <h5 className="text-[9px] font-black text-blue-600 uppercase mb-2 leading-none text-left text-left">中学校</h5>
+                        <div className="flex flex-wrap gap-1.5 leading-none text-left text-left">
+                           {SUBJECT_DEFS.school.map(s => (<button key={s.id} onClick={() => toggleSubjectVisibility(s.id)} className={`px-2.5 py-1.5 rounded-lg text-[9px] font-black flex items-center gap-1.5 transition-all leading-none ${visibleSubjects.includes(s.id) ? 'bg-blue-50 text-blue-600 border border-blue-100 shadow-sm' : 'bg-slate-50 text-slate-400 border border-transparent'}`}>
+                               {visibleSubjects.includes(s.id) ? <CheckSquare size={10}/> : <Square size={10}/>} {s.label}
+                             </button>))}
+                        </div>
+                      </div>
+                      <div className="text-left leading-none text-left text-left text-left">
+                        <h5 className="text-[9px] font-black text-emerald-600 uppercase mb-2 leading-none text-left text-left">塾</h5>
+                        <div className="flex flex-wrap gap-1.5 leading-none text-left text-left">
+                           {SUBJECT_DEFS.juku.map(s => (<button key={s.id} onClick={() => toggleSubjectVisibility(s.id)} className={`px-2.5 py-1.5 rounded-lg text-[9px] font-black flex items-center gap-1.5 transition-all leading-none ${visibleSubjects.includes(s.id) ? 'bg-emerald-50 text-emerald-600 border border-emerald-100 shadow-sm' : 'bg-slate-50 text-slate-400 border border-transparent'}`}>
+                               {visibleSubjects.includes(s.id) ? <CheckSquare size={10}/> : <Square size={10}/>} {s.label}
+                           </button>))}
+                        </div>
+                      </div>
+                      <button onClick={() => toggleSubjectVisibility('average')} className={`self-start px-3 py-2 rounded-xl text-[9px] font-black transition-all flex items-center gap-2 ${visibleSubjects.includes('average') ? 'bg-slate-200 text-slate-800 shadow-inner' : 'bg-slate-50 text-slate-400'} leading-none text-left text-left`}>
+                         {visibleSubjects.includes('average') ? <Eye size={12}/> : <EyeOff size={12}/>} 学年平均
+                      </button>
+                   </div>
+                </div>
+
+                <div className="bg-white p-4 sm:p-10 rounded-[2.5rem] border border-slate-100 shadow-sm relative overflow-hidden text-center leading-none text-center">
+                   <div className="h-64 sm:h-96 w-full text-center leading-none text-center">
+                      <ResponsiveContainer width="100%" height="100%">
+                         <LineChart data={filteredTests} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9"/>
+                            <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 9, fontWeight: '900', fill: '#cbd5e1' }}/>
+                            <YAxis domain={[0, 100]} axisLine={false} tickLine={false} tick={{ fontSize: 9, fontWeight: '900', fill: '#cbd5e1' }}/>
+                            <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', fontSize: '10px' }}/>
+                            <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px', fontWeight: '900', fontSize: '10px' }}/>
+                            
+                            {visibleSubjects.includes('average') && (<Line type="monotone" dataKey="average" name="学年平均" stroke="#94a3b8" strokeDasharray="5 5" strokeWidth={2} dot={false} connectNulls/>)}
+                            {allChartSubjects.filter(s => s.id !== 'average').map(sub => (visibleSubjects.includes(sub.id) && (<Line key={sub.id} type="monotone" dataKey={`scores.${sub.id}`} name={sub.label} stroke={sub.hex} strokeWidth={3} dot={{ r: 4, fill: sub.hex, strokeWidth: 1, stroke: '#fff' }} connectNulls animationDuration={800}/>)))}
+                         </LineChart>
+                      </ResponsiveContainer>
+                   </div>
+                </div>
+
+                <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden text-left leading-none text-left text-left">
+                  <div className="p-5 border-b border-slate-50 flex justify-between items-center bg-slate-50/30 leading-none text-left text-left">
+                    <h4 className="font-black text-sm text-slate-800 leading-none text-left text-left">成績データ一覧</h4>
+                    <span className="text-[10px] font-black text-slate-400 uppercase leading-none text-left text-left">{filteredTests.length}回分</span>
+                  </div>
+                  <div className="overflow-x-auto overflow-y-hidden no-scrollbar text-left leading-none text-left">
+                    <table className="w-full text-left border-collapse min-w-[800px] leading-none text-left text-left">
+                      <thead>
+                        <tr className="bg-slate-50/80 text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 text-left leading-none text-left">
+                          <th className="px-6 py-4 sticky left-0 bg-slate-50/95 backdrop-blur-md z-10 text-left leading-none text-left">テスト名 / 日付</th>
+                          <th className="px-4 py-4 text-center leading-none text-left">平均</th>
+                          <th className="px-4 py-4 text-center text-blue-600 leading-none text-left">数学</th>
+                          <th className="px-4 py-4 text-center text-rose-600 leading-none text-left">国語</th>
+                          <th className="px-4 py-4 text-center text-indigo-600 leading-none text-left">英語</th>
+                          <th className="px-4 py-4 text-center text-emerald-600 leading-none text-left">理科</th>
+                          <th className="px-4 py-4 text-center text-amber-600 leading-none text-left">社会</th>
+                          <th className="px-6 py-4 text-right leading-none text-left text-left">操作</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-50 text-center leading-none text-left text-left">
+                        {[...filteredTests].reverse().map(test => {
+                const prefix = test.category === 'school' ? 's_' : 'j_';
+                return (<tr key={test.id} className="group hover:bg-blue-50/10 transition-colors leading-none text-left">
+                              <td className="px-6 py-5 sticky left-0 bg-white group-hover:bg-blue-50/10 backdrop-blur-md z-10 transition-colors text-left leading-none text-left text-left text-left">
+                                <p className="font-black text-slate-800 text-sm leading-tight truncate w-32 sm:w-auto text-left text-left text-left">{test.name}</p>
+                                <p className="text-[8px] font-bold text-slate-400 mt-1 uppercase text-left leading-none text-left">{test.date}</p>
+                              </td>
+                              <td className="px-4 py-5 text-center font-mono font-black text-slate-700 text-xs leading-none text-left">{test.average}</td>
+                              <td className="px-4 py-5 text-center font-mono font-black text-blue-600 text-sm leading-none text-left">{test.scores[`${prefix}math`] || "-"}</td>
+                              <td className="px-4 py-5 text-center font-mono font-black text-rose-600 text-sm leading-none text-left">{test.scores[`${prefix}japanese`] || "-"}</td>
+                              <td className="px-4 py-5 text-center font-mono font-black text-indigo-600 text-sm leading-none text-left">{test.scores[`${prefix}english`] || "-"}</td>
+                              <td className="px-4 py-5 text-center font-mono font-black text-emerald-600 text-sm leading-none text-left">{test.scores[`${prefix}science`] || "-"}</td>
+                              <td className="px-4 py-5 text-center font-mono font-black text-amber-600 text-sm leading-none text-left">{test.scores[`${prefix}social`] || "-"}</td>
+                              <td className="px-6 py-5 text-right leading-none text-left text-left">
+                                <div className="flex justify-end gap-2 leading-none text-left">
+                                  <button onClick={() => { setEditingTest(test); setIsAddingTest(true); }} className="p-1.5 bg-slate-100 text-slate-400 rounded-lg hover:bg-blue-600 hover:text-white transition-all leading-none text-left"><Edit3 size={14}/></button>
+                                  <button onClick={() => handleDeleteTest(test.id)} className="p-1.5 bg-slate-100 text-slate-400 rounded-lg hover:bg-rose-600 hover:text-white transition-all leading-none text-left"><Trash2 size={14}/></button>
+                                </div>
+                              </td>
+                            </tr>);
+            })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>)}
+          </main>
         </div>
-      </header>
 
-      <main className="flex-1 overflow-y-auto overscroll-contain no-scrollbar flex flex-col pb-24 md:pb-32 lg:pb-40">
-        {activeTab === "daily" ? (
-          <DailyView
-            tasks={tasks}
-            updateLocalTask={updateLocalTask}
-            syncTaskToCloud={syncTaskToCloud}
-            cycleStatus={cycleStatus}
-            saveHistoryRecord={saveHistoryRecord}
-            deleteUnitTasks={deleteUnitTasks}
-            deleteTask={(id) => {
-              setConfirmModalData({
-                title: "タスクの削除",
-                message: "本当にこのタスクを削除しますか？",
-                onConfirm: async () => {
-                  setTasks((prev) => prev.filter((t) => t.id !== id));
-                  const dbInstance = getSafeDb();
-                  if (dbInstance && user && !isSampleMode)
-                    await deleteDoc(getTaskDoc(dbInstance, id));
-                },
-              });
-            }}
-            setAddModalOpen={setAddModalOpen}
-            selectedUnit={selectedUnit}
-            setSelectedUnit={setSelectedUnit}
-            unitsWithTasks={unitsWithTasks}
-            onAddCustomTask={onAddCustomTask}
-            setDetailTaskId={setDetailTaskId}
-            setDeleteConfirmation={setConfirmModalData}
-            pauseAllOtherTasks={pauseAllOtherTasks}
-          />
-        ) : activeTab === "tests" ? (
-          <TestsView
-            tests={tests}
-            onSaveTest={saveTestToCloud}
-            onDeleteTest={deleteTestFromCloud}
-          />
-        ) : (
-          <AchievementsView tasks={tasks} />
-        )}
-      </main>
+        {/* --- Modals --- */}
+        {isAddingTask && (<div className={modalOverlayClass}>
+             <div className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
+                <div className="p-6 border-b border-slate-50 flex justify-between items-center bg-slate-50/50 leading-none">
+                   <h3 className="text-lg font-black tracking-tight text-center flex-1 leading-none text-center">学習項目の追加</h3>
+                   <button onClick={() => setIsAddingTask(false)} className="p-2 bg-white rounded-xl shadow-sm hover:bg-slate-50 transition leading-none text-left text-left"><X size={20}/></button>
+                </div>
+                <form onSubmit={handleAddTask} className="p-8 space-y-6 text-left leading-none text-left">
+                   <div className="text-left leading-none text-left text-left">
+                      <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 ml-2 leading-none text-left text-left text-left">教科</label>
+                      <select name="subjectId" value={selectedSubjectId} onChange={(e) => setSelectedSubjectId(e.target.value)} required className="w-full bg-slate-50 border-none rounded-xl p-4 font-black text-slate-800 appearance-none shadow-inner text-sm outline-none focus:ring-2 focus:ring-blue-600 leading-none">
+                         {SUBJECT_DEFS[activeCategory]?.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
+                      </select>
+                   </div>
+                   <div className="text-left leading-none text-left text-left text-left">
+                      <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 ml-2 leading-none text-left text-left text-left">種類</label>
+                      <div className="grid grid-cols-2 gap-3 leading-none text-left text-left">
+                         {['homework', 'self'].map(t => (<label key={t} className="relative cursor-pointer group text-center leading-none text-left text-left">
+                             <input type="radio" name="type" value={t} defaultChecked={t === 'homework'} className="peer sr-only"/>
+                             <div className="p-3 border-2 border-slate-100 rounded-xl text-center font-black text-xs peer-checked:border-blue-600 peer-checked:bg-blue-50 peer-checked:text-blue-600 transition leading-none">
+                               {t === 'homework' ? '宿題' : '自習'}
+                             </div>
+                           </label>))}
+                      </div>
+                   </div>
+                   <div className="text-left leading-none text-left text-left text-left">
+                      <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 ml-2 leading-none text-left text-left text-left text-left">内容</label>
+                      <input name="detail" required placeholder="例：数学ワーク P.40" className="w-full bg-slate-50 border-none rounded-xl p-4 font-black placeholder:text-slate-300 shadow-inner text-sm outline-none leading-none text-left"/>
+                   </div>
+                   <button type="submit" className="w-full bg-blue-600 text-white font-black py-4 rounded-xl shadow-2xl active:scale-95 transition text-md uppercase leading-none">Add Task</button>
+                </form>
+             </div>
+          </div>)}
 
-      <nav className="bg-white/90 backdrop-blur-lg border-t border-slate-100 fixed bottom-0 left-0 right-0 z-40 pb-6 md:pb-8 lg:pb-8 w-full max-w-[1600px] mx-auto rounded-t-3xl md:rounded-t-[2rem] shadow-[0_-10px_30px_rgba(0,0,0,0.04)]">
-        <div className="h-16 md:h-20 lg:h-24 flex justify-around items-center px-2 md:px-6 lg:px-10">
-          <button
-            onClick={() => setActiveTab("daily")}
-            className={`flex-1 flex flex-col items-center justify-center h-full space-y-1 md:space-y-2 transition-all duration-300 ${activeTab === "daily" ? "text-blue-600 -translate-y-1 md:-translate-y-2" : "text-slate-400 hover:text-slate-500"}`}
-          >
-            <div
-              className={`p-1.5 md:p-3 rounded-xl md:rounded-2xl ${activeTab === "daily" ? "bg-blue-50" : ""}`}
-            >
-              <FileText
-                className="w-[22px] h-[22px] md:w-6 md:h-6 lg:w-7 lg:h-7"
-                strokeWidth={activeTab === "daily" ? 2.5 : 2}
-                fill={activeTab === "daily" ? "currentColor" : "none"}
-              />
-            </div>
-            <span className="text-[10px] md:text-sm lg:text-base font-bold">
-              学習
-            </span>
-          </button>
-          <button
-            onClick={() => setActiveTab("achievements")}
-            className={`flex-1 flex flex-col items-center justify-center h-full space-y-1 md:space-y-2 transition-all duration-300 ${activeTab === "achievements" ? "text-blue-600 -translate-y-1 md:-translate-y-2" : "text-slate-400 hover:text-slate-500"}`}
-          >
-            <div
-              className={`p-1.5 md:p-3 rounded-xl md:rounded-2xl ${activeTab === "achievements" ? "bg-blue-50" : ""}`}
-            >
-              <BarChart2
-                className="w-[22px] h-[22px] md:w-6 md:h-6 lg:w-7 lg:h-7"
-                strokeWidth={activeTab === "achievements" ? 2.5 : 2}
-              />
-            </div>
-            <span className="text-[10px] md:text-sm lg:text-base font-bold">
-              実績
-            </span>
-          </button>
-          <button
-            onClick={() => setActiveTab("tests")}
-            className={`flex-1 flex flex-col items-center justify-center h-full space-y-1 md:space-y-2 transition-all duration-300 ${activeTab === "tests" ? "text-blue-600 -translate-y-1 md:-translate-y-2" : "text-slate-400 hover:text-slate-500"}`}
-          >
-            <div
-              className={`p-1.5 md:p-3 rounded-xl md:rounded-2xl ${activeTab === "tests" ? "bg-blue-50" : ""}`}
-            >
-              <Award
-                className="w-[22px] h-[22px] md:w-6 md:h-6 lg:w-7 lg:h-7"
-                strokeWidth={activeTab === "tests" ? 2.5 : 2}
-              />
-            </div>
-            <span className="text-[10px] md:text-sm lg:text-base font-bold">
-              成績
-            </span>
-          </button>
-        </div>
-      </nav>
+        {selectedTaskId && (<div className={taskDetailOverlayClass}>
+             <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setSelectedTaskId(null)}/>
+             <div className="relative bg-white w-full max-w-2xl rounded-t-[2.5rem] lg:rounded-[3rem] shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom-10 h-[90vh] max-h-[90vh]">
+                {(() => {
+                const task = tasks.find(t => t.id === selectedTaskId);
+                if (!task)
+                    return null;
+                const cat = CATEGORIES[task.categoryId.toUpperCase()];
+                return (<>
+                      <div className="p-6 sm:p-10 border-b border-slate-50 flex justify-between items-start shrink-0 bg-slate-50/50">
+                         <div className="space-y-2">
+                            <div className="flex gap-2 text-left">
+                               <span className={`text-[9px] font-black px-3 py-1 rounded-full ${cat.bg} ${cat.color} uppercase text-left`}>{cat.label}</span>
+                               <span className="text-[9px] font-black bg-white text-slate-400 px-3 py-1 rounded-full uppercase shadow-sm text-left">{task.type === 'homework' ? '宿題' : '自習'}</span>
+                            </div>
+                            <h2 className="text-2xl sm:text-3xl font-black text-slate-800 tracking-tighter leading-tight text-left">{task.title}</h2>
+                         </div>
+                         <button onClick={() => setSelectedTaskId(null)} className="p-3 bg-white rounded-2xl shadow-sm hover:bg-slate-50 transition shrink-0 text-left"><X size={24}/></button>
+                      </div>
+                      <div className="flex-1 overflow-y-auto p-6 sm:p-10 space-y-10 no-scrollbar pb-32 text-left">
+                         <StrictTimer task={task} isAnyOtherRunning={isAnyTaskRunning && !task.isRunning} onUpdate={handleUpdateLocalTask} onSave={handleSaveRecord}/>
+                         <div className="space-y-4 text-left">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 px-2 text-left"><Search size={14}/> 学習メモ</label>
+                            <textarea value={task.tempDetail || ""} onChange={(e) => handleUpdateLocalTask(task.id, { tempDetail: e.target.value })} placeholder="内容をメモ..." className="w-full h-28 bg-slate-50/50 border-none rounded-2xl p-4 font-black text-md resize-none shadow-inner outline-none focus:ring-2 focus:ring-blue-100 text-left leading-snug"/>
+                         </div>
+                         <div className="space-y-6 text-left">
+                            <h3 className="font-black text-lg flex items-center gap-2 px-2 text-left"><History className="text-blue-500"/> 履歴</h3>
+                            <div className="space-y-3 text-left">
+                              {getMonthlyHistories(task, selectedMonth).length === 0 ? <p className="text-center py-10 text-slate-300 font-bold italic text-sm text-center">この月の記録なし</p> :
+                        [...getMonthlyHistories(task, selectedMonth)].reverse().map(h => (<div key={h.id} className="bg-white border border-slate-100 p-4 rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center shadow-sm gap-3 text-left">
+                                   <div className="flex-1 pr-4 w-full text-left">
+                                      <span className="text-[10px] font-black bg-slate-50 text-slate-500 px-3 py-1 rounded-full mb-2 inline-block text-left">{h.date}</span>
+                                      <p className="font-bold text-slate-500 text-xs leading-snug break-words text-left">{h.memo || "詳細なし"}</p>
+                                   </div>
+                                   <div className="text-blue-600 font-mono font-black text-xl tracking-tighter shrink-0 self-end sm:self-auto text-left">{formatDuration(h.duration)}</div>
+                                </div>))}
+                            </div>
+                         </div>
+                         <button onClick={async () => {
+                        if (confirm("削除しますか？")) {
+                            if (isSampleMode) {
+                                setTasks(prev => prev.filter(t => t.id !== task.id));
+                                setSelectedTaskId(null);
+                            }
+                            else {
+                                try {
+                                    await deleteDoc(doc(getTasksCol(), task.id));
+                                    setTasks(prev => prev.filter(t => t.id !== task.id));
+                                    setSelectedTaskId(null);
+                                    fetchData(true);
+                                }
+                                catch (e) {
+                                    alert("失敗");
+                                }
+                            }
+                        }
+                    }} className="w-full py-6 text-rose-300 hover:text-rose-500 font-black text-[10px] flex items-center justify-center gap-2 border-2 border-dashed border-rose-50 rounded-2xl transition-all hover:bg-rose-50/50 uppercase tracking-widest mt-10 text-center">Delete Task Item</button>
+                      </div>
+                    </>);
+            })()}
+             </div>
+          </div>)}
 
-      <CreateUnitOverlay
-        isOpen={isAddModalOpen}
-        onClose={() => setAddModalOpen(false)}
-        onCreate={addUnitWithPresets}
-      />
+        {isAddingTest && (<div className={modalOverlayClass}>
+             <div className="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 h-[85vh] flex flex-col text-left">
+                <div className="p-6 border-b border-slate-50 flex justify-between items-center bg-slate-50/50 shrink-0 text-left leading-none text-left text-left">
+                   <h3 className="text-lg font-black tracking-tight text-center flex-1 leading-none text-center">成績登録</h3>
+                   <button onClick={() => { setIsAddingTest(false); setEditingTest(null); }} className="p-2 bg-white rounded-xl shadow-sm transition leading-none text-left text-left text-left text-left"><X size={20}/></button>
+                </div>
+                <form onSubmit={handleSaveTest} className="p-6 space-y-6 overflow-y-auto no-scrollbar pb-24 text-left leading-none text-left text-left">
+                   <div className="grid grid-cols-2 gap-4 text-left leading-none text-left text-left text-left">
+                      <div className="text-left leading-none text-left text-left text-left">
+                        <label className="block text-[9px] font-black text-slate-400 uppercase mb-2 leading-none text-left text-left text-left">カテゴリ</label>
+                        <select name="testCategory" defaultValue={editingTest?.category || "school"} className="w-full bg-slate-50 border-none rounded-xl p-3 font-black text-sm shadow-inner appearance-none leading-none"><option value="school">中学校</option><option value="juku">塾</option></select>
+                      </div>
+                      <div className="text-left leading-none text-left text-left text-left">
+                        <label className="block text-[9px] font-black text-slate-400 uppercase mb-2 leading-none text-left text-left text-left">種別</label>
+                        <select name="testSubType" defaultValue={editingTest?.subType || "midterm"} className="w-full bg-slate-50 border-none rounded-xl p-3 font-black text-sm shadow-inner appearance-none leading-none"><option value="midterm">中間</option><option value="final">期末</option><option value="normal">その他</option></select>
+                      </div>
+                   </div>
+                   <div className="grid grid-cols-2 gap-4 text-left leading-none text-left text-left text-left">
+                      <div className="text-left leading-none text-left text-left text-left text-left"><label className="block text-[9px] font-black text-slate-400 uppercase mb-2 leading-none text-left text-left text-left text-left">名称</label><input name="name" required defaultValue={editingTest?.name} placeholder="考査名" className="w-full bg-slate-50 border-none rounded-xl p-3 font-black text-sm shadow-inner leading-none text-left text-left text-left"/></div>
+                      <div className="text-left leading-none text-left text-left text-left text-left text-left"><label className="block text-[9px] font-black text-slate-400 uppercase mb-2 leading-none text-left text-left text-left text-left">日</label><input name="date" type="date" required defaultValue={editingTest?.date} className="w-full bg-slate-50 border-none rounded-xl p-3 font-black text-sm shadow-inner leading-none text-left text-left text-left"/></div>
+                   </div>
+                   <div className="space-y-4 text-left">
+                      <label className="block text-[9px] font-black text-slate-400 uppercase leading-none text-left">点数入力</label>
+                      <div className="grid grid-cols-3 gap-3 text-left">
+                         {[...SUBJECT_DEFS.school, ...SUBJECT_DEFS.juku].map(sub => (<div key={sub.id} className="bg-slate-50 p-3 rounded-2xl border border-slate-100 shadow-inner text-center leading-none">
+                              <p className="text-[8px] font-black text-slate-400 mb-1 truncate leading-none text-center">{sub.label}</p>
+                              <input name={`score_${sub.id}`} type="number" defaultValue={editingTest?.scores?.[sub.id]} placeholder="0" className="w-full bg-white border-none rounded-lg p-2 font-black text-sm text-center shadow-sm outline-none focus:ring-1 focus:ring-blue-600 leading-none"/>
+                           </div>))}
+                      </div>
+                   </div>
+                   <div className="grid grid-cols-2 gap-4 border-t border-slate-50 pt-6 text-left">
+                      <div className="text-left"><label className="block text-[9px] font-black text-slate-400 uppercase mb-2 leading-none text-left">平均点</label><input name="average" type="number" step="0.1" defaultValue={editingTest?.average} className="w-full bg-slate-50 border-none rounded-xl p-3 font-black text-sm leading-none"/></div>
+                      <div className="text-left"><label className="block text-[9px] font-black text-slate-400 uppercase mb-2 leading-none text-left">順位</label><input name="rank" defaultValue={editingTest?.rank} placeholder="例: 10位" className="w-full bg-slate-50 border-none rounded-xl p-3 font-black text-sm leading-none"/></div>
+                   </div>
+                   <button type="submit" className="w-full bg-rose-500 text-white font-black py-4 rounded-2xl shadow-xl active:scale-95 transition text-md uppercase leading-none mt-4 text-center">Save</button>
+                </form>
+             </div>
+          </div>)}
 
-      {detailTaskId && (
-        <TaskDetailModal
-          task={tasks.find((t) => t.id === detailTaskId)}
-          onClose={() => setDetailTaskId(null)}
-          updateLocalTask={updateLocalTask}
-          syncTaskToCloud={syncTaskToCloud}
-          onSaveRecord={saveHistoryRecord}
-          onDelete={() => {
-            setConfirmModalData({
-              title: "タスクの削除",
-              message: "本当にこのタスクを削除しますか？",
-              onConfirm: async () => {
-                setTasks((prev) => prev.filter((t) => t.id !== detailTaskId));
-                const dbInstance = getSafeDb();
-                if (dbInstance && user && !isSampleMode)
-                  await deleteDoc(getTaskDoc(dbInstance, detailTaskId));
-                setDetailTaskId(null);
-              },
-            });
-          }}
-          pauseAllOtherTasks={pauseAllOtherTasks}
-        />
-      )}
-
-      <ConfirmModal
-        isOpen={!!confirmModalData}
-        onClose={() => setConfirmModalData(null)}
-        onConfirm={confirmModalData?.onConfirm || (() => {})}
-        title={confirmModalData?.title}
-        message={confirmModalData?.message}
-      />
-    </div>
-  );
+        {/* --- Mobile Nav Bar --- */}
+        <nav className={isMobileView
+            ? "absolute bottom-0 left-0 right-0 bg-white/90 backdrop-blur-3xl border-t border-slate-100 flex justify-around p-3 pb-8 z-50 rounded-t-[1.75rem] shadow-2xl leading-none text-center"
+            : "lg:hidden fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-3xl border-t border-slate-100 flex justify-around p-3 pb-8 z-50 rounded-t-[1.75rem] shadow-2xl leading-none text-center"}>
+          {[{ id: 'daily', icon: Zap }, { id: 'stats', icon: BarChart2 }, { id: 'tests', icon: TrendingUp }].map(item => (<button key={item.id} onClick={() => setActiveTab(item.id)} className={`p-4 rounded-2xl transition-all duration-300 leading-none text-center ${activeTab === item.id ? 'bg-blue-600 text-white shadow-xl -translate-y-2 text-center' : 'text-slate-300 text-center'}`}><item.icon size={22}/></button>))}
+        </nav>
+      </div>
+    </div>);
 }
