@@ -90,6 +90,11 @@ const getTodayStr = () => {
     const d = new Date();
     return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')}`;
 };
+const getHalfYearAgoStr = () => {
+    const d = new Date();
+    d.setMonth(d.getMonth() - 6);
+    return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')}`;
+};
 const getDateStrFromTimestamp = (timestamp) => {
     if (!timestamp)
         return null;
@@ -807,6 +812,8 @@ export default function App() {
         return d.toISOString().split('T')[0];
     });
     const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
+    const [testStartDate, setTestStartDate] = useState(getHalfYearAgoStr);
+    const [testEndDate, setTestEndDate] = useState(getTodayStr);
     const [visibleSubjects, setVisibleSubjects] = useState(['s_math', 's_english', 'j_math', 'average']);
     const [liveTimerInfo, setLiveTimerInfo] = useState(null);
     const isAnyTaskRunning = useMemo(() => tasks.some(t => t.isRunning), [tasks]);
@@ -1122,13 +1129,31 @@ export default function App() {
         return { totalSec, breakdown, dailyData: Array.from(dailyMap.values()).sort((a, b) => new Date(a.name).getTime() - new Date(b.name).getTime()) };
     }, [tasks, startDate, endDate]);
     const filteredTests = useMemo(() => {
-        const sDate = new Date(startDate);
-        const eDate = new Date(endDate);
+        const sDate = new Date(testStartDate);
+        const eDate = new Date(testEndDate);
         eDate.setHours(23, 59, 59, 999);
-        return tests.filter(t => { const d = new Date(t.date); return d >= sDate && d <= eDate; });
-    }, [tests, startDate, endDate]);
+        return tests
+            .filter(t => {
+                const d = new Date(t.date);
+                return d >= sDate && d <= eDate;
+            })
+            .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    }, [tests, testStartDate, testEndDate]);
+    const testSummary = useMemo(() => {
+        const latest = filteredTests[filteredTests.length - 1] || null;
+        const previous = filteredTests[filteredTests.length - 2] || null;
+        const latestDev = latest?.average;
+        const previousDev = previous?.average;
+        const delta = latestDev != null && previousDev != null ? Number((latestDev - previousDev).toFixed(1)) : null;
+        const best = filteredTests.reduce((hit, test) => {
+            if (test.average == null || Number.isNaN(Number(test.average)))
+                return hit;
+            return !hit || Number(test.average) > Number(hit.average) ? test : hit;
+        }, null);
+        return { latest, previous, delta, best, count: filteredTests.length };
+    }, [filteredTests]);
     const allChartSubjects = useMemo(() => [
-        { id: 'average', label: '学年平均', hex: '#94a3b8' },
+        { id: 'average', label: '総合偏差値', hex: '#0f172a' },
         ...SUBJECT_DEFS.school.filter(s => s.isMajor).map(s => ({ ...s, label: `${s.label}(中)` })),
         ...SUBJECT_DEFS.school.filter(s => !s.isMajor).map(s => ({ ...s, label: `${s.label}(中)` })),
         ...SUBJECT_DEFS.juku.map(s => ({ ...s, label: `${s.label}(塾)` }))
@@ -1223,13 +1248,23 @@ export default function App() {
             {(activeTab === 'stats' || activeTab === 'tests') && (<div className="bg-white/80 backdrop-blur-xl p-4 sm:p-6 rounded-[2rem] shadow-sm border border-white flex flex-wrap items-center gap-4 justify-center lg:sticky lg:top-4 z-30 transition-all text-left">
                   <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-xl shrink-0 overflow-hidden leading-none">
                      <CalendarIcon className="text-slate-400" size={14}/>
-                     <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="bg-transparent border-none p-0 text-[10px] font-bold outline-none leading-none"/>
+                     <input type="date" value={activeTab === 'tests' ? testStartDate : startDate} onChange={e => activeTab === 'tests' ? setTestStartDate(e.target.value) : setStartDate(e.target.value)} className="bg-transparent border-none p-0 text-xs sm:text-sm font-black outline-none leading-none"/>
                      <span className="text-slate-300 mx-1">/</span>
-                     <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="bg-transparent border-none p-0 text-[10px] font-bold outline-none leading-none"/>
+                     <input type="date" value={activeTab === 'tests' ? testEndDate : endDate} onChange={e => activeTab === 'tests' ? setTestEndDate(e.target.value) : setEndDate(e.target.value)} className="bg-transparent border-none p-0 text-xs sm:text-sm font-black outline-none leading-none"/>
                   </div>
                   <div className="flex gap-1 overflow-x-auto no-scrollbar whitespace-nowrap">
-                     {[7, 14, 30, 0].map(days => (<button key={days} onClick={() => {
+                     {(activeTab === 'tests' ? [183, 365, 0] : [7, 14, 30, 0]).map(days => (<button key={days} onClick={() => {
                     const d = new Date();
+                    if (activeTab === 'tests') {
+                        if (days === 0)
+                            setTestStartDate("2026-01-01");
+                        else {
+                            d.setDate(d.getDate() - days);
+                            setTestStartDate(d.toISOString().split('T')[0]);
+                        }
+                        setTestEndDate(getTodayStr());
+                        return;
+                    }
                     if (days === 0)
                         setStartDate("2026-01-01");
                     else {
@@ -1237,8 +1272,10 @@ export default function App() {
                         setStartDate(d.toISOString().split('T')[0]);
                     }
                     setEndDate(new Date().toISOString().split('T')[0]);
-                }} className="px-3 py-2 bg-slate-100 hover:bg-blue-50 hover:text-blue-600 rounded-lg text-[9px] font-black transition-all whitespace-nowrap leading-none">
-                         {days === 30 ? '1月' : days === 14 ? '2週' : days === 7 ? '1週' : '全'}
+                }} className="px-3 py-2 bg-slate-100 hover:bg-blue-50 hover:text-blue-600 rounded-lg text-[10px] sm:text-xs font-black transition-all whitespace-nowrap leading-none">
+                         {activeTab === 'tests'
+                             ? days === 183 ? '半年' : days === 365 ? '1年' : '全'
+                             : days === 30 ? '1月' : days === 14 ? '2週' : days === 7 ? '1週' : '全'}
                        </button>))}
                      {!isSampleMode && <button onClick={() => fetchData()} className="p-2 bg-blue-50 text-blue-600 rounded-lg ml-2 leading-none"><RefreshCw size={14}/></button>}
                   </div>
@@ -1431,60 +1468,81 @@ export default function App() {
                 </div>
               </div>)}
 
-            {activeTab === 'tests' && (<div className="space-y-10 animate-in zoom-in-95 duration-500 pb-10 text-center text-left">
+            {activeTab === 'tests' && (<div className="space-y-8 sm:space-y-10 animate-in zoom-in-95 duration-500 pb-10 text-center text-left">
                 <div className={`flex items-center gap-4 px-4 text-center leading-none text-center ${isMobileView ? 'flex-col' : 'flex-col sm:flex-row justify-between'}`}>
-                  <h3 className="text-2xl font-black text-slate-800 tracking-tight flex items-center justify-center gap-2 leading-none text-center text-center">
-                    <TrendingUp className="text-rose-500" size={24}/> Score Trends
+                  <h3 className="text-2xl sm:text-3xl font-black text-slate-800 tracking-tight flex items-center justify-center gap-2 leading-none text-center text-center">
+                    <TrendingUp className="text-rose-500" size={26}/> 偏差値推移
                   </h3>
-                  <button onClick={() => { setEditingTest(null); setIsAddingTest(true); }} className="w-full sm:w-auto bg-rose-500 text-white font-black px-8 py-3 rounded-2xl shadow-xl active:scale-95 transition text-sm uppercase leading-none">成績登録</button>
+                  <button onClick={() => { setEditingTest(null); setIsAddingTest(true); }} className="w-full sm:w-auto bg-rose-500 text-white font-black px-8 py-4 rounded-2xl shadow-xl active:scale-95 transition text-base leading-none">偏差値を登録</button>
                 </div>
 
-                <div className="bg-white p-4 sm:p-8 rounded-[2rem] border border-slate-100 shadow-sm space-y-6 text-left overflow-x-hidden leading-none text-left">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 px-1">
+                  <div className="rounded-[1.5rem] bg-slate-900 text-white p-4 sm:p-5 shadow-sm text-left">
+                    <p className="text-[10px] sm:text-xs font-black text-slate-300 mb-2">最新偏差値</p>
+                    <p className="text-3xl sm:text-4xl font-black font-mono">{testSummary.latest?.average ?? '-'}</p>
+                  </div>
+                  <div className="rounded-[1.5rem] bg-white border border-slate-100 p-4 sm:p-5 shadow-sm text-left">
+                    <p className="text-[10px] sm:text-xs font-black text-slate-400 mb-2">前回差</p>
+                    <p className={`text-3xl sm:text-4xl font-black font-mono ${testSummary.delta == null ? 'text-slate-300' : testSummary.delta >= 0 ? 'text-rose-500' : 'text-blue-500'}`}>
+                      {testSummary.delta == null ? '-' : `${testSummary.delta > 0 ? '+' : ''}${testSummary.delta}`}
+                    </p>
+                  </div>
+                  <div className="rounded-[1.5rem] bg-white border border-slate-100 p-4 sm:p-5 shadow-sm text-left">
+                    <p className="text-[10px] sm:text-xs font-black text-slate-400 mb-2">期間ベスト</p>
+                    <p className="text-3xl sm:text-4xl font-black font-mono text-slate-800">{testSummary.best?.average ?? '-'}</p>
+                  </div>
+                  <div className="rounded-[1.5rem] bg-white border border-slate-100 p-4 sm:p-5 shadow-sm text-left">
+                    <p className="text-[10px] sm:text-xs font-black text-slate-400 mb-2">表示件数</p>
+                    <p className="text-3xl sm:text-4xl font-black font-mono text-slate-800">{testSummary.count}</p>
+                  </div>
+                </div>
+
+                <div className="bg-white p-5 sm:p-8 rounded-[2rem] border border-slate-100 shadow-sm space-y-6 text-left overflow-x-hidden leading-none text-left">
                    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-50 pb-4 leading-none text-left">
                       <div className="flex items-center gap-2 text-slate-400 leading-none text-left text-left">
                          <ListFilter size={16}/>
-                         <span className="text-[10px] font-black uppercase leading-none text-left">教科選択</span>
+                         <span className="text-xs sm:text-sm font-black leading-none text-left">表示する教科</span>
                       </div>
                       <div className="flex gap-1 leading-none text-left">
-                         <button onClick={() => bulkSelectSubjects('all')} className="px-2 py-1 bg-slate-900 text-white rounded-lg text-[9px] font-black leading-none">全</button>
-                         <button onClick={() => bulkSelectSubjects('none')} className="px-2 py-1 bg-slate-100 text-slate-400 rounded-lg text-[9px] font-black leading-none">無</button>
+                         <button onClick={() => bulkSelectSubjects('all')} className="px-3 py-2 bg-slate-900 text-white rounded-lg text-xs font-black leading-none">全て</button>
+                         <button onClick={() => bulkSelectSubjects('none')} className="px-3 py-2 bg-slate-100 text-slate-400 rounded-lg text-xs font-black leading-none">解除</button>
                       </div>
                    </div>
 
                    <div className="flex flex-col gap-4 text-left leading-none text-left">
                       <div className="text-left leading-none text-left text-left">
-                        <h5 className="text-[9px] font-black text-blue-600 uppercase mb-2 leading-none text-left text-left">中学校</h5>
+                        <h5 className="text-xs font-black text-blue-600 mb-2 leading-none text-left text-left">中学校</h5>
                         <div className="flex flex-wrap gap-1.5 leading-none text-left text-left">
-                           {SUBJECT_DEFS.school.map(s => (<button key={s.id} onClick={() => toggleSubjectVisibility(s.id)} className={`px-2.5 py-1.5 rounded-lg text-[9px] font-black flex items-center gap-1.5 transition-all leading-none ${visibleSubjects.includes(s.id) ? 'bg-blue-50 text-blue-600 border border-blue-100 shadow-sm' : 'bg-slate-50 text-slate-400 border border-transparent'}`}>
+                           {SUBJECT_DEFS.school.map(s => (<button key={s.id} onClick={() => toggleSubjectVisibility(s.id)} className={`px-3 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all leading-none ${visibleSubjects.includes(s.id) ? 'bg-blue-50 text-blue-600 border border-blue-100 shadow-sm' : 'bg-slate-50 text-slate-400 border border-transparent'}`}>
                                {visibleSubjects.includes(s.id) ? <CheckSquare size={10}/> : <Square size={10}/>} {s.label}
                              </button>))}
                         </div>
                       </div>
                       <div className="text-left leading-none text-left text-left text-left">
-                        <h5 className="text-[9px] font-black text-emerald-600 uppercase mb-2 leading-none text-left text-left">塾</h5>
+                        <h5 className="text-xs font-black text-emerald-600 mb-2 leading-none text-left text-left">塾</h5>
                         <div className="flex flex-wrap gap-1.5 leading-none text-left text-left">
-                           {SUBJECT_DEFS.juku.map(s => (<button key={s.id} onClick={() => toggleSubjectVisibility(s.id)} className={`px-2.5 py-1.5 rounded-lg text-[9px] font-black flex items-center gap-1.5 transition-all leading-none ${visibleSubjects.includes(s.id) ? 'bg-emerald-50 text-emerald-600 border border-emerald-100 shadow-sm' : 'bg-slate-50 text-slate-400 border border-transparent'}`}>
+                           {SUBJECT_DEFS.juku.map(s => (<button key={s.id} onClick={() => toggleSubjectVisibility(s.id)} className={`px-3 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all leading-none ${visibleSubjects.includes(s.id) ? 'bg-emerald-50 text-emerald-600 border border-emerald-100 shadow-sm' : 'bg-slate-50 text-slate-400 border border-transparent'}`}>
                                {visibleSubjects.includes(s.id) ? <CheckSquare size={10}/> : <Square size={10}/>} {s.label}
                            </button>))}
                         </div>
                       </div>
-                      <button onClick={() => toggleSubjectVisibility('average')} className={`self-start px-3 py-2 rounded-xl text-[9px] font-black transition-all flex items-center gap-2 ${visibleSubjects.includes('average') ? 'bg-slate-200 text-slate-800 shadow-inner' : 'bg-slate-50 text-slate-400'} leading-none text-left text-left`}>
-                         {visibleSubjects.includes('average') ? <Eye size={12}/> : <EyeOff size={12}/>} 学年平均
+                      <button onClick={() => toggleSubjectVisibility('average')} className={`self-start px-4 py-3 rounded-xl text-xs font-black transition-all flex items-center gap-2 ${visibleSubjects.includes('average') ? 'bg-slate-200 text-slate-800 shadow-inner' : 'bg-slate-50 text-slate-400'} leading-none text-left text-left`}>
+                         {visibleSubjects.includes('average') ? <Eye size={12}/> : <EyeOff size={12}/>} 総合偏差値
                       </button>
                    </div>
                 </div>
 
-                <div className="bg-white p-4 sm:p-10 rounded-[2.5rem] border border-slate-100 shadow-sm relative overflow-hidden text-center leading-none text-center">
-                   <div className="h-64 sm:h-96 w-full text-center leading-none text-center">
+                <div className="bg-white p-5 sm:p-10 rounded-[2.5rem] border border-slate-100 shadow-sm relative overflow-hidden text-center leading-none text-center">
+                   <div className="h-80 sm:h-[28rem] w-full text-center leading-none text-center">
                       <ResponsiveContainer width="100%" height="100%">
-                         <LineChart data={filteredTests} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
+                         <LineChart data={filteredTests} margin={{ top: 10, right: 14, left: -8, bottom: 0 }}>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9"/>
-                            <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 9, fontWeight: '900', fill: '#cbd5e1' }}/>
-                            <YAxis domain={[0, 100]} axisLine={false} tickLine={false} tick={{ fontSize: 9, fontWeight: '900', fill: '#cbd5e1' }}/>
-                            <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', fontSize: '10px' }}/>
-                            <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px', fontWeight: '900', fontSize: '10px' }}/>
+                            <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 12, fontWeight: '900', fill: '#94a3b8' }}/>
+                            <YAxis domain={[30, 75]} axisLine={false} tickLine={false} tick={{ fontSize: 12, fontWeight: '900', fill: '#94a3b8' }}/>
+                            <Tooltip contentStyle={{ borderRadius: '14px', border: 'none', fontSize: '13px', fontWeight: '900' }}/>
+                            <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px', fontWeight: '900', fontSize: '12px' }}/>
                             
-                            {visibleSubjects.includes('average') && (<Line type="monotone" dataKey="average" name="学年平均" stroke="#94a3b8" strokeDasharray="5 5" strokeWidth={2} dot={false} connectNulls/>)}
+                            {visibleSubjects.includes('average') && (<Line type="monotone" dataKey="average" name="総合偏差値" stroke="#0f172a" strokeWidth={4} dot={{ r: 5, fill: '#0f172a', strokeWidth: 2, stroke: '#fff' }} connectNulls/>)}
                             {allChartSubjects.filter(s => s.id !== 'average').map(sub => (visibleSubjects.includes(sub.id) && (<Line key={sub.id} type="monotone" dataKey={`scores.${sub.id}`} name={sub.label} stroke={sub.hex} strokeWidth={3} dot={{ r: 4, fill: sub.hex, strokeWidth: 1, stroke: '#fff' }} connectNulls animationDuration={800}/>)))}
                          </LineChart>
                       </ResponsiveContainer>
@@ -1493,15 +1551,15 @@ export default function App() {
 
                 <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden text-left leading-none text-left text-left">
                   <div className="p-5 border-b border-slate-50 flex justify-between items-center bg-slate-50/30 leading-none text-left text-left">
-                    <h4 className="font-black text-sm text-slate-800 leading-none text-left text-left">成績データ一覧</h4>
-                    <span className="text-[10px] font-black text-slate-400 uppercase leading-none text-left text-left">{filteredTests.length}回分</span>
+                    <h4 className="font-black text-base sm:text-lg text-slate-800 leading-none text-left text-left">偏差値データ一覧</h4>
+                    <span className="text-xs font-black text-slate-400 leading-none text-left text-left">{filteredTests.length}回分</span>
                   </div>
                   <div className="overflow-x-auto overflow-y-hidden no-scrollbar text-left leading-none text-left">
                     <table className="w-full text-left border-collapse min-w-[800px] leading-none text-left text-left">
                       <thead>
-                        <tr className="bg-slate-50/80 text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 text-left leading-none text-left">
+                        <tr className="bg-slate-50/80 text-xs font-black text-slate-400 tracking-widest border-b border-slate-100 text-left leading-none text-left">
                           <th className="px-6 py-4 sticky left-0 bg-slate-50/95 backdrop-blur-md z-10 text-left leading-none text-left">テスト名 / 日付</th>
-                          <th className="px-4 py-4 text-center leading-none text-left">平均</th>
+                          <th className="px-4 py-4 text-center leading-none text-left">総合</th>
                           <th className="px-4 py-4 text-center text-blue-600 leading-none text-left">数学</th>
                           <th className="px-4 py-4 text-center text-rose-600 leading-none text-left">国語</th>
                           <th className="px-4 py-4 text-center text-indigo-600 leading-none text-left">英語</th>
@@ -1515,15 +1573,15 @@ export default function App() {
                 const prefix = test.category === 'school' ? 's_' : 'j_';
                 return (<tr key={test.id} className="group hover:bg-blue-50/10 transition-colors leading-none text-left">
                               <td className="px-6 py-5 sticky left-0 bg-white group-hover:bg-blue-50/10 backdrop-blur-md z-10 transition-colors text-left leading-none text-left text-left text-left">
-                                <p className="font-black text-slate-800 text-sm leading-tight truncate w-32 sm:w-auto text-left text-left text-left">{test.name}</p>
-                                <p className="text-[8px] font-bold text-slate-400 mt-1 uppercase text-left leading-none text-left">{test.date}</p>
+                                <p className="font-black text-slate-800 text-base leading-tight truncate w-32 sm:w-auto text-left text-left text-left">{test.name}</p>
+                                <p className="text-xs font-bold text-slate-400 mt-1 text-left leading-none text-left">{test.date}</p>
                               </td>
-                              <td className="px-4 py-5 text-center font-mono font-black text-slate-700 text-xs leading-none text-left">{test.average}</td>
-                              <td className="px-4 py-5 text-center font-mono font-black text-blue-600 text-sm leading-none text-left">{test.scores[`${prefix}math`] || "-"}</td>
-                              <td className="px-4 py-5 text-center font-mono font-black text-rose-600 text-sm leading-none text-left">{test.scores[`${prefix}japanese`] || "-"}</td>
-                              <td className="px-4 py-5 text-center font-mono font-black text-indigo-600 text-sm leading-none text-left">{test.scores[`${prefix}english`] || "-"}</td>
-                              <td className="px-4 py-5 text-center font-mono font-black text-emerald-600 text-sm leading-none text-left">{test.scores[`${prefix}science`] || "-"}</td>
-                              <td className="px-4 py-5 text-center font-mono font-black text-amber-600 text-sm leading-none text-left">{test.scores[`${prefix}social`] || "-"}</td>
+                              <td className="px-4 py-5 text-center font-mono font-black text-slate-800 text-base leading-none text-left">{test.average ?? "-"}</td>
+                              <td className="px-4 py-5 text-center font-mono font-black text-blue-600 text-base leading-none text-left">{test.scores[`${prefix}math`] || "-"}</td>
+                              <td className="px-4 py-5 text-center font-mono font-black text-rose-600 text-base leading-none text-left">{test.scores[`${prefix}japanese`] || "-"}</td>
+                              <td className="px-4 py-5 text-center font-mono font-black text-indigo-600 text-base leading-none text-left">{test.scores[`${prefix}english`] || "-"}</td>
+                              <td className="px-4 py-5 text-center font-mono font-black text-emerald-600 text-base leading-none text-left">{test.scores[`${prefix}science`] || "-"}</td>
+                              <td className="px-4 py-5 text-center font-mono font-black text-amber-600 text-base leading-none text-left">{test.scores[`${prefix}social`] || "-"}</td>
                               <td className="px-6 py-5 text-right leading-none text-left text-left">
                                 <div className="flex justify-end gap-2 leading-none text-left">
                                   <button onClick={() => { setEditingTest(test); setIsAddingTest(true); }} className="p-1.5 bg-slate-100 text-slate-400 rounded-lg hover:bg-blue-600 hover:text-white transition-all leading-none text-left"><Edit3 size={14}/></button>
@@ -1638,40 +1696,40 @@ export default function App() {
           </div>)}
 
         {isAddingTest && (<div className={modalOverlayClass}>
-             <div className="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 h-[85vh] flex flex-col text-left">
+             <div className="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 h-[85vh] flex flex-col text-left">
                 <div className="p-6 border-b border-slate-50 flex justify-between items-center bg-slate-50/50 shrink-0 text-left leading-none text-left text-left">
-                   <h3 className="text-lg font-black tracking-tight text-center flex-1 leading-none text-center">成績登録</h3>
+                   <h3 className="text-xl sm:text-2xl font-black tracking-tight text-center flex-1 leading-none text-center">偏差値登録</h3>
                    <button onClick={() => { setIsAddingTest(false); setEditingTest(null); }} className="p-2 bg-white rounded-xl shadow-sm transition leading-none text-left text-left text-left text-left"><X size={20}/></button>
                 </div>
                 <form onSubmit={handleSaveTest} className="p-6 space-y-6 overflow-y-auto no-scrollbar pb-24 text-left leading-none text-left text-left">
                    <div className="grid grid-cols-2 gap-4 text-left leading-none text-left text-left text-left">
                       <div className="text-left leading-none text-left text-left text-left">
-                        <label className="block text-[9px] font-black text-slate-400 uppercase mb-2 leading-none text-left text-left text-left">カテゴリ</label>
-                        <select name="testCategory" defaultValue={editingTest?.category || "school"} className="w-full bg-slate-50 border-none rounded-xl p-3 font-black text-sm shadow-inner appearance-none leading-none"><option value="school">中学校</option><option value="juku">塾</option></select>
+                        <label className="block text-xs font-black text-slate-500 mb-2 leading-none text-left text-left text-left">カテゴリ</label>
+                        <select name="testCategory" defaultValue={editingTest?.category || "school"} className="w-full bg-slate-50 border-none rounded-xl p-4 font-black text-base shadow-inner appearance-none leading-none"><option value="school">中学校</option><option value="juku">塾</option></select>
                       </div>
                       <div className="text-left leading-none text-left text-left text-left">
-                        <label className="block text-[9px] font-black text-slate-400 uppercase mb-2 leading-none text-left text-left text-left">種別</label>
-                        <select name="testSubType" defaultValue={editingTest?.subType || "midterm"} className="w-full bg-slate-50 border-none rounded-xl p-3 font-black text-sm shadow-inner appearance-none leading-none"><option value="midterm">中間</option><option value="final">期末</option><option value="normal">その他</option></select>
+                        <label className="block text-xs font-black text-slate-500 mb-2 leading-none text-left text-left text-left">種別</label>
+                        <select name="testSubType" defaultValue={editingTest?.subType || "midterm"} className="w-full bg-slate-50 border-none rounded-xl p-4 font-black text-base shadow-inner appearance-none leading-none"><option value="midterm">中間</option><option value="final">期末</option><option value="normal">その他</option></select>
                       </div>
                    </div>
                    <div className="grid grid-cols-2 gap-4 text-left leading-none text-left text-left text-left">
-                      <div className="text-left leading-none text-left text-left text-left text-left"><label className="block text-[9px] font-black text-slate-400 uppercase mb-2 leading-none text-left text-left text-left text-left">名称</label><input name="name" required defaultValue={editingTest?.name} placeholder="考査名" className="w-full bg-slate-50 border-none rounded-xl p-3 font-black text-sm shadow-inner leading-none text-left text-left text-left"/></div>
-                      <div className="text-left leading-none text-left text-left text-left text-left text-left"><label className="block text-[9px] font-black text-slate-400 uppercase mb-2 leading-none text-left text-left text-left text-left">日</label><input name="date" type="date" required defaultValue={editingTest?.date} className="w-full bg-slate-50 border-none rounded-xl p-3 font-black text-sm shadow-inner leading-none text-left text-left text-left"/></div>
+                      <div className="text-left leading-none text-left text-left text-left text-left"><label className="block text-xs font-black text-slate-500 mb-2 leading-none text-left text-left text-left text-left">テスト名</label><input name="name" required defaultValue={editingTest?.name} placeholder="例: 第1回公開模試" className="w-full bg-slate-50 border-none rounded-xl p-4 font-black text-base shadow-inner leading-none text-left text-left text-left"/></div>
+                      <div className="text-left leading-none text-left text-left text-left text-left text-left"><label className="block text-xs font-black text-slate-500 mb-2 leading-none text-left text-left text-left text-left">実施日</label><input name="date" type="date" required defaultValue={editingTest?.date || getTodayStr()} className="w-full bg-slate-50 border-none rounded-xl p-4 font-black text-base shadow-inner leading-none text-left text-left text-left"/></div>
                    </div>
                    <div className="space-y-4 text-left">
-                      <label className="block text-[9px] font-black text-slate-400 uppercase leading-none text-left">点数入力</label>
+                      <label className="block text-base font-black text-slate-700 leading-none text-left">教科別偏差値</label>
                       <div className="grid grid-cols-3 gap-3 text-left">
                          {[...SUBJECT_DEFS.school, ...SUBJECT_DEFS.juku].map(sub => (<div key={sub.id} className="bg-slate-50 p-3 rounded-2xl border border-slate-100 shadow-inner text-center leading-none">
-                              <p className="text-[8px] font-black text-slate-400 mb-1 truncate leading-none text-center">{sub.label}</p>
-                              <input name={`score_${sub.id}`} type="number" defaultValue={editingTest?.scores?.[sub.id]} placeholder="0" className="w-full bg-white border-none rounded-lg p-2 font-black text-sm text-center shadow-sm outline-none focus:ring-1 focus:ring-blue-600 leading-none"/>
+                              <p className="text-xs font-black text-slate-500 mb-2 truncate leading-none text-center">{sub.label}</p>
+                              <input name={`score_${sub.id}`} type="number" step="0.1" inputMode="decimal" defaultValue={editingTest?.scores?.[sub.id]} placeholder="50.0" className="w-full bg-white border-none rounded-xl p-3 font-black text-lg text-center shadow-sm outline-none focus:ring-2 focus:ring-blue-600 leading-none"/>
                            </div>))}
                       </div>
                    </div>
                    <div className="grid grid-cols-2 gap-4 border-t border-slate-50 pt-6 text-left">
-                      <div className="text-left"><label className="block text-[9px] font-black text-slate-400 uppercase mb-2 leading-none text-left">平均点</label><input name="average" type="number" step="0.1" defaultValue={editingTest?.average} className="w-full bg-slate-50 border-none rounded-xl p-3 font-black text-sm leading-none"/></div>
-                      <div className="text-left"><label className="block text-[9px] font-black text-slate-400 uppercase mb-2 leading-none text-left">順位</label><input name="rank" defaultValue={editingTest?.rank} placeholder="例: 10位" className="w-full bg-slate-50 border-none rounded-xl p-3 font-black text-sm leading-none"/></div>
+                      <div className="text-left"><label className="block text-xs font-black text-slate-500 mb-2 leading-none text-left">総合偏差値</label><input name="average" type="number" step="0.1" inputMode="decimal" defaultValue={editingTest?.average} placeholder="50.0" className="w-full bg-slate-50 border-none rounded-xl p-4 font-black text-lg leading-none"/></div>
+                      <div className="text-left"><label className="block text-xs font-black text-slate-500 mb-2 leading-none text-left">順位 任意</label><input name="rank" defaultValue={editingTest?.rank} placeholder="例: 10位 / 1234人中" className="w-full bg-slate-50 border-none rounded-xl p-4 font-black text-base leading-none"/></div>
                    </div>
-                   <button type="submit" className="w-full bg-rose-500 text-white font-black py-4 rounded-2xl shadow-xl active:scale-95 transition text-md uppercase leading-none mt-4 text-center">Save</button>
+                   <button type="submit" className="w-full bg-rose-500 text-white font-black py-5 rounded-2xl shadow-xl active:scale-95 transition text-lg leading-none mt-4 text-center">保存する</button>
                 </form>
              </div>
           </div>)}
