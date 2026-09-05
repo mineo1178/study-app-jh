@@ -5,6 +5,7 @@ export const REVIEW_SESSION_MINUTES = 120;
 export const HIGH_RISK_SESSION_MINUTES = 180;
 export const CLOCK_MISMATCH_TOLERANCE_SECONDS = 5 * 60;
 export const FOCUS_BONUS_LIMIT_PER_DAY = 3;
+export const STALE_RUNNING_THRESHOLD_MS = 15 * 60 * 1000;
 export const MAJOR_SUBJECT_IDS = ['s_math', 's_japanese', 's_social', 's_science', 's_english', 'j_math', 'j_japanese', 'j_social', 'j_science', 'j_english'];
 
 export const BOSSES = [
@@ -46,9 +47,83 @@ export function elapsedSeconds(sessionStartTime, now = Date.now(), isRunning = t
   return Math.max(0, Math.floor((Number(now) - Number(sessionStartTime)) / 1000));
 }
 
+function validTimestamp(value) {
+  const timestamp = Number(value);
+  return Number.isFinite(timestamp) && timestamp > 0 ? timestamp : null;
+}
+
+function localDateString(timestamp) {
+  const date = new Date(timestamp);
+  return `${date.getFullYear()}-${`${date.getMonth() + 1}`.padStart(2, '0')}-${`${date.getDate()}`.padStart(2, '0')}`;
+}
+
+export function getLastHeartbeatTime(task) {
+  return validTimestamp(task?.lastHeartbeatAt) || validTimestamp(task?.lastUpdatedAt) || validTimestamp(task?.sessionStartTime);
+}
+
+export function isStaleRunningTask(task, now = Date.now()) {
+  if (!task?.isRunning || !task?.sessionStartTime) return false;
+  const lastHeartbeat = getLastHeartbeatTime(task);
+  if (!lastHeartbeat) return false;
+  return Number(now) - lastHeartbeat >= STALE_RUNNING_THRESHOLD_MS;
+}
+
+export function getStaleSessionRecoveryDuration(task, recoveryEndTime) {
+  if (!task?.sessionStartTime) return Math.max(0, Number(task?.currentDuration) || 0);
+  return (Number(task?.currentDuration) || 0) + elapsedSeconds(task.sessionStartTime, recoveryEndTime, true);
+}
+
+export function validateStaleRecoveryEndTime(task, recoveryEndTime, now = Date.now()) {
+  const endTime = validTimestamp(recoveryEndTime);
+  const startedAt = validTimestamp(task?.sessionStartTime);
+  if (!endTime || !startedAt) return { valid: false, reason: 'invalid' };
+  if (endTime < startedAt) return { valid: false, reason: 'beforeStart' };
+  if (endTime > Number(now)) return { valid: false, reason: 'future' };
+  return { valid: true, endTime };
+}
+
+export function timerStateAfterContinueRunning(task, now) {
+  if (!task?.isRunning || !task?.sessionStartTime) return task;
+  return { ...task, lastHeartbeatAt: now, lastUpdatedAt: now };
+}
+
+export function staleRecoveryHistoryId(task, recoveryEndTime) {
+  return `recovered-${task?.id || 'task'}-${task?.sessionStartTime || 'unknown'}-${Number(recoveryEndTime) || 0}`;
+}
+
+export function taskStateAfterStaleRecovery(task, recoveryEndTime, memo = '', now = Date.now()) {
+  const validation = validateStaleRecoveryEndTime(task, recoveryEndTime, now);
+  if (!validation.valid) return { valid: false, reason: validation.reason, task };
+  const endedAt = validation.endTime;
+  const historyItem = {
+    id: staleRecoveryHistoryId(task, endedAt),
+    date: localDateString(endedAt),
+    duration: getStaleSessionRecoveryDuration(task, endedAt),
+    memo,
+    startedAt: task.sessionStartTime,
+    endedAt,
+  };
+  const history = task.history || [];
+  const alreadySaved = history.some((item) => item.id === historyItem.id);
+  return {
+    valid: true,
+    alreadySaved,
+    historyItem,
+    task: {
+      ...task,
+      history: alreadySaved ? history : [...history, historyItem],
+      currentDuration: 0,
+      isRunning: false,
+      sessionStartTime: null,
+      lastUpdatedAt: now,
+      lastHeartbeatAt: endedAt,
+    },
+  };
+}
+
 export function timerStateAfterStart(task, now, hasOtherRunning = false) {
   if (hasOtherRunning || task?.isRunning) return task;
-  return { ...task, isRunning: true, sessionStartTime: now, lastUpdatedAt: now };
+  return { ...task, isRunning: true, sessionStartTime: now, lastUpdatedAt: now, lastHeartbeatAt: now };
 }
 
 export function timerStateAfterPause(task, now) {
@@ -59,6 +134,7 @@ export function timerStateAfterPause(task, now) {
     currentDuration: (task.currentDuration || 0) + elapsedSeconds(task.sessionStartTime, now),
     sessionStartTime: null,
     lastUpdatedAt: now,
+    lastHeartbeatAt: now,
   };
 }
 

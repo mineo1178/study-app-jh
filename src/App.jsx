@@ -4,7 +4,7 @@ import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, Cart
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from 'firebase/auth';
 import { getFirestore, collection, doc, getDocs, updateDoc, deleteDoc, enableIndexedDbPersistence, addDoc, setDoc, onSnapshot } from 'firebase/firestore';
-import { damageForRecord, elapsedSeconds, gameProgress, getCreditedStudySeconds, recordIntegrity, timerStateAfterPause, timerStateAfterStart, totalSecondsForFinish } from './gameLogic';
+import { HIGH_RISK_SESSION_MINUTES, LONG_SESSION_MINUTES, REVIEW_SESSION_MINUTES, damageForRecord, elapsedSeconds, gameProgress, getCreditedStudySeconds, getLastHeartbeatTime, getStaleSessionRecoveryDuration, isStaleRunningTask, recordIntegrity, taskStateAfterStaleRecovery, timerStateAfterContinueRunning, timerStateAfterPause, timerStateAfterStart, totalSecondsForFinish, validateStaleRecoveryEndTime } from './gameLogic';
 // ==========================================
 // Firebase Initialization (Vite/Vercel Dedicated)
 // ==========================================
@@ -37,7 +37,7 @@ catch { console.warn('Offline persistence setup could not start.'); }
 const FAMILY_ID = 'oomine-study-2026';
 const getTasksCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tasks');
 const getTestsCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tests');
-const APP_VERSION = 'v1.65';
+const APP_VERSION = 'v1.66';
 const TIMER_HEARTBEAT_MS = 30 * 1000;
 const DAILY_TARGET_SECONDS = 2 * 60 * 60;
 const isDocumentHidden = () => typeof document !== 'undefined' && document.hidden;
@@ -259,25 +259,29 @@ const TodayTimeline = ({ tasks }) => {
             });
             if (t.isRunning && t.sessionStartTime) {
                 const start = Number(t.sessionStartTime);
+                const stale = isStaleRunningTask(t, nowTick);
+                const lastHeartbeat = getLastHeartbeatTime(t) || start;
                 const startDate = new Date(start);
                 const startStr = `${startDate.getFullYear()}-${(startDate.getMonth() + 1).toString().padStart(2, '0')}-${startDate.getDate().toString().padStart(2, '0')}`;
                 if (startStr === todayStr) {
-                    const elapsed = Math.max(0, Math.floor((nowTick - start) / 1000));
+                    const displayEnd = stale ? Math.max(start, lastHeartbeat) : nowTick;
+                    const elapsed = stale ? getStaleSessionRecoveryDuration(t, displayEnd) : Math.max(0, Math.floor((nowTick - start) / 1000));
                     histories.push({
                         id: `live-${t.id}`,
                         date: todayStr,
                         duration: elapsed,
-                        memo: '現在計測中',
+                        memo: stale ? '計測内容を確認してください' : '現在計測中',
                         startedAt: start,
-                        endedAt: nowTick,
-                        integrity: recordIntegrity({ duration: elapsed, startedAt: start, endedAt: nowTick }),
+                        endedAt: displayEnd,
+                        integrity: recordIntegrity({ duration: elapsed, startedAt: start, endedAt: displayEnd }),
                         color: meta.color,
                         subjectLabel: meta.subjectLabel,
                         categoryLabel: meta.categoryLabel,
                         typeLabel: meta.typeLabel,
                         taskTitle: t.title || 'Untitled',
-                        isLive: true,
-                        currentDuration: t.currentDuration || 0
+                        isLive: !stale,
+                        isStale: stale,
+                        currentDuration: 0
                     });
                 }
             }
@@ -301,6 +305,8 @@ const TodayTimeline = ({ tasks }) => {
             const d = new Date(start);
             const startStr = `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')}`;
             if (startStr !== todayStr)
+                return sum;
+            if (isStaleRunningTask(t, nowTick))
                 return sum;
             return sum + (t.currentDuration || 0) + Math.max(0, Math.floor((nowTick - start) / 1000));
         }, 0);
@@ -332,6 +338,7 @@ const TodayTimeline = ({ tasks }) => {
         acc[key].count += h.isLive ? 0 : 1;
         acc[key].latestAt = Math.max(acc[key].latestAt, h.endedAt || 0);
         acc[key].hasLive = acc[key].hasLive || h.isLive;
+        acc[key].hasStale = acc[key].hasStale || h.isStale;
         return acc;
     }, {});
     const taskSummaryList = Object.values(taskSummary).sort((a, b) => b.latestAt - a.latestAt);
@@ -389,10 +396,11 @@ const TodayTimeline = ({ tasks }) => {
                   <span className="rounded-full bg-slate-50 px-2 py-0.5 text-[9px] font-black text-slate-400">{item.categoryLabel}</span>
                   <span className="rounded-full px-2 py-0.5 text-[9px] font-black text-white" style={{ backgroundColor: item.color }}>{item.subjectLabel}</span>
                   {item.hasLive && <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[9px] font-black text-blue-600 ring-1 ring-blue-100">LIVE</span>}
+                  {item.hasStale && <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[9px] font-black text-amber-600 ring-1 ring-amber-100">要確認</span>}
                   {item.integrity?.needsReview && <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[9px] font-black text-amber-600 ring-1 ring-amber-100">要確認</span>}
                 </div>
                 <div className="truncate text-sm font-black text-slate-800">{item.taskTitle}</div>
-                <div className="mt-1 text-[10px] font-bold text-slate-400">{item.count > 0 ? `${item.count}回保存` : '現在計測中'} ・ 最終 {formatClockTime(item.latestAt)}</div>
+                <div className="mt-1 text-[10px] font-bold text-slate-400">{item.hasStale ? '計測内容を確認してください' : item.count > 0 ? `${item.count}回保存` : '現在計測中'} ・ 最終 {formatClockTime(item.latestAt)}</div>
               </div>
               <div className="shrink-0 text-right font-mono text-lg font-black tracking-tighter text-blue-600">{formatDuration(item.duration)}</div>
             </div>
@@ -408,6 +416,7 @@ const TodayTimeline = ({ tasks }) => {
                 <span className="rounded-full bg-slate-50 px-2.5 py-1 text-[10px] font-black text-slate-500">{selectedHistory.categoryLabel}</span>
                 <span className="rounded-full px-2.5 py-1 text-[10px] font-black text-white" style={{ backgroundColor: selectedHistory.color }}>{selectedHistory.subjectLabel}</span>
                 {selectedHistory.isLive && <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-black text-blue-600">LIVE</span>}
+                {selectedHistory.isStale && <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-black text-amber-600">要確認</span>}
                 {selectedHistory.integrity?.needsReview && <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-black text-amber-600">要確認</span>}
               </div>
               <h4 className="text-xl font-black leading-tight text-slate-800">{selectedHistory.taskTitle}</h4>
@@ -431,19 +440,24 @@ const TodayTimeline = ({ tasks }) => {
           {selectedHistory.integrity?.needsReview && <div className="mt-3 rounded-2xl bg-amber-50 p-4 text-xs font-bold leading-relaxed text-amber-700">
             長時間または時刻の整合性を確認したい記録です。学習履歴は残し、RPG報酬だけ上限・除外で扱います。
           </div>}
+          {selectedHistory.isStale && <div className="mt-3 rounded-2xl bg-amber-50 p-4 text-xs font-bold leading-relaxed text-amber-700">
+            長時間 heartbeat が止まっているため、現在までの時間はまだ確定していません。タスク詳細で計測内容を確認してください。
+          </div>}
         </div>
       </div>)}
     </div>);
 };
-const StrictTimer = ({ task, isAnyOtherRunning, isSaving, onUpdate, onSave }) => {
+const StrictTimer = ({ task, isAnyOtherRunning, isSaving, onUpdate, onSave, onRequestRecovery }) => {
     const [sessionElapsed, setSessionElapsed] = useState(0);
     const timerRef = useRef(null);
 
     const getAccurateElapsed = useCallback(() => {
         if (!task.isRunning || !task.sessionStartTime)
             return 0;
+        if (isStaleRunningTask(task))
+            return getStaleSessionRecoveryDuration(task, getLastHeartbeatTime(task));
         return elapsedSeconds(task.sessionStartTime);
-    }, [task.isRunning, task.sessionStartTime]);
+    }, [task]);
 
     const getAccurateTotal = useCallback(() => {
         return (task.currentDuration || 0) + getAccurateElapsed();
@@ -452,16 +466,21 @@ const StrictTimer = ({ task, isAnyOtherRunning, isSaving, onUpdate, onSave }) =>
     const stopTimer = useCallback(() => {
         if (!task.isRunning || !task.sessionStartTime)
             return;
+        if (isStaleRunningTask(task)) {
+            onRequestRecovery(task);
+            return;
+        }
         const now = Date.now();
         const nextTask = timerStateAfterPause(task, now);
         onUpdate(task.id, {
             isRunning: nextTask.isRunning,
             currentDuration: nextTask.currentDuration,
             sessionStartTime: nextTask.sessionStartTime,
-            lastUpdatedAt: nextTask.lastUpdatedAt
+            lastUpdatedAt: nextTask.lastUpdatedAt,
+            lastHeartbeatAt: nextTask.lastHeartbeatAt
         }, true);
         setSessionElapsed(0);
-    }, [task, onUpdate]);
+    }, [task, onUpdate, onRequestRecovery]);
 
     useEffect(() => {
         if (timerRef.current)
@@ -505,13 +524,18 @@ const StrictTimer = ({ task, isAnyOtherRunning, isSaving, onUpdate, onSave }) =>
         onUpdate(task.id, {
             isRunning: nextTask.isRunning,
             sessionStartTime: nextTask.sessionStartTime,
-            lastUpdatedAt: nextTask.lastUpdatedAt
+            lastUpdatedAt: nextTask.lastUpdatedAt,
+            lastHeartbeatAt: nextTask.lastHeartbeatAt
         }, true);
     };
 
     const handleSaveClick = () => {
         if (isSaving)
             return;
+        if (isStaleRunningTask(task)) {
+            onRequestRecovery(task);
+            return;
+        }
         const totalToSave = totalSecondsForFinish(task, Date.now());
         if (totalToSave < 10) {
             alert("学習時間が短すぎます（10秒以上必要です）。");
@@ -521,11 +545,31 @@ const StrictTimer = ({ task, isAnyOtherRunning, isSaving, onUpdate, onSave }) =>
     };
 
     const totalSeconds = getAccurateTotal();
+    const stale = isStaleRunningTask(task);
+    const totalMinutes = Math.floor(totalSeconds / 60);
+    const longSessionMessage = !stale && task.isRunning && totalMinutes > HIGH_RISK_SESSION_MINUTES
+        ? '3時間以上続いています。計測内容を強く確認してください。'
+        : !stale && task.isRunning && totalMinutes > REVIEW_SESSION_MINUTES
+            ? '2時間以上続いています。休憩または計測内容を確認してください。'
+            : !stale && task.isRunning && totalMinutes > LONG_SESSION_MINUTES
+                ? '長時間学習中です。疲れたら休憩してください。'
+                : null;
     return (<div className="bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950 rounded-[2rem] p-6 sm:p-10 text-center shadow-2xl relative overflow-hidden border border-white/10 flex flex-col items-center justify-center">
       <div className="absolute -top-24 -right-24 w-56 h-56 bg-blue-500/20 rounded-full blur-3xl"/>
       <div className="absolute -bottom-28 -left-20 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl"/>
       <div className="mb-8 flex flex-col items-center justify-center w-full relative z-10">
-        {task.isRunning ? (<>
+        {task.isRunning && stale ? (<>
+            <div className="mb-4 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-300/10 border border-amber-200/20 text-amber-100 text-[10px] sm:text-xs font-black uppercase tracking-widest">
+              <span className="w-2 h-2 rounded-full bg-amber-300"/> 要確認
+            </div>
+            <span className="text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-widest mb-2">計測内容の確認が必要です</span>
+            <div className="max-w-sm text-sm font-bold leading-relaxed text-white/90">
+              長時間 heartbeat が止まっています。現在までの時間を通常の学習時間としては扱わず、確認後に履歴へ保存します。
+            </div>
+            <div className="mt-4 px-4 py-2 bg-amber-300/10 border border-amber-200/20 rounded-full text-xs sm:text-sm font-bold text-amber-100 flex items-center gap-2 shadow-sm">
+              <History size={14}/> 最後の確認: {formatClockTime(getLastHeartbeatTime(task))}
+            </div>
+          </>) : task.isRunning ? (<>
             <div className="mb-4 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-400/10 border border-blue-300/20 text-blue-200 text-[10px] sm:text-xs font-black uppercase tracking-widest">
               <span className="w-2 h-2 rounded-full bg-blue-300 animate-pulse"/> Live Sync
             </div>
@@ -539,6 +583,7 @@ const StrictTimer = ({ task, isAnyOtherRunning, isSaving, onUpdate, onSave }) =>
             <div className="mt-4 px-4 py-2 bg-white/10 border border-white/10 rounded-full text-xs sm:text-sm font-bold text-white/90 flex items-center gap-2 shadow-sm">
               <History size={14}/> 累計: {formatDuration(totalSeconds)}
             </div>
+            {longSessionMessage && <div className="mt-4 rounded-2xl bg-amber-300/10 px-4 py-3 text-xs font-bold leading-relaxed text-amber-100 ring-1 ring-amber-200/20">{longSessionMessage}</div>}
           </>) : (<>
             <span className="text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-widest mb-2">累計学習時間</span>
             <div className="text-4xl sm:text-6xl font-mono font-black tracking-tighter text-white leading-none">
@@ -550,6 +595,8 @@ const StrictTimer = ({ task, isAnyOtherRunning, isSaving, onUpdate, onSave }) =>
       <div className="flex gap-3 w-full max-w-sm relative z-10">
         {!task.isRunning ? (<button type="button" onClick={handleStart} disabled={isSaving} className="flex-1 bg-white text-slate-950 font-black py-4 sm:py-5 rounded-xl sm:rounded-2xl shadow-lg active:scale-95 transition flex items-center justify-center gap-2 text-sm sm:text-lg uppercase leading-none hover:bg-blue-50 disabled:opacity-60">
             <Play size={20} fill="currentColor"/> START
+          </button>) : stale ? (<button type="button" onClick={() => onRequestRecovery(task)} disabled={isSaving} className="flex-1 bg-amber-400 text-slate-950 font-black py-4 sm:py-5 rounded-xl sm:rounded-2xl shadow-lg active:scale-95 transition flex items-center justify-center gap-2 text-sm sm:text-lg uppercase leading-none hover:bg-amber-300 disabled:opacity-60">
+            <Clock size={20}/> 確認する
           </button>) : (<button type="button" onClick={stopTimer} disabled={isSaving} className="flex-1 bg-amber-400 text-slate-950 font-black py-4 sm:py-5 rounded-xl sm:rounded-2xl shadow-lg active:scale-95 transition flex items-center justify-center gap-2 text-sm sm:text-lg uppercase leading-none hover:bg-amber-300 disabled:opacity-60">
             <Pause size={20} fill="currentColor"/> PAUSE
           </button>)}
@@ -560,7 +607,7 @@ const StrictTimer = ({ task, isAnyOtherRunning, isSaving, onUpdate, onSave }) =>
     </div>);
 };
 
-const ActiveTimerSummary = ({ task, onHeartbeat }) => {
+const ActiveTimerSummary = ({ task, onHeartbeat, onRequestRecovery }) => {
     const [sessionElapsed, setSessionElapsed] = useState(0);
     const timerRef = useRef(null);
     const heartbeatRef = useRef(0);
@@ -568,6 +615,8 @@ const ActiveTimerSummary = ({ task, onHeartbeat }) => {
     const getAccurateElapsed = useCallback(() => {
         if (!task?.isRunning || !task?.sessionStartTime)
             return 0;
+        if (isStaleRunningTask(task))
+            return getStaleSessionRecoveryDuration(task, getLastHeartbeatTime(task));
         return elapsedSeconds(task.sessionStartTime);
     }, [task]);
 
@@ -581,7 +630,8 @@ const ActiveTimerSummary = ({ task, onHeartbeat }) => {
                 setSessionElapsed(getAccurateElapsed());
                 if (now - heartbeatRef.current >= TIMER_HEARTBEAT_MS) {
                     heartbeatRef.current = now;
-                    onHeartbeat(task.id, { lastUpdatedAt: now }, true);
+                    if (!isStaleRunningTask(task, now))
+                        onHeartbeat(task.id, { lastUpdatedAt: now, lastHeartbeatAt: now }, true);
                 }
             }, 1000);
         }
@@ -592,22 +642,39 @@ const ActiveTimerSummary = ({ task, onHeartbeat }) => {
             if (timerRef.current)
                 clearInterval(timerRef.current);
         };
-    }, [task?.id, task?.isRunning, task?.sessionStartTime, getAccurateElapsed, onHeartbeat]);
+    }, [task, getAccurateElapsed, onHeartbeat]);
 
     useEffect(() => {
         const handleVisibilityChange = () => {
-            if (!isDocumentHidden() && task?.isRunning && task?.sessionStartTime) {
+            if (!task?.isRunning || !task?.sessionStartTime)
+                return;
+            const now = Date.now();
+            if (isDocumentHidden() && !isStaleRunningTask(task, now)) {
+                heartbeatRef.current = now;
+                onHeartbeat(task.id, { lastUpdatedAt: now, lastHeartbeatAt: now }, true);
+                return;
+            }
+            if (!isDocumentHidden()) {
                 setSessionElapsed(getAccurateElapsed());
             }
         };
         document.addEventListener('visibilitychange', handleVisibilityChange);
         return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-    }, [task?.isRunning, task?.sessionStartTime, getAccurateElapsed]);
+    }, [task, getAccurateElapsed, onHeartbeat]);
 
     if (!task?.isRunning || !task?.sessionStartTime)
         return null;
 
     const totalSeconds = (task.currentDuration || 0) + sessionElapsed;
+    const stale = isStaleRunningTask(task);
+    const totalMinutes = Math.floor(totalSeconds / 60);
+    const longSessionMessage = !stale && totalMinutes > HIGH_RISK_SESSION_MINUTES
+        ? '3時間以上続いています。計測内容を強く確認してください。'
+        : !stale && totalMinutes > REVIEW_SESSION_MINUTES
+            ? '2時間以上続いています。休憩または計測内容を確認してください。'
+            : !stale && totalMinutes > LONG_SESSION_MINUTES
+                ? '長時間学習中です。疲れたら休憩してください。'
+                : null;
     const categoryInfo = Object.values(CATEGORIES).find(c => c.id === task.categoryId);
     const subjectInfo = SUBJECT_DEFS[task.categoryId]?.find(s => s.id === task.subjectId);
     const subjectLabel = subjectInfo?.label || categoryInfo?.label || '学習';
@@ -619,28 +686,41 @@ const ActiveTimerSummary = ({ task, onHeartbeat }) => {
         <div className="min-w-0">
           <div className="mb-3 flex flex-wrap items-center gap-2">
             <span className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-blue-50 ring-1 ring-white/20">
-              <span className="h-2 w-2 rounded-full bg-emerald-300 animate-pulse"/> LIVE TIMER
+              <span className={`h-2 w-2 rounded-full ${stale ? 'bg-amber-300' : 'bg-emerald-300 animate-pulse'}`}/> {stale ? '要確認' : 'LIVE TIMER'}
             </span>
             <span className="rounded-full bg-white/10 px-3 py-1.5 text-[10px] font-black text-blue-50 ring-1 ring-white/15">他端末同期中</span>
             <span className="rounded-full bg-white/10 px-3 py-1.5 text-[10px] font-black text-blue-50 ring-1 ring-white/15">{APP_VERSION}</span>
           </div>
-          <div className="text-xs font-black uppercase tracking-widest text-blue-100/80">現在計測中</div>
+          <div className="text-xs font-black uppercase tracking-widest text-blue-100/80">{stale ? '計測内容の確認が必要です' : '現在計測中'}</div>
           <div className="mt-1 truncate text-2xl sm:text-3xl font-black tracking-tight">{subjectLabel} / {task.title || 'Untitled'}</div>
-          <div className="mt-2 text-xs font-bold text-blue-100/80">開始 {startedTime} ・ Firestore Live Sync</div>
+          <div className="mt-2 text-xs font-bold text-blue-100/80">開始 {startedTime} ・ 最後の確認 {formatClockTime(getLastHeartbeatTime(task))}</div>
+          {stale && <button type="button" onClick={() => onRequestRecovery(task)} className="mt-4 rounded-2xl bg-amber-300 px-4 py-3 text-xs font-black text-slate-950 shadow-lg active:scale-95">計測内容を確認する</button>}
+          {longSessionMessage && <div className="mt-3 rounded-2xl bg-amber-300/10 px-4 py-3 text-xs font-bold leading-relaxed text-amber-100 ring-1 ring-amber-200/20">{longSessionMessage}</div>}
         </div>
 
-        <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:min-w-[300px]">
+        <div className={`grid gap-2 sm:gap-3 lg:min-w-[300px] ${stale ? 'grid-cols-1' : 'grid-cols-2'}`}>
           <div className="rounded-3xl bg-white/15 p-4 text-center ring-1 ring-white/20 backdrop-blur-xl">
-            <div className="mb-2 text-[9px] font-black uppercase tracking-widest text-blue-100/80">今回</div>
-            <div className="font-mono text-2xl sm:text-3xl font-black tracking-tighter">{formatDuration(sessionElapsed)}</div>
+            <div className="mb-2 text-[9px] font-black uppercase tracking-widest text-blue-100/80">{stale ? '確認候補' : '今回'}</div>
+            <div className="font-mono text-2xl sm:text-3xl font-black tracking-tighter">{stale ? '要確認' : formatDuration(sessionElapsed)}</div>
           </div>
-          <div className="rounded-3xl bg-white/10 p-4 text-center ring-1 ring-white/15 backdrop-blur-xl">
+          {!stale && <div className="rounded-3xl bg-white/10 p-4 text-center ring-1 ring-white/15 backdrop-blur-xl">
             <div className="mb-2 text-[9px] font-black uppercase tracking-widest text-blue-100/80">累計</div>
             <div className="font-mono text-2xl sm:text-3xl font-black tracking-tighter">{formatDuration(totalSeconds)}</div>
-          </div>
+          </div>}
         </div>
       </div>
     </div>);
+};
+const formatDateTimeLocalValue = (ms) => {
+    if (!ms)
+        return '';
+    const d = new Date(ms);
+    const yyyy = d.getFullYear();
+    const mm = `${d.getMonth() + 1}`.padStart(2, '0');
+    const dd = `${d.getDate()}`.padStart(2, '0');
+    const hh = `${d.getHours()}`.padStart(2, '0');
+    const mi = `${d.getMinutes()}`.padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
 };
 
 const AdventureStatus = ({ adventure }) => {
@@ -711,10 +791,16 @@ export default function App() {
     const [testEndDate, setTestEndDate] = useState(getTodayStr);
     const [visibleSubjects, setVisibleSubjects] = useState(['s_math', 's_english', 'j_math', 'average']);
     const [questResult, setQuestResult] = useState(null);
+    const [recoveryTaskId, setRecoveryTaskId] = useState(null);
+    const [manualRecoveryEnd, setManualRecoveryEnd] = useState('');
+    const [staleCheckNow, setStaleCheckNow] = useState(() => Date.now());
     const [isSavingRecord, setIsSavingRecord] = useState(false);
     const savingRecordRef = useRef(false);
+    const recoverySavingRef = useRef(false);
     const isAnyTaskRunning = useMemo(() => tasks.some(t => t.isRunning), [tasks]);
     const runningTask = useMemo(() => tasks.find(t => t.isRunning) || null, [tasks]);
+    const staleRunningTasks = useMemo(() => tasks.filter(t => isStaleRunningTask(t, staleCheckNow)), [tasks, staleCheckNow]);
+    const recoveryTask = useMemo(() => tasks.find(t => t.id === recoveryTaskId) || null, [tasks, recoveryTaskId]);
     const adventure = useMemo(() => gameProgress(tasks, getTodayStr()), [tasks]);
     const todayTaskSummaries = useMemo(() => {
         const todayStr = getTodayStr();
@@ -733,14 +819,34 @@ export default function App() {
                     count: todayHistories.length,
                     totalDuration,
                     latestTimestamp,
-                    isRunning: task.isRunning
+                    isRunning: task.isRunning,
+                    isStale: isStaleRunningTask(task, staleCheckNow)
                 }];
         }).sort((a, b) => {
             if (a.isRunning !== b.isRunning)
                 return a.isRunning ? -1 : 1;
             return (b.latestTimestamp || 0) - (a.latestTimestamp || 0);
         });
-    }, [tasks]);
+    }, [tasks, staleCheckNow]);
+    useEffect(() => {
+        if (!isAnyTaskRunning)
+            return;
+        const interval = setInterval(() => setStaleCheckNow(Date.now()), 30 * 1000);
+        return () => clearInterval(interval);
+    }, [isAnyTaskRunning]);
+    useEffect(() => {
+        if (!recoveryTaskId && staleRunningTasks.length > 0) {
+            const task = staleRunningTasks[0];
+            queueMicrotask(() => {
+                setRecoveryTaskId(task.id);
+                setManualRecoveryEnd(formatDateTimeLocalValue(getLastHeartbeatTime(task)));
+            });
+        }
+    }, [recoveryTaskId, staleRunningTasks]);
+    useEffect(() => {
+        if (recoveryTask)
+            queueMicrotask(() => setManualRecoveryEnd(formatDateTimeLocalValue(getLastHeartbeatTime(recoveryTask))));
+    }, [recoveryTask]);
     const handleCategoryChange = (categoryId) => {
         setActiveCategory(categoryId);
         setSelectedSubjectId(SUBJECT_DEFS[categoryId]?.[0]?.id || '');
@@ -898,6 +1004,103 @@ export default function App() {
         }
         finally {
             savingRecordRef.current = false;
+            setIsSavingRecord(false);
+        }
+    };
+    const openRecoveryModal = useCallback((task) => {
+        if (!task)
+            return;
+        setRecoveryTaskId(task.id);
+        setManualRecoveryEnd(formatDateTimeLocalValue(getLastHeartbeatTime(task)));
+    }, []);
+    const handleContinueStaleTask = async () => {
+        if (!recoveryTask || recoverySavingRef.current)
+            return;
+        recoverySavingRef.current = true;
+        setIsSavingRecord(true);
+        try {
+            const now = Date.now();
+            const nextTask = timerStateAfterContinueRunning(recoveryTask, now);
+            const updates = { lastUpdatedAt: nextTask.lastUpdatedAt, lastHeartbeatAt: nextTask.lastHeartbeatAt };
+            if (!isSampleMode && user) {
+                await updateDoc(doc(getTasksCol(), recoveryTask.id), updates);
+            }
+            handleUpdateLocalTask(recoveryTask.id, updates);
+            setRecoveryTaskId(null);
+            setStaleCheckNow(now);
+        }
+        catch (err) {
+            console.error("Stale recovery continue failed:", err);
+            alert("復旧に失敗しました。");
+        }
+        finally {
+            recoverySavingRef.current = false;
+            setIsSavingRecord(false);
+        }
+    };
+    const handleFinishStaleTask = async (endTime, reasonLabel) => {
+        if (!recoveryTask || recoverySavingRef.current)
+            return;
+        recoverySavingRef.current = true;
+        setIsSavingRecord(true);
+        try {
+            const now = Date.now();
+            const validation = validateStaleRecoveryEndTime(recoveryTask, endTime, now);
+            if (!validation.valid) {
+                alert(validation.reason === 'beforeStart' ? "終了時刻は開始時刻より後にしてください。" : validation.reason === 'future' ? "未来の時刻は指定できません。" : "終了時刻を確認してください。");
+                return;
+            }
+            const totalSeconds = getStaleSessionRecoveryDuration(recoveryTask, validation.endTime);
+            if (totalSeconds < 10) {
+                alert("学習時間が短すぎます（10秒以上必要です）。");
+                return;
+            }
+            const beforeAdventure = gameProgress(tasks, getTodayStr());
+            const memo = `復旧確認: ${reasonLabel}`;
+            const result = taskStateAfterStaleRecovery(recoveryTask, validation.endTime, memo, now);
+            if (!result.valid)
+                return;
+            const updates = {
+                history: result.task.history,
+                currentDuration: result.task.currentDuration,
+                isRunning: result.task.isRunning,
+                sessionStartTime: result.task.sessionStartTime,
+                lastUpdatedAt: result.task.lastUpdatedAt,
+                lastHeartbeatAt: result.task.lastHeartbeatAt
+            };
+            if (!isSampleMode && user) {
+                await updateDoc(doc(getTasksCol(), recoveryTask.id), updates);
+            }
+            handleUpdateLocalTask(recoveryTask.id, updates);
+            setRecoveryTaskId(null);
+            setStaleCheckNow(now);
+            if (!result.alreadySaved) {
+                const projectedTasks = tasks.map((item) => item.id === recoveryTask.id ? { ...item, ...updates } : item);
+                const afterAdventure = gameProgress(projectedTasks, getTodayStr());
+                const savedRecord = afterAdventure.records.find((record) => record.id === result.historyItem.id);
+                const previousIntervals = beforeAdventure.records.map((record) => record.startedAt && record.creditedDuration > 0 ? { start: Number(record.startedAt), end: Number(record.startedAt) + record.creditedDuration * 1000 } : null).filter(Boolean);
+                const credited = getCreditedStudySeconds({ ...result.historyItem, subjectId: recoveryTask.subjectId }, previousIntervals);
+                const resultRecord = savedRecord || { ...result.historyItem, subjectId: recoveryTask.subjectId, creditedDuration: credited.creditedDuration, integrity: credited.integrity };
+                setQuestResult({
+                    exp: Math.max(0, afterAdventure.levelInfo.totalExp - beforeAdventure.levelInfo.totalExp),
+                    recordedDuration: result.historyItem.duration,
+                    creditedDuration: resultRecord.creditedDuration,
+                    damage: damageForRecord(resultRecord, beforeAdventure.boss.boss),
+                    levelUp: afterAdventure.levelInfo.level > beforeAdventure.levelInfo.level,
+                    newItems: afterAdventure.items.filter((item) => !beforeAdventure.items.some((previous) => previous.id === item.id)),
+                    newSkills: afterAdventure.skills.filter((skill) => !beforeAdventure.skills.some((previous) => previous.id === skill.id)),
+                    chest: afterAdventure.chests > beforeAdventure.chests,
+                    needsReview: resultRecord.integrity?.needsReview,
+                    flags: resultRecord.integrity?.flags || [],
+                });
+            }
+        }
+        catch (err) {
+            console.error("Stale recovery finish failed:", err);
+            alert("復旧に失敗しました。");
+        }
+        finally {
+            recoverySavingRef.current = false;
             setIsSavingRecord(false);
         }
     };
@@ -1252,7 +1455,7 @@ export default function App() {
                     {todayTaskSummaries.map(item => (<button type="button" key={item.task.id} onClick={() => setSelectedTaskId(item.task.id)} className={`rounded-2xl border p-4 text-left transition active:scale-95 ${item.isRunning ? 'border-blue-200 bg-blue-50 shadow-blue-100' : 'border-slate-100 bg-slate-50 hover:bg-white hover:shadow-md'}`}>
                         <div className="mb-3 flex items-center justify-between gap-2">
                           <span className="rounded-full px-2.5 py-1 text-[9px] font-black text-white" style={{ backgroundColor: item.color }}>{item.subjectLabel}</span>
-                          <span className={`text-[9px] font-black ${item.isRunning ? 'text-blue-600' : 'text-slate-400'}`}>{item.isRunning ? '計測中' : `${item.count}回`}</span>
+                          <span className={`text-[9px] font-black ${item.isStale ? 'text-amber-600' : item.isRunning ? 'text-blue-600' : 'text-slate-400'}`}>{item.isStale ? '要確認' : item.isRunning ? '計測中' : `${item.count}回`}</span>
                         </div>
                         <div className="truncate text-sm font-black text-slate-800">{item.task.title || 'Untitled'}</div>
                         <div className="mt-3 flex items-center justify-between border-t border-white pt-3">
@@ -1266,7 +1469,7 @@ export default function App() {
               {/* 当日のタイムライン */}
               <TodayTimeline tasks={tasks}/>
 
-              <ActiveTimerSummary task={runningTask} onHeartbeat={handleUpdateLocalTask}/>
+              <ActiveTimerSummary task={runningTask} onHeartbeat={handleUpdateLocalTask} onRequestRecovery={openRecoveryModal}/>
 
               <div className="flex gap-2 bg-slate-100 p-1.5 rounded-[1.75rem] w-full max-w-md mx-auto shadow-inner overflow-hidden leading-none text-center">
                     {Object.values(CATEGORIES).map(cat => (<button type="button" key={cat.id} onClick={() => handleCategoryChange(cat.id)} className={`flex-1 flex items-center justify-center gap-1.5 py-3 rounded-2xl text-[10px] font-black transition-all leading-none ${activeCategory === cat.id ? 'bg-white text-slate-900 shadow-md' : 'text-slate-400'}`}>
@@ -1302,10 +1505,10 @@ export default function App() {
                                       <div className="flex items-center gap-1.5 sm:gap-2 leading-none text-left">
                                         <span className={`text-[8px] sm:text-[9px] font-black px-2 py-0.5 rounded-full leading-none ${CATEGORIES[task.categoryId.toUpperCase()].bg} ${CATEGORIES[task.categoryId.toUpperCase()].color}`}>{task.type === 'homework' ? '宿題' : '自習'}</span>
                                       </div>
-                                      {task.isRunning && <div className="rounded-full bg-white/15 px-2 py-1 text-[8px] font-black text-white ring-1 ring-white/20">LIVE</div>}
+                                      {task.isRunning && <div className={`rounded-full px-2 py-1 text-[8px] font-black ring-1 ${isStaleRunningTask(task, staleCheckNow) ? 'bg-amber-300 text-slate-950 ring-amber-100' : 'bg-white/15 text-white ring-white/20'}`}>{isStaleRunningTask(task, staleCheckNow) ? '要確認' : 'LIVE'}</div>}
                                     </div>
                                     <div className={`text-[9px] sm:text-[10px] font-bold mb-2 sm:mb-3 ${task.isRunning ? 'text-blue-100/80' : 'text-slate-400'}`}>
-                                       {task.isRunning ? '現在計測中' : `${formatRecordDate(latestMonthlyTimestamp)} 記録`}
+                                       {task.isRunning ? isStaleRunningTask(task, staleCheckNow) ? '計測内容を確認してください' : '現在計測中' : `${formatRecordDate(latestMonthlyTimestamp)} 記録`}
                                     </div>
                                     <h4 className={`font-black text-base sm:text-lg mb-3 sm:mb-4 truncate leading-tight text-left ${task.isRunning ? 'text-white' : 'text-slate-800'}`}>{task.title || "Untitled"}</h4>
                                     <div className={`flex justify-between items-end border-t pt-3 sm:pt-4 leading-none text-left ${task.isRunning ? 'border-white/15' : 'border-slate-50'}`}>
@@ -1536,6 +1739,38 @@ export default function App() {
           </div>
         </div>)}
 
+        {recoveryTask && (<div className={modalOverlayClass} role="dialog" aria-modal="true" aria-label="計測内容の確認">
+          <div className="w-full max-w-md rounded-[2rem] bg-white p-6 text-left shadow-2xl">
+            <div className="mb-4 flex items-start gap-3">
+              <div className="rounded-2xl bg-amber-50 p-3 text-amber-600"><Clock size={22}/></div>
+              <div className="min-w-0">
+                <div className="text-[10px] font-black tracking-[0.2em] text-amber-500">TIMER CHECK</div>
+                <h3 className="mt-1 text-xl font-black leading-tight text-slate-800">{recoveryTask.title || 'Untitled'}の計測が長時間継続しています</h3>
+              </div>
+            </div>
+            <div className="rounded-2xl bg-slate-50 p-4 text-sm font-bold leading-relaxed text-slate-600">
+              <div>開始: {formatClockTime(recoveryTask.sessionStartTime)}</div>
+              <div>最後の確認: {formatClockTime(getLastHeartbeatTime(recoveryTask))}</div>
+              <div className="mt-2 text-xs text-slate-400">その後も勉強を続けていましたか？ 未確認の時間は、確定するまで通常の学習時間やRPG報酬として扱いません。</div>
+            </div>
+            <div className="mt-5 space-y-3">
+              <button type="button" onClick={() => handleFinishStaleTask(getLastHeartbeatTime(recoveryTask), '最後の確認時刻で終了')} disabled={isSavingRecord} className="w-full rounded-2xl bg-slate-900 px-4 py-4 text-sm font-black text-white shadow-lg active:scale-95 disabled:opacity-60">
+                最後の確認時刻で終了
+              </button>
+              <button type="button" onClick={handleContinueStaleTask} disabled={isSavingRecord} className="w-full rounded-2xl bg-blue-50 px-4 py-4 text-sm font-black text-blue-700 ring-1 ring-blue-100 active:scale-95 disabled:opacity-60">
+                勉強を続けていた
+              </button>
+              <div className="rounded-2xl border border-slate-100 p-4">
+                <label className="mb-2 block text-[10px] font-black uppercase tracking-widest text-slate-400">終了時刻を修正</label>
+                <input type="datetime-local" value={manualRecoveryEnd} min={formatDateTimeLocalValue(recoveryTask.sessionStartTime)} max={formatDateTimeLocalValue(staleCheckNow)} onChange={(e) => setManualRecoveryEnd(e.target.value)} className="w-full rounded-xl bg-slate-50 p-3 text-sm font-black text-slate-700 outline-none ring-1 ring-slate-100 focus:ring-blue-200"/>
+                <button type="button" onClick={() => handleFinishStaleTask(Date.parse(manualRecoveryEnd), '終了時刻を修正')} disabled={isSavingRecord} className="mt-3 w-full rounded-xl bg-amber-400 px-4 py-3 text-xs font-black text-slate-950 shadow-sm active:scale-95 disabled:opacity-60">
+                  この終了時刻で保存
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>)}
+
         {/* --- Modals --- */}
         {isAddingTask && (<div className={modalOverlayClass}>
              <div className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
@@ -1590,7 +1825,7 @@ export default function App() {
                          <button type="button" aria-label="学習項目詳細を閉じる" title="閉じる" onClick={() => setSelectedTaskId(null)} className="p-3 bg-white rounded-2xl shadow-sm hover:bg-slate-50 transition shrink-0 text-left"><X size={24}/></button>
                       </div>
                       <div className="flex-1 overflow-y-auto p-6 sm:p-10 space-y-10 no-scrollbar pb-32 text-left">
-                         <StrictTimer task={task} isAnyOtherRunning={isAnyTaskRunning && !task.isRunning} isSaving={isSavingRecord} onUpdate={handleUpdateLocalTask} onSave={handleSaveRecord}/>
+                         <StrictTimer task={task} isAnyOtherRunning={isAnyTaskRunning && !task.isRunning} isSaving={isSavingRecord} onUpdate={handleUpdateLocalTask} onSave={handleSaveRecord} onRequestRecovery={openRecoveryModal}/>
                          <div className="space-y-4 text-left">
                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 px-2 text-left"><Search size={14}/> 学習メモ</label>
                             <textarea value={task.tempDetail || ""} onChange={(e) => handleUpdateLocalTask(task.id, { tempDetail: e.target.value })} placeholder="内容をメモ..." className="w-full h-28 bg-slate-50/50 border-none rounded-2xl p-4 font-black text-md resize-none shadow-inner outline-none focus:ring-2 focus:ring-blue-100 text-left leading-snug"/>

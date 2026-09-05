@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   BOSSES,
+  STALE_RUNNING_THRESHOLD_MS,
   bossProgress,
   collectStudyRecords,
   dailyQuestStatus,
@@ -8,13 +9,19 @@ import {
   elapsedSeconds,
   gameProgress,
   getCreditedStudySeconds,
+  getLastHeartbeatTime,
+  getStaleSessionRecoveryDuration,
+  isStaleRunningTask,
   levelFromExp,
   recordIntegrity,
   sessionExp,
   subjectBalance,
+  taskStateAfterStaleRecovery,
+  timerStateAfterContinueRunning,
   timerStateAfterPause,
   timerStateAfterStart,
   totalSecondsForFinish,
+  validateStaleRecoveryEndTime,
   weeklyAdventureDays,
 } from './gameLogic';
 
@@ -54,6 +61,90 @@ describe('timer pure functions', () => {
 
   it('FINISH連打相当では停止済みタスクの保存時間を増やさない', () => {
     expect(totalSecondsForFinish({ currentDuration: 30 * 60, sessionStartTime: null, isRunning: false }, 60 * 60 * 1000)).toBe(30 * 60);
+  });
+});
+
+describe('stale running session recovery', () => {
+  const now = Date.parse('2026-09-05T23:00:00+09:00');
+  const startedAt = Date.parse('2026-09-05T18:00:00+09:00');
+  const heartbeatAt = Date.parse('2026-09-05T18:32:00+09:00');
+
+  it('heartbeat 5分前はstaleではない', () => {
+    expect(isStaleRunningTask({ isRunning: true, sessionStartTime: startedAt, lastHeartbeatAt: now - 5 * 60 * 1000 }, now)).toBe(false);
+  });
+
+  it('heartbeat 14分59秒前はstaleではない', () => {
+    expect(isStaleRunningTask({ isRunning: true, sessionStartTime: startedAt, lastHeartbeatAt: now - STALE_RUNNING_THRESHOLD_MS + 1000 }, now)).toBe(false);
+  });
+
+  it('heartbeat 15分以上前はstale', () => {
+    expect(isStaleRunningTask({ isRunning: true, sessionStartTime: startedAt, lastHeartbeatAt: now - STALE_RUNNING_THRESHOLD_MS }, now)).toBe(true);
+  });
+
+  it('lastHeartbeatAtなしの場合はlastUpdatedAtへfallbackする', () => {
+    const taskItem = { isRunning: true, sessionStartTime: startedAt, lastUpdatedAt: heartbeatAt };
+    expect(getLastHeartbeatTime(taskItem)).toBe(heartbeatAt);
+    expect(isStaleRunningTask(taskItem, now)).toBe(true);
+  });
+
+  it('lastUpdatedAtもない場合はsessionStartTimeへfallbackする', () => {
+    const taskItem = { isRunning: true, sessionStartTime: startedAt };
+    expect(getLastHeartbeatTime(taskItem)).toBe(startedAt);
+    expect(isStaleRunningTask(taskItem, now)).toBe(true);
+  });
+
+  it('stale状態では現在までの巨大なelapsedを復旧候補の正常時間にしない', () => {
+    const taskItem = { isRunning: true, sessionStartTime: startedAt, currentDuration: 0, lastHeartbeatAt: heartbeatAt };
+    expect(elapsedSeconds(startedAt, now)).toBe(5 * 60 * 60);
+    expect(getStaleSessionRecoveryDuration(taskItem, getLastHeartbeatTime(taskItem))).toBe(32 * 60);
+  });
+
+  it('最後のheartbeatで終了するとdurationが正しい', () => {
+    const result = taskStateAfterStaleRecovery({ id: 'kanji', isRunning: true, sessionStartTime: startedAt, currentDuration: 0, lastHeartbeatAt: heartbeatAt, history: [] }, heartbeatAt, '復旧', now);
+    expect(result.valid).toBe(true);
+    expect(result.historyItem.duration).toBe(32 * 60);
+    expect(result.task.isRunning).toBe(false);
+  });
+
+  it('currentDurationありでも二重加算しない', () => {
+    const resumedAt = Date.parse('2026-09-05T18:20:00+09:00');
+    const endAt = Date.parse('2026-09-05T18:35:00+09:00');
+    const result = taskStateAfterStaleRecovery({ id: 'kanji', isRunning: true, sessionStartTime: resumedAt, currentDuration: 20 * 60, lastHeartbeatAt: endAt, history: [] }, endAt, '復旧', now);
+    expect(result.historyItem.duration).toBe(35 * 60);
+  });
+
+  it('勉強を続けていた選択時はRunningを継続しheartbeatを更新する', () => {
+    const result = timerStateAfterContinueRunning({ id: 'kanji', isRunning: true, sessionStartTime: startedAt, lastHeartbeatAt: heartbeatAt }, now);
+    expect(result.isRunning).toBe(true);
+    expect(result.sessionStartTime).toBe(startedAt);
+    expect(result.lastHeartbeatAt).toBe(now);
+  });
+
+  it('手動終了時刻が開始前なら拒否する', () => {
+    expect(validateStaleRecoveryEndTime({ sessionStartTime: startedAt }, startedAt - 1000, now)).toMatchObject({ valid: false, reason: 'beforeStart' });
+  });
+
+  it('手動終了時刻が未来なら拒否する', () => {
+    expect(validateStaleRecoveryEndTime({ sessionStartTime: startedAt }, now + 1000, now)).toMatchObject({ valid: false, reason: 'future' });
+  });
+
+  it('復旧FINISH連打でhistoryを二重保存しない', () => {
+    const baseTask = { id: 'kanji', isRunning: true, sessionStartTime: startedAt, currentDuration: 0, lastHeartbeatAt: heartbeatAt, history: [] };
+    const first = taskStateAfterStaleRecovery(baseTask, heartbeatAt, '復旧', now);
+    const second = taskStateAfterStaleRecovery({ ...baseTask, history: first.task.history }, heartbeatAt, '復旧', now);
+    expect(second.alreadySaved).toBe(true);
+    expect(second.task.history).toHaveLength(1);
+  });
+
+  it('stale未確定時間はRPG EXPに入らない', () => {
+    const recovered = taskStateAfterStaleRecovery({ id: 'kanji', subjectId: 's_japanese', categoryId: 'school', isRunning: true, sessionStartTime: startedAt, currentDuration: 0, lastHeartbeatAt: heartbeatAt, history: [] }, heartbeatAt, '復旧', now);
+    const progress = gameProgress([{ id: 'kanji', subjectId: 's_japanese', categoryId: 'school', history: recovered.task.history }], '2026-09-05');
+    expect(progress.rawExp).toBe(32);
+  });
+
+  it('正常heartbeat中の60分紙学習はstaleにならない', () => {
+    const sixtyMinutesLater = startedAt + 60 * 60 * 1000;
+    expect(isStaleRunningTask({ isRunning: true, sessionStartTime: startedAt, lastHeartbeatAt: sixtyMinutesLater - 30 * 1000 }, sixtyMinutesLater)).toBe(false);
   });
 });
 
