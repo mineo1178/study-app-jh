@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Play, Pause, Trash2, X, Zap, History, TrendingUp, Calendar as CalendarIcon, PieChart as PieChartIcon, BarChart2, RefreshCw, FlaskConical, LogOut, ChevronRight, BookOpen, GraduationCap, Laptop, Trophy, Save, ChevronLeft, Search, PlusCircle, Edit3, Eye, EyeOff, CheckSquare, Square, ListFilter, Award, Smartphone, Monitor, Clock } from 'lucide-react';
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from 'firebase/auth';
 import { getFirestore, collection, doc, getDocs, updateDoc, deleteDoc, enableIndexedDbPersistence, addDoc, setDoc, onSnapshot } from 'firebase/firestore';
+import { damageForRecord, elapsedSeconds, gameProgress, getCreditedStudySeconds, recordIntegrity, timerStateAfterPause, timerStateAfterStart, totalSecondsForFinish } from './gameLogic';
 // ==========================================
 // Firebase Initialization (Vite/Vercel Dedicated)
 // ==========================================
@@ -12,7 +13,7 @@ try {
     // @ts-ignore
     env = import.meta.env || {};
 }
-catch (e) {
+catch {
     console.warn("Preview environment detected: Using dummy Firebase config.");
 }
 const firebaseConfig = {
@@ -32,12 +33,11 @@ try {
             console.warn("Offline persistence disabled");
     });
 }
-catch (e) { }
+catch { console.warn('Offline persistence setup could not start.'); }
 const FAMILY_ID = 'oomine-study-2026';
 const getTasksCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tasks');
 const getTestsCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tests');
-const APP_VERSION = 'v1.64';
-const IDLE_LIMIT_SECONDS = 5 * 60;
+const APP_VERSION = 'v1.65';
 const TIMER_HEARTBEAT_MS = 30 * 1000;
 const DAILY_TARGET_SECONDS = 2 * 60 * 60;
 const isDocumentHidden = () => typeof document !== 'undefined' && document.hidden;
@@ -162,6 +162,11 @@ const generateSampleData = () => {
     const tests = [];
     const now = new Date();
     const startDate = new Date(2026, 0, 1);
+    let seed = 16520260905;
+    const seededRandom = () => {
+        seed = (seed * 1664525 + 1013904223) % 4294967296;
+        return seed / 4294967296;
+    };
     const baseTasks = [
         { catId: 'school', subId: 's_math', type: 'homework', title: '数学ワーク' },
         { catId: 'school', subId: 's_english', type: 'homework', title: '英語ワーク' },
@@ -175,9 +180,9 @@ const generateSampleData = () => {
         const history = [];
         let loopDate = new Date(startDate);
         while (loopDate <= now) {
-            if (Math.random() > 0.3) {
+            if (seededRandom() > 0.3) {
                 const dStr = `${loopDate.getFullYear()}-${(loopDate.getMonth() + 1).toString().padStart(2, '0')}-${loopDate.getDate().toString().padStart(2, '0')}`;
-                const duration = (Math.floor(Math.random() * 60) + 15) * 60;
+                const duration = (Math.floor(seededRandom() * 60) + 15) * 60;
                 const dummyStart = loopDate.getTime() + 1000 * 60 * 60 * 15; // ダミー:15時
                 history.push({
                     id: `h-${dStr}-${idx}`,
@@ -190,7 +195,7 @@ const generateSampleData = () => {
             }
             loopDate.setDate(loopDate.getDate() + 1);
         }
-        const lastUpdate = new Date(now.getTime() - Math.random() * 100000000).getTime();
+        const lastUpdate = new Date(now.getTime() - seededRandom() * 100000000).getTime();
         tasks.push({
             id: `sample-${idx}`, categoryId: base.catId, subjectId: base.subId, type: base.type, title: base.title,
             history, currentDuration: 0, isRunning: false, sessionStartTime: null, lastUpdatedAt: lastUpdate
@@ -223,7 +228,7 @@ const generateSampleData = () => {
 // ==========================================
 const TodayTimeline = ({ tasks }) => {
     const [selectedHistory, setSelectedHistory] = useState(null);
-    const [nowTick, setNowTick] = useState(Date.now());
+    const [nowTick, setNowTick] = useState(() => Date.now());
 
     useEffect(() => {
         const hasRunning = tasks.some(t => t.isRunning && t.sessionStartTime);
@@ -242,6 +247,7 @@ const TodayTimeline = ({ tasks }) => {
                 if (h.date === todayStr && h.startedAt && h.endedAt) {
                     histories.push({
                         ...h,
+                        integrity: recordIntegrity(h),
                         color: meta.color,
                         subjectLabel: meta.subjectLabel,
                         categoryLabel: meta.categoryLabel,
@@ -264,6 +270,7 @@ const TodayTimeline = ({ tasks }) => {
                         memo: '現在計測中',
                         startedAt: start,
                         endedAt: nowTick,
+                        integrity: recordIntegrity({ duration: elapsed, startedAt: start, endedAt: nowTick }),
                         color: meta.color,
                         subjectLabel: meta.subjectLabel,
                         categoryLabel: meta.categoryLabel,
@@ -382,6 +389,7 @@ const TodayTimeline = ({ tasks }) => {
                   <span className="rounded-full bg-slate-50 px-2 py-0.5 text-[9px] font-black text-slate-400">{item.categoryLabel}</span>
                   <span className="rounded-full px-2 py-0.5 text-[9px] font-black text-white" style={{ backgroundColor: item.color }}>{item.subjectLabel}</span>
                   {item.hasLive && <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[9px] font-black text-blue-600 ring-1 ring-blue-100">LIVE</span>}
+                  {item.integrity?.needsReview && <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[9px] font-black text-amber-600 ring-1 ring-amber-100">要確認</span>}
                 </div>
                 <div className="truncate text-sm font-black text-slate-800">{item.taskTitle}</div>
                 <div className="mt-1 text-[10px] font-bold text-slate-400">{item.count > 0 ? `${item.count}回保存` : '現在計測中'} ・ 最終 {formatClockTime(item.latestAt)}</div>
@@ -400,10 +408,11 @@ const TodayTimeline = ({ tasks }) => {
                 <span className="rounded-full bg-slate-50 px-2.5 py-1 text-[10px] font-black text-slate-500">{selectedHistory.categoryLabel}</span>
                 <span className="rounded-full px-2.5 py-1 text-[10px] font-black text-white" style={{ backgroundColor: selectedHistory.color }}>{selectedHistory.subjectLabel}</span>
                 {selectedHistory.isLive && <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-black text-blue-600">LIVE</span>}
+                {selectedHistory.integrity?.needsReview && <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-black text-amber-600">要確認</span>}
               </div>
               <h4 className="text-xl font-black leading-tight text-slate-800">{selectedHistory.taskTitle}</h4>
             </div>
-            <button onClick={() => setSelectedHistory(null)} className="rounded-2xl bg-slate-50 p-3 text-slate-400"><X size={20}/></button>
+            <button type="button" aria-label="履歴詳細を閉じる" title="閉じる" onClick={() => setSelectedHistory(null)} className="rounded-2xl bg-slate-50 p-3 text-slate-400"><X size={20}/></button>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-2xl bg-slate-50 p-4">
@@ -419,145 +428,91 @@ const TodayTimeline = ({ tasks }) => {
             <div className="mb-1 text-[9px] font-black uppercase tracking-widest text-slate-400">内容</div>
             <div className="text-sm font-bold leading-relaxed text-slate-600">{selectedHistory.memo || '詳細なし'}</div>
           </div>
+          {selectedHistory.integrity?.needsReview && <div className="mt-3 rounded-2xl bg-amber-50 p-4 text-xs font-bold leading-relaxed text-amber-700">
+            長時間または時刻の整合性を確認したい記録です。学習履歴は残し、RPG報酬だけ上限・除外で扱います。
+          </div>}
         </div>
       </div>)}
     </div>);
 };
-const StrictTimer = ({ task, isAnyOtherRunning, onUpdate, onSave, onLiveUpdate }) => {
+const StrictTimer = ({ task, isAnyOtherRunning, isSaving, onUpdate, onSave }) => {
     const [sessionElapsed, setSessionElapsed] = useState(0);
-    const [statusMessage, setStatusMessage] = useState(null);
-    const [idleRemaining, setIdleRemaining] = useState(IDLE_LIMIT_SECONDS);
-    const lastActive = useRef(Date.now());
     const timerRef = useRef(null);
-    const heartbeatRef = useRef(0);
 
     const getAccurateElapsed = useCallback(() => {
         if (!task.isRunning || !task.sessionStartTime)
             return 0;
-        return Math.max(0, Math.floor((Date.now() - Number(task.sessionStartTime)) / 1000));
+        return elapsedSeconds(task.sessionStartTime);
     }, [task.isRunning, task.sessionStartTime]);
 
     const getAccurateTotal = useCallback(() => {
         return (task.currentDuration || 0) + getAccurateElapsed();
     }, [task.currentDuration, getAccurateElapsed]);
 
-    const updateIdleRemaining = useCallback(() => {
-        if (typeof document !== 'undefined' && isDocumentHidden()) {
-            setIdleRemaining(IDLE_LIMIT_SECONDS);
-            return IDLE_LIMIT_SECONDS;
-        }
-        const remaining = Math.max(0, IDLE_LIMIT_SECONDS - Math.floor((Date.now() - lastActive.current) / 1000));
-        setIdleRemaining(remaining);
-        return remaining;
-    }, []);
-
-    const stopTimer = useCallback((reason = "") => {
+    const stopTimer = useCallback(() => {
         if (!task.isRunning || !task.sessionStartTime)
             return;
         const now = Date.now();
-        const finalSecs = getAccurateTotal();
+        const nextTask = timerStateAfterPause(task, now);
         onUpdate(task.id, {
-            isRunning: false,
-            currentDuration: finalSecs,
-            sessionStartTime: null,
-            lastActivityAt: now,
-            lastUpdatedAt: now
+            isRunning: nextTask.isRunning,
+            currentDuration: nextTask.currentDuration,
+            sessionStartTime: nextTask.sessionStartTime,
+            lastUpdatedAt: nextTask.lastUpdatedAt
         }, true);
         setSessionElapsed(0);
-        setIdleRemaining(IDLE_LIMIT_SECONDS);
-        if (reason)
-            setStatusMessage(reason);
-    }, [task.isRunning, task.sessionStartTime, task.id, getAccurateTotal, onUpdate]);
+    }, [task, onUpdate]);
 
     useEffect(() => {
         if (timerRef.current)
             clearInterval(timerRef.current);
         if (task.isRunning && task.sessionStartTime) {
-            setSessionElapsed(getAccurateElapsed());
+            queueMicrotask(() => setSessionElapsed(getAccurateElapsed()));
             timerRef.current = setInterval(() => {
-                const now = Date.now();
                 const elapsed = getAccurateElapsed();
                 setSessionElapsed(elapsed);
-
-                const remaining = updateIdleRemaining();
-                if (!isDocumentHidden() && remaining === 0) {
-                    stopTimer("5分以上操作がなかったため一時停止しました。");
-                    return;
-                }
-
-                // 他端末に「計測中であること」を軽く知らせるためのハートビート。
-                // 経過時間そのものは sessionStartTime から各端末で再計算するため、毎秒のDB更新はしない。
-                if (!isDocumentHidden() && now - heartbeatRef.current > TIMER_HEARTBEAT_MS) {
-                    heartbeatRef.current = now;
-                    onUpdate(task.id, { lastUpdatedAt: now, lastActivityAt: lastActive.current }, true);
-                }
             }, 1000);
         }
         else {
-            setSessionElapsed(0);
-            setIdleRemaining(IDLE_LIMIT_SECONDS);
+            queueMicrotask(() => setSessionElapsed(0));
         }
         return () => {
             if (timerRef.current)
                 clearInterval(timerRef.current);
         };
-    }, [task.isRunning, task.sessionStartTime, task.id, getAccurateElapsed, updateIdleRemaining, stopTimer, onUpdate]);
+    }, [task.isRunning, task.sessionStartTime, getAccurateElapsed]);
 
     useEffect(() => {
         const handleVisibilityChange = () => {
             if (!isDocumentHidden() && task.isRunning && task.sessionStartTime) {
-                // タブ復帰・スマホスリープ復帰時も停止しない。Date.now()差分で表示だけ即補正する。
-                lastActive.current = Date.now();
+                // タブ・スリープ復帰時も、開始時刻との差分で即座に表示を補正する。
                 setSessionElapsed(getAccurateElapsed());
-                setIdleRemaining(IDLE_LIMIT_SECONDS);
-                setStatusMessage(null);
             }
         };
         document.addEventListener('visibilitychange', handleVisibilityChange);
         return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
     }, [task.isRunning, task.sessionStartTime, getAccurateElapsed]);
 
-    useEffect(() => {
-        const recordActivity = () => {
-            lastActive.current = Date.now();
-            setIdleRemaining(IDLE_LIMIT_SECONDS);
-        };
-        window.addEventListener('mousemove', recordActivity);
-        window.addEventListener('touchstart', recordActivity);
-        window.addEventListener('touchmove', recordActivity);
-        window.addEventListener('scroll', recordActivity);
-        window.addEventListener('click', recordActivity);
-        window.addEventListener('keydown', recordActivity);
-        return () => {
-            window.removeEventListener('mousemove', recordActivity);
-            window.removeEventListener('touchstart', recordActivity);
-            window.removeEventListener('touchmove', recordActivity);
-            window.removeEventListener('scroll', recordActivity);
-            window.removeEventListener('click', recordActivity);
-            window.removeEventListener('keydown', recordActivity);
-        };
-    }, []);
-
     const handleStart = () => {
+        if (task.isRunning)
+            return;
         if (isAnyOtherRunning) {
             alert("他の教科を計測中です。一度終了させてください。");
             return;
         }
         const now = Date.now();
-        lastActive.current = now;
-        heartbeatRef.current = now;
-        setIdleRemaining(IDLE_LIMIT_SECONDS);
-        setStatusMessage(null);
+        const nextTask = timerStateAfterStart(task, now, isAnyOtherRunning);
         onUpdate(task.id, {
-            isRunning: true,
-            sessionStartTime: now,
-            lastActivityAt: now,
-            lastUpdatedAt: now
+            isRunning: nextTask.isRunning,
+            sessionStartTime: nextTask.sessionStartTime,
+            lastUpdatedAt: nextTask.lastUpdatedAt
         }, true);
     };
 
     const handleSaveClick = () => {
-        const totalToSave = getAccurateTotal();
+        if (isSaving)
+            return;
+        const totalToSave = totalSecondsForFinish(task, Date.now());
         if (totalToSave < 10) {
             alert("学習時間が短すぎます（10秒以上必要です）。");
             return;
@@ -566,48 +521,9 @@ const StrictTimer = ({ task, isAnyOtherRunning, onUpdate, onSave, onLiveUpdate }
     };
 
     const totalSeconds = getAccurateTotal();
-    const formatIdleTime = (sec) => {
-        const m = Math.floor(sec / 60);
-        const s = sec % 60;
-        return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-    };
-
-    useEffect(() => {
-        if (!onLiveUpdate)
-            return;
-        if (task.isRunning) {
-            onLiveUpdate({
-                taskId: task.id,
-                taskTitle: task.title,
-                sessionElapsed,
-                idleRemaining,
-                totalSeconds,
-                sessionStartTime: task.sessionStartTime
-            });
-        }
-        else {
-            onLiveUpdate(null);
-        }
-        return () => onLiveUpdate(null);
-    }, [task.isRunning, task.id, task.title, task.sessionStartTime, sessionElapsed, idleRemaining, totalSeconds, onLiveUpdate]);
-
-    const getIdleColorClass = (sec) => {
-        if (isDocumentHidden())
-            return "text-blue-300";
-        if (sec <= 30)
-            return "text-rose-300 animate-pulse";
-        if (sec <= 60)
-            return "text-amber-300";
-        return "text-slate-300";
-    };
-
     return (<div className="bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950 rounded-[2rem] p-6 sm:p-10 text-center shadow-2xl relative overflow-hidden border border-white/10 flex flex-col items-center justify-center">
       <div className="absolute -top-24 -right-24 w-56 h-56 bg-blue-500/20 rounded-full blur-3xl"/>
       <div className="absolute -bottom-28 -left-20 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl"/>
-      {statusMessage && (<div className="absolute top-4 left-4 right-4 bg-amber-400/95 text-slate-950 text-[10px] font-black py-2 px-3 rounded-2xl z-10 shadow-lg animate-in slide-in-from-top duration-300">
-           {statusMessage}
-        </div>)}
-
       <div className="mb-8 flex flex-col items-center justify-center w-full relative z-10">
         {task.isRunning ? (<>
             <div className="mb-4 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-400/10 border border-blue-300/20 text-blue-200 text-[10px] sm:text-xs font-black uppercase tracking-widest">
@@ -617,8 +533,8 @@ const StrictTimer = ({ task, isAnyOtherRunning, onUpdate, onSave, onLiveUpdate }
             <div className="text-5xl sm:text-7xl font-mono font-black tracking-tighter text-white leading-none drop-shadow-sm">
               {formatDuration(sessionElapsed)}
             </div>
-            <div className={`mt-3 text-[10px] sm:text-xs font-black tracking-widest flex items-center gap-1.5 ${getIdleColorClass(idleRemaining)}`}>
-               <Clock size={12}/> {isDocumentHidden() ? 'バックグラウンド中も計測継続' : `操作なし停止まで: ${formatIdleTime(idleRemaining)}`}
+            <div className="mt-3 text-[10px] sm:text-xs font-black tracking-widest flex items-center gap-1.5 text-blue-200">
+                <Clock size={12}/> PAUSE または FINISH まで計測継続
             </div>
             <div className="mt-4 px-4 py-2 bg-white/10 border border-white/10 rounded-full text-xs sm:text-sm font-bold text-white/90 flex items-center gap-2 shadow-sm">
               <History size={14}/> 累計: {formatDuration(totalSeconds)}
@@ -632,104 +548,56 @@ const StrictTimer = ({ task, isAnyOtherRunning, onUpdate, onSave, onLiveUpdate }
       </div>
 
       <div className="flex gap-3 w-full max-w-sm relative z-10">
-        {!task.isRunning ? (<button onClick={handleStart} className="flex-1 bg-white text-slate-950 font-black py-4 sm:py-5 rounded-xl sm:rounded-2xl shadow-lg active:scale-95 transition flex items-center justify-center gap-2 text-sm sm:text-lg uppercase leading-none hover:bg-blue-50">
+        {!task.isRunning ? (<button type="button" onClick={handleStart} disabled={isSaving} className="flex-1 bg-white text-slate-950 font-black py-4 sm:py-5 rounded-xl sm:rounded-2xl shadow-lg active:scale-95 transition flex items-center justify-center gap-2 text-sm sm:text-lg uppercase leading-none hover:bg-blue-50 disabled:opacity-60">
             <Play size={20} fill="currentColor"/> START
-          </button>) : (<button onClick={() => stopTimer()} className="flex-1 bg-amber-400 text-slate-950 font-black py-4 sm:py-5 rounded-xl sm:rounded-2xl shadow-lg active:scale-95 transition flex items-center justify-center gap-2 text-sm sm:text-lg uppercase leading-none hover:bg-amber-300">
+          </button>) : (<button type="button" onClick={stopTimer} disabled={isSaving} className="flex-1 bg-amber-400 text-slate-950 font-black py-4 sm:py-5 rounded-xl sm:rounded-2xl shadow-lg active:scale-95 transition flex items-center justify-center gap-2 text-sm sm:text-lg uppercase leading-none hover:bg-amber-300 disabled:opacity-60">
             <Pause size={20} fill="currentColor"/> PAUSE
           </button>)}
-        <button onClick={handleSaveClick} className="flex-1 bg-blue-600 text-white font-black py-4 sm:py-5 rounded-xl sm:rounded-2xl hover:bg-blue-500 transition flex items-center justify-center gap-2 text-sm sm:text-lg uppercase leading-none shadow-lg">
-          <Save size={20}/> FINISH
+        <button type="button" onClick={handleSaveClick} disabled={isSaving} className="flex-1 bg-blue-600 text-white font-black py-4 sm:py-5 rounded-xl sm:rounded-2xl hover:bg-blue-500 transition flex items-center justify-center gap-2 text-sm sm:text-lg uppercase leading-none shadow-lg disabled:opacity-60">
+          <Save size={20}/> {isSaving ? 'SAVING' : 'FINISH'}
         </button>
       </div>
     </div>);
 };
 
-const ActiveTimerSummary = ({ task, onUpdate }) => {
+const ActiveTimerSummary = ({ task, onHeartbeat }) => {
     const [sessionElapsed, setSessionElapsed] = useState(0);
-    const [idleRemaining, setIdleRemaining] = useState(IDLE_LIMIT_SECONDS);
-    const lastActive = useRef(Date.now());
     const timerRef = useRef(null);
+    const heartbeatRef = useRef(0);
 
     const getAccurateElapsed = useCallback(() => {
         if (!task?.isRunning || !task?.sessionStartTime)
             return 0;
-        return Math.max(0, Math.floor((Date.now() - Number(task.sessionStartTime)) / 1000));
-    }, [task?.isRunning, task?.sessionStartTime]);
-
-    const stopFromSummary = useCallback((reason = "") => {
-        if (!task?.isRunning || !task?.sessionStartTime)
-            return;
-        const now = Date.now();
-        const finalSecs = (task.currentDuration || 0) + getAccurateElapsed();
-        onUpdate(task.id, {
-            isRunning: false,
-            currentDuration: finalSecs,
-            sessionStartTime: null,
-            lastActivityAt: now,
-            lastUpdatedAt: now
-        }, true);
-        setSessionElapsed(0);
-        setIdleRemaining(IDLE_LIMIT_SECONDS);
-        if (reason)
-            console.warn(reason);
-    }, [task, getAccurateElapsed, onUpdate]);
+        return elapsedSeconds(task.sessionStartTime);
+    }, [task]);
 
     useEffect(() => {
         if (timerRef.current)
             clearInterval(timerRef.current);
         if (task?.isRunning && task?.sessionStartTime) {
-            lastActive.current = Date.now();
-            setSessionElapsed(getAccurateElapsed());
+            queueMicrotask(() => setSessionElapsed(getAccurateElapsed()));
             timerRef.current = setInterval(() => {
                 const now = Date.now();
                 setSessionElapsed(getAccurateElapsed());
-                if (isDocumentHidden()) {
-                    setIdleRemaining(IDLE_LIMIT_SECONDS);
-                    return;
+                if (now - heartbeatRef.current >= TIMER_HEARTBEAT_MS) {
+                    heartbeatRef.current = now;
+                    onHeartbeat(task.id, { lastUpdatedAt: now }, true);
                 }
-                const remaining = Math.max(0, IDLE_LIMIT_SECONDS - Math.floor((now - lastActive.current) / 1000));
-                setIdleRemaining(remaining);
-                if (remaining === 0)
-                    stopFromSummary("5分以上操作がなかったため一時停止しました。");
             }, 1000);
         }
         else {
-            setSessionElapsed(0);
-            setIdleRemaining(IDLE_LIMIT_SECONDS);
+            queueMicrotask(() => setSessionElapsed(0));
         }
         return () => {
             if (timerRef.current)
                 clearInterval(timerRef.current);
         };
-    }, [task?.id, task?.isRunning, task?.sessionStartTime, getAccurateElapsed, stopFromSummary]);
-
-    useEffect(() => {
-        const recordActivity = () => {
-            lastActive.current = Date.now();
-            setIdleRemaining(IDLE_LIMIT_SECONDS);
-        };
-        window.addEventListener('mousemove', recordActivity);
-        window.addEventListener('touchstart', recordActivity);
-        window.addEventListener('touchmove', recordActivity);
-        window.addEventListener('scroll', recordActivity);
-        window.addEventListener('click', recordActivity);
-        window.addEventListener('keydown', recordActivity);
-        return () => {
-            window.removeEventListener('mousemove', recordActivity);
-            window.removeEventListener('touchstart', recordActivity);
-            window.removeEventListener('touchmove', recordActivity);
-            window.removeEventListener('scroll', recordActivity);
-            window.removeEventListener('click', recordActivity);
-            window.removeEventListener('keydown', recordActivity);
-        };
-    }, []);
+    }, [task?.id, task?.isRunning, task?.sessionStartTime, getAccurateElapsed, onHeartbeat]);
 
     useEffect(() => {
         const handleVisibilityChange = () => {
             if (!isDocumentHidden() && task?.isRunning && task?.sessionStartTime) {
-                lastActive.current = Date.now();
                 setSessionElapsed(getAccurateElapsed());
-                setIdleRemaining(IDLE_LIMIT_SECONDS);
             }
         };
         document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -744,12 +612,6 @@ const ActiveTimerSummary = ({ task, onUpdate }) => {
     const subjectInfo = SUBJECT_DEFS[task.categoryId]?.find(s => s.id === task.subjectId);
     const subjectLabel = subjectInfo?.label || categoryInfo?.label || '学習';
     const startedTime = new Date(Number(task.sessionStartTime)).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
-    const formatIdleTime = (sec) => {
-        const m = Math.floor(sec / 60);
-        const s = sec % 60;
-        return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-    };
-
     return (<div className="relative overflow-hidden rounded-[2rem] sm:rounded-[2.5rem] bg-gradient-to-br from-blue-600 via-indigo-600 to-slate-950 p-5 sm:p-6 text-left text-white shadow-2xl shadow-blue-200/50 ring-1 ring-white/20">
       <div className="absolute -right-16 -top-16 h-40 w-40 rounded-full bg-white/10 blur-2xl"/>
       <div className="absolute -left-12 bottom-0 h-32 w-32 rounded-full bg-cyan-300/20 blur-2xl"/>
@@ -767,16 +629,10 @@ const ActiveTimerSummary = ({ task, onUpdate }) => {
           <div className="mt-2 text-xs font-bold text-blue-100/80">開始 {startedTime} ・ Firestore Live Sync</div>
         </div>
 
-        <div className="grid grid-cols-3 gap-2 sm:gap-3 lg:min-w-[420px]">
+        <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:min-w-[300px]">
           <div className="rounded-3xl bg-white/15 p-4 text-center ring-1 ring-white/20 backdrop-blur-xl">
             <div className="mb-2 text-[9px] font-black uppercase tracking-widest text-blue-100/80">今回</div>
             <div className="font-mono text-2xl sm:text-3xl font-black tracking-tighter">{formatDuration(sessionElapsed)}</div>
-          </div>
-          <div className="rounded-3xl bg-white/10 p-4 text-center ring-1 ring-white/15 backdrop-blur-xl">
-            <div className="mb-2 text-[9px] font-black uppercase tracking-widest text-blue-100/80">停止まで</div>
-            <div className={`font-mono text-2xl sm:text-3xl font-black tracking-tighter ${idleRemaining <= 30 && !isDocumentHidden() ? 'text-rose-200 animate-pulse' : 'text-white'}`}>
-              {isDocumentHidden() ? '--:--' : formatIdleTime(idleRemaining)}
-            </div>
           </div>
           <div className="rounded-3xl bg-white/10 p-4 text-center ring-1 ring-white/15 backdrop-blur-xl">
             <div className="mb-2 text-[9px] font-black uppercase tracking-widest text-blue-100/80">累計</div>
@@ -785,6 +641,45 @@ const ActiveTimerSummary = ({ task, onUpdate }) => {
         </div>
       </div>
     </div>);
+};
+
+const AdventureStatus = ({ adventure }) => {
+    const { levelInfo, boss, daily, weekly, weeklyMissions, items, skills, chests, reviewRecords, balance } = adventure;
+    const weaknessNames = (boss.boss?.weaknesses || []).map((id) => {
+        const category = id.startsWith('j_') ? 'juku' : id.startsWith('s_') ? 'school' : 'etc';
+        return SUBJECT_DEFS[category]?.find((subject) => subject.id === id)?.label;
+    }).filter(Boolean);
+    const nextQuest = daily.quests.find((quest) => !quest.achieved);
+    return (<section className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-violet-700 via-indigo-700 to-slate-900 p-5 sm:p-7 text-white shadow-xl shadow-indigo-200/50 ring-1 ring-indigo-300/30">
+      <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-fuchsia-300/15 blur-3xl"/>
+      <div className="relative z-10">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2 text-[10px] font-black tracking-[0.2em] text-indigo-100"><Trophy size={14}/> ADVENTURE STATUS</div>
+            <h2 className="mt-1 text-2xl font-black tracking-tight">勇者 Lv.{levelInfo.level}</h2>
+            <p className="mt-1 text-xs font-bold text-indigo-100">次のレベルまであと {levelInfo.expToNext} EXP（約{levelInfo.expToNext}分）</p>
+          </div>
+          <div className="rounded-2xl bg-white/10 px-4 py-3 text-right ring-1 ring-white/15">
+            <div className="text-[9px] font-black tracking-widest text-indigo-100">今週の冒険</div>
+            <div className="mt-1 text-lg font-black">{weekly.days} / {weekly.target} 日</div>
+          </div>
+        </div>
+        <div className="mt-4 h-3 overflow-hidden rounded-full bg-slate-950/40 ring-1 ring-white/10"><div className="h-full rounded-full bg-amber-300 transition-all" style={{ width: `${(levelInfo.expIntoLevel / levelInfo.expForNext) * 100}%` }}/></div>
+        <div className="mt-2 text-right text-[10px] font-black text-indigo-100">EXP {levelInfo.expIntoLevel} / {levelInfo.expForNext}</div>
+        {boss.boss ? <div className="mt-5 rounded-2xl bg-slate-950/25 p-4 ring-1 ring-white/10">
+          <div className="flex flex-wrap items-center justify-between gap-2"><div><span className="text-[10px] font-black tracking-widest text-indigo-100">第{boss.boss.chapter}章</span><h3 className="text-lg font-black">{boss.boss.name}</h3></div><span className="rounded-full bg-rose-400/20 px-3 py-1 text-[10px] font-black text-rose-100">弱点: {weaknessNames.join(' / ')}</span></div>
+          <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-950/50"><div className="h-full rounded-full bg-rose-300" style={{ width: `${(boss.hpRemaining / boss.boss.hp) * 100}%` }}/></div>
+          <div className="mt-2 text-right text-[10px] font-black text-indigo-100">HP {boss.hpRemaining} / {boss.boss.hp} ・撃破まであと{boss.hpRemaining} DAMAGE</div>
+        </div> : <div className="mt-5 rounded-2xl bg-amber-300/15 p-4 text-sm font-black text-amber-100">魔王撃破！伝説の冒険者です。</div>}
+        <div className="mt-5 grid gap-3 md:grid-cols-2">
+          <div className="rounded-2xl bg-white/10 p-4 ring-1 ring-white/10"><div className="text-[10px] font-black tracking-widest text-indigo-100">今日のクエスト {daily.completedCount}/{daily.quests.length}</div><div className="mt-2 space-y-1.5 text-xs font-bold">{daily.quests.map((quest) => <div key={quest.id} className={quest.achieved ? 'text-emerald-200' : 'text-white'}>{quest.achieved ? '✓' : '□'} {quest.label} <span className="text-indigo-200">{quest.reward}</span></div>)}</div></div>
+          <div className="rounded-2xl bg-white/10 p-4 ring-1 ring-white/10"><div className="text-[10px] font-black tracking-widest text-indigo-100">次の小さな目標</div><p className="mt-2 text-sm font-black">{nextQuest ? `${nextQuest.label}まであと${nextQuest.remaining}${nextQuest.id === 'subjects' ? '教科' : '分'}` : weekly.remaining > 0 ? `あと${weekly.remaining}日で週間宝箱` : '今週の宝箱を獲得！'}</p><p className="mt-2 text-[10px] font-bold text-indigo-100">宝箱 {chests} ・装備 {items.length} ・スキル {skills.length}</p></div>
+          <div className="rounded-2xl bg-white/10 p-4 ring-1 ring-white/10"><div className="text-[10px] font-black tracking-widest text-indigo-100">バランスボーナス</div><p className="mt-2 text-xs font-bold text-indigo-50">今日 {balance.subjectCount}教科 ・EXP x{balance.expMultiplier} ・ダメージ x{balance.damageMultiplier}</p><p className="mt-2 text-[10px] font-bold text-indigo-100">1教科長時間より、短めに区切って教科を変えると有利です。</p></div>
+          <div className="rounded-2xl bg-white/10 p-4 ring-1 ring-white/10"><div className="text-[10px] font-black tracking-widest text-indigo-100">週間ミッション</div><div className="mt-2 space-y-1.5 text-xs font-bold">{weeklyMissions.map((mission) => <div key={mission.id} className={mission.achieved ? 'text-emerald-200' : 'text-white'}>{mission.achieved ? '✓' : '□'} {mission.label}{!mission.achieved && <span className="text-indigo-200"> あと{mission.remaining}</span>}</div>)}</div></div>
+        </div>
+        {reviewRecords.length > 0 && <div className="mt-4 rounded-2xl bg-amber-300/15 px-4 py-3 text-xs font-bold text-amber-100 ring-1 ring-amber-200/20">要確認セッション {reviewRecords.length}件。履歴は残したまま、RPG報酬は上限または重複除外で計算します。</div>}
+      </div>
+    </section>);
 };
 
 // ==========================================
@@ -797,7 +692,7 @@ export default function App() {
     const [activeTab, setActiveTab] = useState('daily');
     const [activeCategory, setActiveCategory] = useState('school');
     // カテゴリ連動用の選択中の教科State
-    const [selectedSubjectId, setSelectedSubjectId] = useState('');
+    const [selectedSubjectId, setSelectedSubjectId] = useState('s_math');
     const [tasks, setTasks] = useState([]);
     const [tests, setTests] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -815,9 +710,12 @@ export default function App() {
     const [testStartDate, setTestStartDate] = useState(getHalfYearAgoStr);
     const [testEndDate, setTestEndDate] = useState(getTodayStr);
     const [visibleSubjects, setVisibleSubjects] = useState(['s_math', 's_english', 'j_math', 'average']);
-    const [liveTimerInfo, setLiveTimerInfo] = useState(null);
+    const [questResult, setQuestResult] = useState(null);
+    const [isSavingRecord, setIsSavingRecord] = useState(false);
+    const savingRecordRef = useRef(false);
     const isAnyTaskRunning = useMemo(() => tasks.some(t => t.isRunning), [tasks]);
     const runningTask = useMemo(() => tasks.find(t => t.isRunning) || null, [tasks]);
+    const adventure = useMemo(() => gameProgress(tasks, getTodayStr()), [tasks]);
     const todayTaskSummaries = useMemo(() => {
         const todayStr = getTodayStr();
         return tasks.flatMap(task => {
@@ -843,11 +741,10 @@ export default function App() {
             return (b.latestTimestamp || 0) - (a.latestTimestamp || 0);
         });
     }, [tasks]);
-    // カテゴリが変更されたら、対象カテゴリの先頭の教科を初期選択する
-    useEffect(() => {
-        const subjects = SUBJECT_DEFS[activeCategory] || [];
-        setSelectedSubjectId(subjects[0]?.id || '');
-    }, [activeCategory]);
+    const handleCategoryChange = (categoryId) => {
+        setActiveCategory(categoryId);
+        setSelectedSubjectId(SUBJECT_DEFS[categoryId]?.[0]?.id || '');
+    };
     const fetchData = useCallback(async (silent = false) => {
         if (isSampleMode || !auth.currentUser)
             return;
@@ -881,7 +778,7 @@ export default function App() {
     }, [isSampleMode, fetchData]);
     useEffect(() => {
         if (user && !isSampleMode)
-            fetchData(true);
+            queueMicrotask(() => fetchData(true));
     }, [user, isSampleMode, fetchData]);
 
     // 他端末で開始・停止されたタイマーを即時反映するため、Firestoreをリアルタイム購読する。
@@ -911,7 +808,7 @@ export default function App() {
             setLoading(true);
             await signInWithEmailAndPassword(auth, fd.get('email'), fd.get('password'));
         }
-        catch (err) {
+        catch {
             alert("ログイン失敗。");
         }
         finally {
@@ -948,30 +845,61 @@ export default function App() {
         }
     }, [isSampleMode, user]);
     const handleSaveRecord = async (task, totalSeconds) => {
-        const memo = prompt("学習内容：") || "";
-        const now = Date.now();
-        const startedAt = task.sessionStartTime || (now - (totalSeconds * 1000));
-        const endedAt = now;
-        const historyItem = {
-            id: now.toString(),
-            date: getTodayStr(),
-            duration: totalSeconds,
-            memo,
-            startedAt,
-            endedAt
-        };
-        const updatedHistory = [...(task.history || []), historyItem];
-        const updates = { history: updatedHistory, currentDuration: 0, isRunning: false, sessionStartTime: null, lastUpdatedAt: now };
-        handleUpdateLocalTask(task.id, updates);
-        if (!isSampleMode && user) {
-            try {
+        if (savingRecordRef.current)
+            return;
+        savingRecordRef.current = true;
+        setIsSavingRecord(true);
+        try {
+            const memo = prompt("学習内容：") || "";
+            const now = Date.now();
+            const today = getTodayStr();
+            const beforeAdventure = gameProgress(tasks, today);
+            const startedAt = task.sessionStartTime || (now - (totalSeconds * 1000));
+            const endedAt = now;
+            const historyItem = {
+                id: `${task.id}-${now}`,
+                date: today,
+                duration: totalSeconds,
+                memo,
+                startedAt,
+                endedAt
+            };
+            const updatedHistory = [...(task.history || []), historyItem];
+            const updates = { history: updatedHistory, currentDuration: 0, isRunning: false, sessionStartTime: null, lastUpdatedAt: now };
+            const projectedTasks = tasks.map((item) => item.id === task.id ? { ...item, ...updates } : item);
+            const afterAdventure = gameProgress(projectedTasks, today);
+            const savedRecord = afterAdventure.records.find((record) => record.id === historyItem.id);
+            const credited = getCreditedStudySeconds({ ...historyItem, subjectId: task.subjectId }, beforeAdventure.records.map((record) => record.startedAt && record.creditedDuration > 0 ? { start: Number(record.startedAt), end: Number(record.startedAt) + record.creditedDuration * 1000 } : null).filter(Boolean));
+            const resultRecord = savedRecord || { ...historyItem, subjectId: task.subjectId, creditedDuration: credited.creditedDuration, integrity: credited.integrity };
+            const newItems = afterAdventure.items.filter((item) => !beforeAdventure.items.some((previous) => previous.id === item.id));
+            const newSkills = afterAdventure.skills.filter((skill) => !beforeAdventure.skills.some((previous) => previous.id === skill.id));
+
+            if (!isSampleMode && user) {
                 await updateDoc(doc(getTasksCol(), task.id), updates);
             }
-            catch (e) {
-                alert("保存に失敗しました。");
-            }
+            handleUpdateLocalTask(task.id, updates);
+            setQuestResult({
+                exp: Math.max(0, afterAdventure.levelInfo.totalExp - beforeAdventure.levelInfo.totalExp),
+                recordedDuration: historyItem.duration,
+                creditedDuration: resultRecord.creditedDuration,
+                damage: damageForRecord(resultRecord, beforeAdventure.boss.boss),
+                levelUp: afterAdventure.levelInfo.level > beforeAdventure.levelInfo.level,
+                newItems,
+                newSkills,
+                chest: afterAdventure.chests > beforeAdventure.chests,
+                needsReview: resultRecord.integrity?.needsReview,
+                flags: resultRecord.integrity?.flags || [],
+            });
+            setSelectedTaskId(null);
         }
-        setSelectedTaskId(null);
+        catch (err) {
+            console.error("Record save failed:", err);
+            alert("保存に失敗しました。");
+        }
+        finally {
+            savingRecordRef.current = false;
+            setIsSavingRecord(false);
+        }
     };
     const handleAddTask = async (e) => {
         e.preventDefault();
@@ -992,7 +920,7 @@ export default function App() {
                 await addDoc(getTasksCol(), newTask);
                 fetchData(true);
             }
-            catch (e) {
+            catch {
                 alert("追加に失敗しました。");
             }
         }
@@ -1030,7 +958,7 @@ export default function App() {
                     await addDoc(getTestsCol(), testData);
                 fetchData(true);
             }
-            catch (e) {
+            catch {
                 alert("保存に失敗しました。");
             }
         }
@@ -1047,7 +975,7 @@ export default function App() {
                 await deleteDoc(doc(getTestsCol(), id));
                 fetchData(true);
             }
-            catch (e) {
+        catch {
                 alert("削除に失敗しました。");
             }
         }
@@ -1076,17 +1004,6 @@ export default function App() {
                 setVisibleSubjects(prev => Array.from(new Set([...prev, ...juku5])));
                 break;
         }
-    };
-    const getSortedTasks = (categoryTasks) => {
-        const subjectOrder = SUBJECT_DEFS[activeCategory]?.map(s => s.id) || [];
-        return categoryTasks.sort((a, b) => {
-            const idxA = subjectOrder.indexOf(a.subjectId);
-            const idxB = subjectOrder.indexOf(b.subjectId);
-            if (idxA !== idxB) {
-                return (idxA === -1 ? 99 : idxA) - (idxB === -1 ? 99 : idxB);
-            }
-            return b.lastUpdatedAt - a.lastUpdatedAt;
-        });
     };
     const stats = useMemo(() => {
         const sDate = new Date(startDate);
@@ -1179,7 +1096,7 @@ export default function App() {
            <input name="password" type="password" required placeholder="パスワード" className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold focus:ring-2 focus:ring-blue-600 transition outline-none text-sm leading-none"/>
            <button type="submit" className="w-full bg-blue-600 text-white font-black py-4 rounded-2xl shadow-xl active:scale-95 transition text-md uppercase leading-none">LOGIN</button>
         </form>
-        <button onClick={toggleSampleMode} className="text-slate-400 font-bold hover:text-blue-600 transition flex items-center justify-center gap-2 w-full text-xs uppercase leading-none"><FlaskConical size={14}/> サンプルデータでお試し</button>
+        <button type="button" aria-label="サンプルデータで試す" title="サンプルデータで試す" onClick={toggleSampleMode} className="text-slate-400 font-bold hover:text-blue-600 transition flex items-center justify-center gap-2 w-full text-xs uppercase leading-none"><FlaskConical size={14}/> サンプルデータでお試し</button>
       </div>
     </div>);
     return (<div className={isMobileView
@@ -1205,21 +1122,21 @@ export default function App() {
             </div>
           </div>
           <nav className="flex-1 space-y-2">
-            {[{ id: 'daily', label: '学習記録', icon: Zap }, { id: 'stats', label: '実績分析', icon: BarChart2 }, { id: 'tests', label: '成績推移', icon: TrendingUp }].map(item => (<button key={item.id} onClick={() => setActiveTab(item.id)} className={`w-full flex items-center gap-4 px-6 py-4 rounded-3xl font-black transition-all leading-none ${activeTab === item.id ? 'bg-blue-600 text-white shadow-2xl' : 'text-slate-400 hover:bg-slate-50'}`}>
+            {[{ id: 'daily', label: '学習記録', icon: Zap }, { id: 'stats', label: '実績分析', icon: BarChart2 }, { id: 'tests', label: '成績推移', icon: TrendingUp }].map(item => (<button type="button" key={item.id} onClick={() => setActiveTab(item.id)} className={`w-full flex items-center gap-4 px-6 py-4 rounded-3xl font-black transition-all leading-none ${activeTab === item.id ? 'bg-blue-600 text-white shadow-2xl' : 'text-slate-400 hover:bg-slate-50'}`}>
                 <item.icon size={20}/> {item.label}
               </button>))}
           </nav>
-          <button onClick={toggleSampleMode} className={`mt-8 w-full flex items-center justify-between p-4 rounded-2xl border-2 transition-all leading-none ${isSampleMode ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-slate-50 border-slate-100 text-slate-400'}`}>
+          <button type="button" aria-label="サンプルモードを切り替える" title="サンプルモード" onClick={toggleSampleMode} className={`mt-8 w-full flex items-center justify-between p-4 rounded-2xl border-2 transition-all leading-none ${isSampleMode ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-slate-50 border-slate-100 text-slate-400'}`}>
             <span className="text-[10px] font-black uppercase tracking-wider leading-none">Sample Mode</span>
             <FlaskConical size={16}/>
           </button>
           
-          {isSampleMode && (<button onClick={() => setIsMobileView(true)} className="mt-4 w-full flex items-center justify-between p-4 rounded-2xl bg-slate-900 text-white font-black transition-all leading-none shadow-xl">
+          {isSampleMode && (<button type="button" aria-label="スマホ表示に切り替える" title="スマホ表示" onClick={() => setIsMobileView(true)} className="mt-4 w-full flex items-center justify-between p-4 rounded-2xl bg-slate-900 text-white font-black transition-all leading-none shadow-xl">
               <span className="text-[10px] uppercase tracking-wider">スマホプレビュー</span>
               <Smartphone size={16}/>
             </button>)}
 
-          {!isSampleMode && <button onClick={() => signOut(auth)} className="mt-4 flex items-center gap-2 text-xs font-black text-slate-300 hover:text-rose-500 transition px-4 leading-none"><LogOut size={14}/> LOGOUT</button>}
+          {!isSampleMode && <button type="button" aria-label="ログアウト" title="ログアウト" onClick={() => signOut(auth)} className="mt-4 flex items-center gap-2 text-xs font-black text-slate-300 hover:text-rose-500 transition px-4 leading-none"><LogOut size={14}/> LOGOUT</button>}
         </aside>
 
         {/* --- Mobile Header --- */}
@@ -1231,12 +1148,12 @@ export default function App() {
             <h1 className="text-sm font-black tracking-tighter uppercase leading-none">Study JH</h1>
           </div>
           <div className="flex items-center">
-            {isSampleMode && isMobileView && (<button onClick={() => setIsMobileView(false)} className="p-2 rounded-xl bg-slate-100 text-slate-600 flex items-center gap-1 leading-none mr-2">
+            {isSampleMode && isMobileView && (<button type="button" aria-label="PC表示に切り替える" title="PC表示" onClick={() => setIsMobileView(false)} className="p-2 rounded-xl bg-slate-100 text-slate-600 flex items-center gap-1 leading-none mr-2">
                 <Monitor size={14}/>
                 <span className="text-[9px] font-black uppercase">PC</span>
               </button>)}
             <span className="mr-2 rounded-full bg-blue-50 px-2.5 py-1 text-[9px] font-black text-blue-700 ring-1 ring-blue-100">{APP_VERSION}</span>
-            <button onClick={toggleSampleMode} className={`p-2 rounded-xl border leading-none ${isSampleMode ? 'bg-amber-100 border-amber-200 text-amber-600' : 'bg-slate-50 border-slate-100 text-slate-400'}`}>
+            <button type="button" aria-label="サンプルモードを切り替える" title="サンプルモード" onClick={toggleSampleMode} className={`p-2 rounded-xl border leading-none ${isSampleMode ? 'bg-amber-100 border-amber-200 text-amber-600' : 'bg-slate-50 border-slate-100 text-slate-400'}`}>
               <FlaskConical size={18}/>
             </button>
           </div>
@@ -1253,7 +1170,7 @@ export default function App() {
                      <input type="date" value={activeTab === 'tests' ? testEndDate : endDate} onChange={e => activeTab === 'tests' ? setTestEndDate(e.target.value) : setEndDate(e.target.value)} className="bg-transparent border-none p-0 text-xs sm:text-sm font-black outline-none leading-none"/>
                   </div>
                   <div className="flex gap-1 overflow-x-auto no-scrollbar whitespace-nowrap">
-                     {(activeTab === 'tests' ? [183, 365, 0] : [7, 14, 30, 0]).map(days => (<button key={days} onClick={() => {
+                     {(activeTab === 'tests' ? [183, 365, 0] : [7, 14, 30, 0]).map(days => (<button type="button" key={days} onClick={() => {
                     const d = new Date();
                     if (activeTab === 'tests') {
                         if (days === 0)
@@ -1277,7 +1194,7 @@ export default function App() {
                              ? days === 183 ? '半年' : days === 365 ? '1年' : '全'
                              : days === 30 ? '1月' : days === 14 ? '2週' : days === 7 ? '1週' : '全'}
                        </button>))}
-                     {!isSampleMode && <button onClick={() => fetchData()} className="p-2 bg-blue-50 text-blue-600 rounded-lg ml-2 leading-none"><RefreshCw size={14}/></button>}
+                     {!isSampleMode && <button type="button" aria-label="データを更新" title="更新" onClick={() => fetchData()} className="p-2 bg-blue-50 text-blue-600 rounded-lg ml-2 leading-none"><RefreshCw size={14}/></button>}
                   </div>
                </div>)}
 
@@ -1285,7 +1202,7 @@ export default function App() {
             <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-slate-950 via-blue-950 to-indigo-700 p-4 sm:p-5 shadow-2xl shadow-blue-200/40 ring-1 ring-white/20 lg:sticky lg:top-4 z-30">
               <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full bg-blue-400/25 blur-2xl"/>
               <div className="relative z-10 flex items-center justify-between">
-                <button onClick={() => setSelectedMonth(m => m === 1 ? 12 : m - 1)} className="p-2 bg-white/10 hover:bg-white/20 rounded-xl transition leading-none text-white ring-1 ring-white/15"><ChevronLeft size={20}/></button>
+                <button type="button" aria-label="前月" title="前月" onClick={() => setSelectedMonth(m => m === 1 ? 12 : m - 1)} className="p-2 bg-white/10 hover:bg-white/20 rounded-xl transition leading-none text-white ring-1 ring-white/15"><ChevronLeft size={20}/></button>
                 <div className="flex-1 text-center">
                   <div className="text-[10px] font-black uppercase tracking-[0.22em] text-blue-100/80">Monthly Clean View</div>
                   <h2 className="mt-1 text-xl sm:text-3xl font-black text-white tracking-tight leading-none">{selectedMonth}月の学習記録</h2>
@@ -1293,9 +1210,11 @@ export default function App() {
                     <span className="h-1.5 w-1.5 rounded-full bg-emerald-300 animate-pulse"/> {APP_VERSION} / Monthly Clean View
                   </div>
                 </div>
-                <button onClick={() => setSelectedMonth(m => m === 12 ? 1 : m + 1)} className="p-2 bg-white/10 hover:bg-white/20 rounded-xl transition leading-none text-white ring-1 ring-white/15"><ChevronRight size={20}/></button>
+                <button type="button" aria-label="翌月" title="翌月" onClick={() => setSelectedMonth(m => m === 12 ? 1 : m + 1)} className="p-2 bg-white/10 hover:bg-white/20 rounded-xl transition leading-none text-white ring-1 ring-white/15"><ChevronRight size={20}/></button>
               </div>
             </div>
+
+            <AdventureStatus adventure={adventure}/>
 
             <div className={`grid gap-3 sm:gap-4 text-center ${isMobileView ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-4'}`}>
               <div className={`${isMobileView ? '' : 'md:col-span-1'} bg-gradient-to-br from-blue-600 to-indigo-700 p-3 sm:p-6 rounded-[1.5rem] sm:rounded-[2rem] text-white shadow-xl relative overflow-hidden text-center flex flex-col justify-center min-h-[70px] sm:min-h-[120px]`}>
@@ -1307,7 +1226,7 @@ export default function App() {
               <div className={`${isMobileView ? 'grid grid-cols-3 gap-2' : 'md:col-span-3 grid grid-cols-3 gap-2 sm:gap-4'} text-center`}>
                  {Object.values(CATEGORIES).map(cat => {
                 const catTotal = tasks.filter(t => t.categoryId === cat.id).reduce((sum, t) => sum + getMonthlyDuration(t, selectedMonth), 0);
-                return (<div key={cat.id} onClick={() => setActiveCategory(cat.id)} className={`cursor-pointer transition-all bg-white/90 backdrop-blur-xl p-2 sm:p-4 rounded-[1.5rem] sm:rounded-[2rem] border-2 shadow-sm hover:shadow-xl flex flex-col items-center justify-center min-h-[70px] sm:min-h-[120px] text-center leading-none ${activeCategory === cat.id ? 'border-blue-400 shadow-blue-100 scale-105 z-10 ring-4 ring-blue-50' : 'border-slate-100 hover:border-blue-200'}`}>
+                return (<div key={cat.id} onClick={() => handleCategoryChange(cat.id)} className={`cursor-pointer transition-all bg-white/90 backdrop-blur-xl p-2 sm:p-4 rounded-[1.5rem] sm:rounded-[2rem] border-2 shadow-sm hover:shadow-xl flex flex-col items-center justify-center min-h-[70px] sm:min-h-[120px] text-center leading-none ${activeCategory === cat.id ? 'border-blue-400 shadow-blue-100 scale-105 z-10 ring-4 ring-blue-50' : 'border-slate-100 hover:border-blue-200'}`}>
                         <cat.icon size={16} className={`sm:w-6 sm:h-6 ${cat.color}`}/>
                         <p className="text-[9px] sm:text-sm font-black text-slate-600 mt-1.5 sm:mt-3 uppercase leading-none">{cat.label}</p>
                         <p className="text-xs sm:text-lg font-black font-mono text-slate-800 mt-1 sm:mt-2 w-full text-center leading-none tracking-tighter whitespace-nowrap">{formatDuration(catTotal)}</p>
@@ -1330,7 +1249,7 @@ export default function App() {
                 {todayTaskSummaries.length === 0 ? (<div className="rounded-2xl border-2 border-dashed border-slate-100 py-8 text-center">
                     <p className="text-xs font-black text-slate-300">今日はまだ記録がありません</p>
                   </div>) : (<div className={`grid gap-3 ${isMobileView ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'}`}>
-                    {todayTaskSummaries.map(item => (<button key={item.task.id} onClick={() => setSelectedTaskId(item.task.id)} className={`rounded-2xl border p-4 text-left transition active:scale-95 ${item.isRunning ? 'border-blue-200 bg-blue-50 shadow-blue-100' : 'border-slate-100 bg-slate-50 hover:bg-white hover:shadow-md'}`}>
+                    {todayTaskSummaries.map(item => (<button type="button" key={item.task.id} onClick={() => setSelectedTaskId(item.task.id)} className={`rounded-2xl border p-4 text-left transition active:scale-95 ${item.isRunning ? 'border-blue-200 bg-blue-50 shadow-blue-100' : 'border-slate-100 bg-slate-50 hover:bg-white hover:shadow-md'}`}>
                         <div className="mb-3 flex items-center justify-between gap-2">
                           <span className="rounded-full px-2.5 py-1 text-[9px] font-black text-white" style={{ backgroundColor: item.color }}>{item.subjectLabel}</span>
                           <span className={`text-[9px] font-black ${item.isRunning ? 'text-blue-600' : 'text-slate-400'}`}>{item.isRunning ? '計測中' : `${item.count}回`}</span>
@@ -1347,16 +1266,16 @@ export default function App() {
               {/* 当日のタイムライン */}
               <TodayTimeline tasks={tasks}/>
 
-              <ActiveTimerSummary task={runningTask} onUpdate={handleUpdateLocalTask}/>
+              <ActiveTimerSummary task={runningTask} onHeartbeat={handleUpdateLocalTask}/>
 
               <div className="flex gap-2 bg-slate-100 p-1.5 rounded-[1.75rem] w-full max-w-md mx-auto shadow-inner overflow-hidden leading-none text-center">
-                    {Object.values(CATEGORIES).map(cat => (<button key={cat.id} onClick={() => setActiveCategory(cat.id)} className={`flex-1 flex items-center justify-center gap-1.5 py-3 rounded-2xl text-[10px] font-black transition-all leading-none ${activeCategory === cat.id ? 'bg-white text-slate-900 shadow-md' : 'text-slate-400'}`}>
+                    {Object.values(CATEGORIES).map(cat => (<button type="button" key={cat.id} onClick={() => handleCategoryChange(cat.id)} className={`flex-1 flex items-center justify-center gap-1.5 py-3 rounded-2xl text-[10px] font-black transition-all leading-none ${activeCategory === cat.id ? 'bg-white text-slate-900 shadow-md' : 'text-slate-400'}`}>
                         <cat.icon size={14}/> {cat.label}
                       </button>))}
                   </div>
 
                   <div className="flex justify-center">
-                    <button onClick={() => setIsAddingTask(true)} className="bg-white border-2 border-dashed border-blue-200 text-blue-600 font-black px-6 py-4 rounded-[1.75rem] flex items-center gap-2 hover:bg-blue-50 active:scale-95 transition-all shadow-sm text-xs leading-none">
+                    <button type="button" onClick={() => setIsAddingTask(true)} className="bg-white border-2 border-dashed border-blue-200 text-blue-600 font-black px-6 py-4 rounded-[1.75rem] flex items-center gap-2 hover:bg-blue-50 active:scale-95 transition-all shadow-sm text-xs leading-none">
                       <PlusCircle size={20}/> 項目を追加
                     </button>
                   </div>
@@ -1473,7 +1392,7 @@ export default function App() {
                   <h3 className="text-2xl sm:text-3xl font-black text-slate-800 tracking-tight flex items-center justify-center gap-2 leading-none text-center text-center">
                     <TrendingUp className="text-rose-500" size={26}/> 偏差値推移
                   </h3>
-                  <button onClick={() => { setEditingTest(null); setIsAddingTest(true); }} className="w-full sm:w-auto bg-rose-500 text-white font-black px-8 py-4 rounded-2xl shadow-xl active:scale-95 transition text-base leading-none">偏差値を登録</button>
+                  <button type="button" onClick={() => { setEditingTest(null); setIsAddingTest(true); }} className="w-full sm:w-auto bg-rose-500 text-white font-black px-8 py-4 rounded-2xl shadow-xl active:scale-95 transition text-base leading-none">偏差値を登録</button>
                 </div>
 
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 px-1">
@@ -1504,8 +1423,8 @@ export default function App() {
                          <span className="text-xs sm:text-sm font-black leading-none text-left">表示する教科</span>
                       </div>
                       <div className="flex gap-1 leading-none text-left">
-                         <button onClick={() => bulkSelectSubjects('all')} className="px-3 py-2 bg-slate-900 text-white rounded-lg text-xs font-black leading-none">全て</button>
-                         <button onClick={() => bulkSelectSubjects('none')} className="px-3 py-2 bg-slate-100 text-slate-400 rounded-lg text-xs font-black leading-none">解除</button>
+                         <button type="button" onClick={() => bulkSelectSubjects('all')} className="px-3 py-2 bg-slate-900 text-white rounded-lg text-xs font-black leading-none">全て</button>
+                         <button type="button" onClick={() => bulkSelectSubjects('none')} className="px-3 py-2 bg-slate-100 text-slate-400 rounded-lg text-xs font-black leading-none">解除</button>
                       </div>
                    </div>
 
@@ -1513,7 +1432,7 @@ export default function App() {
                       <div className="text-left leading-none text-left text-left">
                         <h5 className="text-xs font-black text-blue-600 mb-2 leading-none text-left text-left">中学校</h5>
                         <div className="flex flex-wrap gap-1.5 leading-none text-left text-left">
-                           {SUBJECT_DEFS.school.map(s => (<button key={s.id} onClick={() => toggleSubjectVisibility(s.id)} className={`px-3 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all leading-none ${visibleSubjects.includes(s.id) ? 'bg-blue-50 text-blue-600 border border-blue-100 shadow-sm' : 'bg-slate-50 text-slate-400 border border-transparent'}`}>
+                           {SUBJECT_DEFS.school.map(s => (<button type="button" key={s.id} onClick={() => toggleSubjectVisibility(s.id)} className={`px-3 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all leading-none ${visibleSubjects.includes(s.id) ? 'bg-blue-50 text-blue-600 border border-blue-100 shadow-sm' : 'bg-slate-50 text-slate-400 border border-transparent'}`}>
                                {visibleSubjects.includes(s.id) ? <CheckSquare size={10}/> : <Square size={10}/>} {s.label}
                              </button>))}
                         </div>
@@ -1521,12 +1440,12 @@ export default function App() {
                       <div className="text-left leading-none text-left text-left text-left">
                         <h5 className="text-xs font-black text-emerald-600 mb-2 leading-none text-left text-left">塾</h5>
                         <div className="flex flex-wrap gap-1.5 leading-none text-left text-left">
-                           {SUBJECT_DEFS.juku.map(s => (<button key={s.id} onClick={() => toggleSubjectVisibility(s.id)} className={`px-3 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all leading-none ${visibleSubjects.includes(s.id) ? 'bg-emerald-50 text-emerald-600 border border-emerald-100 shadow-sm' : 'bg-slate-50 text-slate-400 border border-transparent'}`}>
+                           {SUBJECT_DEFS.juku.map(s => (<button type="button" key={s.id} onClick={() => toggleSubjectVisibility(s.id)} className={`px-3 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all leading-none ${visibleSubjects.includes(s.id) ? 'bg-emerald-50 text-emerald-600 border border-emerald-100 shadow-sm' : 'bg-slate-50 text-slate-400 border border-transparent'}`}>
                                {visibleSubjects.includes(s.id) ? <CheckSquare size={10}/> : <Square size={10}/>} {s.label}
                            </button>))}
                         </div>
                       </div>
-                      <button onClick={() => toggleSubjectVisibility('average')} className={`self-start px-4 py-3 rounded-xl text-xs font-black transition-all flex items-center gap-2 ${visibleSubjects.includes('average') ? 'bg-slate-200 text-slate-800 shadow-inner' : 'bg-slate-50 text-slate-400'} leading-none text-left text-left`}>
+                      <button type="button" onClick={() => toggleSubjectVisibility('average')} className={`self-start px-4 py-3 rounded-xl text-xs font-black transition-all flex items-center gap-2 ${visibleSubjects.includes('average') ? 'bg-slate-200 text-slate-800 shadow-inner' : 'bg-slate-50 text-slate-400'} leading-none text-left text-left`}>
                          {visibleSubjects.includes('average') ? <Eye size={12}/> : <EyeOff size={12}/>} 総合偏差値
                       </button>
                    </div>
@@ -1584,8 +1503,8 @@ export default function App() {
                               <td className="px-4 py-5 text-center font-mono font-black text-amber-600 text-base leading-none text-left">{test.scores[`${prefix}social`] || "-"}</td>
                               <td className="px-6 py-5 text-right leading-none text-left text-left">
                                 <div className="flex justify-end gap-2 leading-none text-left">
-                                  <button onClick={() => { setEditingTest(test); setIsAddingTest(true); }} className="p-1.5 bg-slate-100 text-slate-400 rounded-lg hover:bg-blue-600 hover:text-white transition-all leading-none text-left"><Edit3 size={14}/></button>
-                                  <button onClick={() => handleDeleteTest(test.id)} className="p-1.5 bg-slate-100 text-slate-400 rounded-lg hover:bg-rose-600 hover:text-white transition-all leading-none text-left"><Trash2 size={14}/></button>
+                                  <button type="button" aria-label="成績を編集" title="編集" onClick={() => { setEditingTest(test); setIsAddingTest(true); }} className="p-1.5 bg-slate-100 text-slate-400 rounded-lg hover:bg-blue-600 hover:text-white transition-all leading-none text-left"><Edit3 size={14}/></button>
+                                  <button type="button" aria-label="成績を削除" title="削除" onClick={() => handleDeleteTest(test.id)} className="p-1.5 bg-slate-100 text-slate-400 rounded-lg hover:bg-rose-600 hover:text-white transition-all leading-none text-left"><Trash2 size={14}/></button>
                                 </div>
                               </td>
                             </tr>);
@@ -1598,12 +1517,31 @@ export default function App() {
           </main>
         </div>
 
+        {questResult && (<div className={modalOverlayClass} role="dialog" aria-modal="true" aria-label="学習結果">
+          <div className="w-full max-w-md rounded-[2rem] bg-white p-7 text-center shadow-2xl">
+            <div className="text-xs font-black tracking-[0.24em] text-indigo-500">QUEST CLEAR!</div>
+            <h3 className="mt-2 text-2xl font-black text-slate-800">学習を記録しました</h3>
+            <div className="mt-5 grid grid-cols-2 gap-3">
+              <div className="rounded-2xl bg-indigo-50 p-4"><div className="text-[10px] font-black text-indigo-400">EXP</div><div className="mt-1 text-xl font-black text-indigo-700">+{questResult.exp}</div></div>
+              <div className="rounded-2xl bg-rose-50 p-4"><div className="text-[10px] font-black text-rose-400">DAMAGE</div><div className="mt-1 text-xl font-black text-rose-600">{questResult.damage}</div></div>
+            </div>
+            <div className="mt-3 rounded-2xl bg-slate-50 p-3 text-xs font-bold text-slate-500">記録時間 {formatDuration(questResult.recordedDuration)} / RPG報酬 {formatDuration(questResult.creditedDuration)}</div>
+            {questResult.levelUp && <p className="mt-4 font-black text-amber-600">LEVEL UP!</p>}
+            {questResult.chest && <p className="mt-2 font-black text-amber-600">宝箱を獲得！</p>}
+            {questResult.newItems.map((item) => <p key={item.id} className="mt-2 text-sm font-black text-emerald-600">NEW ITEM! {item.name}</p>)}
+            {questResult.newSkills.map((skill) => <p key={skill.id} className="mt-2 text-sm font-black text-cyan-600">NEW SKILL! {skill.name}</p>)}
+            {questResult.creditedDuration >= 50 * 60 && questResult.creditedDuration <= 60 * 60 && <p className="mt-3 text-sm font-black text-blue-600">集中学習クリア！休憩後に次の教科へ。</p>}
+            {questResult.needsReview && <p className="mt-3 rounded-2xl bg-amber-50 p-3 text-xs font-bold leading-relaxed text-amber-700">要確認セッションです。学習記録は保存済みですが、RPG報酬は安全な範囲だけ反映しました。</p>}
+            <button type="button" aria-label="学習結果を閉じる" onClick={() => setQuestResult(null)} className="mt-6 w-full rounded-2xl bg-indigo-600 py-4 text-sm font-black text-white">冒険を続ける</button>
+          </div>
+        </div>)}
+
         {/* --- Modals --- */}
         {isAddingTask && (<div className={modalOverlayClass}>
              <div className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
                 <div className="p-6 border-b border-slate-50 flex justify-between items-center bg-slate-50/50 leading-none">
                    <h3 className="text-lg font-black tracking-tight text-center flex-1 leading-none text-center">学習項目の追加</h3>
-                   <button onClick={() => setIsAddingTask(false)} className="p-2 bg-white rounded-xl shadow-sm hover:bg-slate-50 transition leading-none text-left text-left"><X size={20}/></button>
+                   <button type="button" aria-label="学習項目の追加を閉じる" title="閉じる" onClick={() => setIsAddingTask(false)} className="p-2 bg-white rounded-xl shadow-sm hover:bg-slate-50 transition leading-none text-left text-left"><X size={20}/></button>
                 </div>
                 <form onSubmit={handleAddTask} className="p-8 space-y-6 text-left leading-none text-left">
                    <div className="text-left leading-none text-left text-left">
@@ -1649,10 +1587,10 @@ export default function App() {
                             </div>
                             <h2 className="text-2xl sm:text-3xl font-black text-slate-800 tracking-tighter leading-tight text-left">{task.title}</h2>
                          </div>
-                         <button onClick={() => setSelectedTaskId(null)} className="p-3 bg-white rounded-2xl shadow-sm hover:bg-slate-50 transition shrink-0 text-left"><X size={24}/></button>
+                         <button type="button" aria-label="学習項目詳細を閉じる" title="閉じる" onClick={() => setSelectedTaskId(null)} className="p-3 bg-white rounded-2xl shadow-sm hover:bg-slate-50 transition shrink-0 text-left"><X size={24}/></button>
                       </div>
                       <div className="flex-1 overflow-y-auto p-6 sm:p-10 space-y-10 no-scrollbar pb-32 text-left">
-                         <StrictTimer task={task} isAnyOtherRunning={isAnyTaskRunning && !task.isRunning} onUpdate={handleUpdateLocalTask} onSave={handleSaveRecord}/>
+                         <StrictTimer task={task} isAnyOtherRunning={isAnyTaskRunning && !task.isRunning} isSaving={isSavingRecord} onUpdate={handleUpdateLocalTask} onSave={handleSaveRecord}/>
                          <div className="space-y-4 text-left">
                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 px-2 text-left"><Search size={14}/> 学習メモ</label>
                             <textarea value={task.tempDetail || ""} onChange={(e) => handleUpdateLocalTask(task.id, { tempDetail: e.target.value })} placeholder="内容をメモ..." className="w-full h-28 bg-slate-50/50 border-none rounded-2xl p-4 font-black text-md resize-none shadow-inner outline-none focus:ring-2 focus:ring-blue-100 text-left leading-snug"/>
@@ -1670,8 +1608,8 @@ export default function App() {
                                 </div>))}
                             </div>
                          </div>
-                         <button onClick={async () => {
-                        if (confirm("削除しますか？")) {
+                         <button type="button" onClick={async () => {
+                         if (confirm("この学習項目を削除しますか？\nこの項目の学習履歴・メモもすべて削除されます。")) {
                             if (isSampleMode) {
                                 setTasks(prev => prev.filter(t => t.id !== task.id));
                                 setSelectedTaskId(null);
@@ -1683,7 +1621,7 @@ export default function App() {
                                     setSelectedTaskId(null);
                                     fetchData(true);
                                 }
-                                catch (e) {
+                                catch {
                                     alert("失敗");
                                 }
                             }
@@ -1699,7 +1637,7 @@ export default function App() {
              <div className="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 h-[85vh] flex flex-col text-left">
                 <div className="p-6 border-b border-slate-50 flex justify-between items-center bg-slate-50/50 shrink-0 text-left leading-none text-left text-left">
                    <h3 className="text-xl sm:text-2xl font-black tracking-tight text-center flex-1 leading-none text-center">偏差値登録</h3>
-                   <button onClick={() => { setIsAddingTest(false); setEditingTest(null); }} className="p-2 bg-white rounded-xl shadow-sm transition leading-none text-left text-left text-left text-left"><X size={20}/></button>
+                   <button type="button" aria-label="成績登録を閉じる" title="閉じる" onClick={() => { setIsAddingTest(false); setEditingTest(null); }} className="p-2 bg-white rounded-xl shadow-sm transition leading-none text-left text-left text-left text-left"><X size={20}/></button>
                 </div>
                 <form onSubmit={handleSaveTest} className="p-6 space-y-6 overflow-y-auto no-scrollbar pb-24 text-left leading-none text-left text-left">
                    <div className="grid grid-cols-2 gap-4 text-left leading-none text-left text-left text-left">
@@ -1738,7 +1676,7 @@ export default function App() {
         <nav className={isMobileView
             ? "absolute bottom-0 left-0 right-0 bg-white/90 backdrop-blur-3xl border-t border-slate-100 flex justify-around p-3 pb-8 z-50 rounded-t-[1.75rem] shadow-2xl leading-none text-center"
             : "lg:hidden fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-3xl border-t border-slate-100 flex justify-around p-3 pb-8 z-50 rounded-t-[1.75rem] shadow-2xl leading-none text-center"}>
-          {[{ id: 'daily', icon: Zap }, { id: 'stats', icon: BarChart2 }, { id: 'tests', icon: TrendingUp }].map(item => (<button key={item.id} onClick={() => setActiveTab(item.id)} className={`p-4 rounded-2xl transition-all duration-300 leading-none text-center ${activeTab === item.id ? 'bg-blue-600 text-white shadow-xl -translate-y-2 text-center' : 'text-slate-300 text-center'}`}><item.icon size={22}/></button>))}
+          {[{ id: 'daily', label: '学習記録', icon: Zap }, { id: 'stats', label: '実績分析', icon: BarChart2 }, { id: 'tests', label: '成績推移', icon: TrendingUp }].map(item => (<button type="button" key={item.id} aria-label={item.label} title={item.label} onClick={() => setActiveTab(item.id)} className={`p-4 rounded-2xl transition-all duration-300 leading-none text-center ${activeTab === item.id ? 'bg-blue-600 text-white shadow-xl -translate-y-2 text-center' : 'text-slate-300 text-center'}`}><item.icon size={22}/></button>))}
         </nav>
       </div>
     </div>);
