@@ -13,6 +13,7 @@ import { activeTimerRef, finishActiveTimer, heartbeatActiveTimer, pauseActiveTim
 import { studySessionsCollection } from './data/studySessionRepository';
 import { formatHms, getEffectiveStudySeconds, getLiveStudySession, getSessionsForDate, getSessionsForTask, getUnifiedStudySessions } from './data/studySessionSelectors';
 import LiveStudyStatus from './components/study/LiveStudyStatus';
+import MigrationExportButton from './components/dev/MigrationExportButton';
 // ==========================================
 // Firebase Initialization (Vite/Vercel Dedicated)
 // ==========================================
@@ -1543,12 +1544,14 @@ export default function App() {
             <FlaskConical size={16}/>
           </button>
           
-          {isSampleMode && (<button type="button" aria-label="スマホ表示に切り替える" title="スマホ表示" onClick={() => setIsMobileView(true)} className="mt-4 w-full flex items-center justify-between p-4 rounded-2xl bg-slate-900 text-white font-black transition-all leading-none shadow-xl">
+           {isSampleMode && (<button type="button" aria-label="スマホ表示に切り替える" title="スマホ表示" onClick={() => setIsMobileView(true)} className="mt-4 w-full flex items-center justify-between p-4 rounded-2xl bg-slate-900 text-white font-black transition-all leading-none shadow-xl">
               <span className="text-[10px] uppercase tracking-wider">スマホプレビュー</span>
               <Smartphone size={16}/>
             </button>)}
 
-          {!isSampleMode && <button type="button" aria-label="ログアウト" title="ログアウト" onClick={() => signOut(auth)} className="mt-4 flex items-center gap-2 text-xs font-black text-slate-300 hover:text-rose-500 transition px-4 leading-none"><LogOut size={14}/> LOGOUT</button>}
+           {import.meta.env.DEV && <MigrationExportButton tasks={tasks} studySessions={studySessions} activeTimer={activeTimer}/>}
+
+           {!isSampleMode && <button type="button" aria-label="ログアウト" title="ログアウト" onClick={() => signOut(auth)} className="mt-4 flex items-center gap-2 text-xs font-black text-slate-300 hover:text-rose-500 transition px-4 leading-none"><LogOut size={14}/> LOGOUT</button>}
         </aside>
 
         {/* --- Mobile Header --- */}

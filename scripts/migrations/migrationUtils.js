@@ -4,6 +4,31 @@ import { inferLegacyActivityType, normalizeActivityType } from '../../src/integr
 import { validateStudySession } from '../../src/integrity/studyValidation.js';
 import { normalizeLegacyHistory } from '../../src/data/studySessionSelectors.js';
 
+function epochMillis(value) {
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string') {
+    const parsed = Date.parse(value);
+    return Number.isNaN(parsed) ? value : parsed;
+  }
+  return value;
+}
+
+function reviveExportInput(data) {
+  return {
+    ...data,
+    tasks: (data.tasks || []).map((task) => ({
+      ...task,
+      history: (task.history || []).map((history) => ({ ...history, startedAt: epochMillis(history.startedAt), endedAt: epochMillis(history.endedAt) })),
+    })),
+    studySessions: (data.studySessions || []).map((session) => ({
+      ...session,
+      segments: (session.segments || []).map((segment) => ({ ...segment, startedAt: epochMillis(segment.startedAt), endedAt: epochMillis(segment.endedAt) })),
+      createdAt: epochMillis(session.createdAt),
+      updatedAt: epochMillis(session.updatedAt),
+    })),
+  };
+}
+
 export function readMigrationInput(argv) {
   const inputIndex = argv.indexOf('--input');
   if (inputIndex < 0 || !argv[inputIndex + 1]) throw new Error('Usage: --input <export.json> [--output <report.json>]');
@@ -17,8 +42,9 @@ export function writeReport(argv, report) {
 }
 
 export function buildMigrationReport(data) {
-  const tasks = data.tasks || [];
-  const sessions = data.studySessions || [];
+  const input = reviveExportInput(data);
+  const tasks = input.tasks || [];
+  const sessions = input.studySessions || [];
   const legacy = tasks.flatMap((task) => (task.history || []).map((history) => ({ task, history })));
   const classified = tasks.filter((task) => !task.activityType && inferLegacyActivityType(task.subjectId) !== 'other').length;
   const candidates = legacy.map(({ task, history }) => normalizeLegacyHistory({ ...task, activityType: normalizeActivityType(task.activityType || inferLegacyActivityType(task.subjectId)) }, history));
