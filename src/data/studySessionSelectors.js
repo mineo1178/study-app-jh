@@ -1,6 +1,6 @@
-import { inferLegacyActivityType, normalizeActivityType } from '../integrity/activityTypes';
-import { isEffectiveValidation, validateStudySession } from '../integrity/studyValidation';
-import { isStaleActiveTimer, timerRecordedSeconds, timerSegmentsAtEnd } from '../timer/timerEngine';
+import { inferLegacyActivityType, normalizeActivityType } from '../integrity/activityTypes.js';
+import { isEffectiveValidation, validateStudySession } from '../integrity/studyValidation.js';
+import { isStaleActiveTimer, timerRecordedSeconds, timerSegmentsAtEnd } from '../timer/timerEngine.js';
 
 const getDateFromTimestamp = (timestamp) => {
   const date = new Date(Number(timestamp));
@@ -12,11 +12,12 @@ export function normalizeLegacyHistory(task, history) {
   const startedAt = Number(history?.startedAt) || 0;
   const endedAt = Number(history?.endedAt) || (startedAt + (Number(history?.duration) || 0) * 1000);
   const durationSeconds = Math.max(0, Number(history?.duration) || 0);
-  const activityType = normalizeActivityType(task.activityType || inferLegacyActivityType(task.subjectId));
+  const activityType = normalizeActivityType(task.activityType || inferLegacyActivityType(task.subjectId, task.title));
   const baseValidation = validateStudySession({
     recordedSeconds: durationSeconds,
     segments: startedAt ? [{ startedAt, endedAt, durationSeconds }] : [],
     taskSnapshot: { activityType },
+    legacySource: { taskId: task.id, historyId: history?.id || null },
   });
   // Legacy history has no pause boundaries; duration alone cannot prove a five-hour continuous reading.
   const validation = activityType === 'reading' && durationSeconds >= 5 * 60 * 60
@@ -96,7 +97,7 @@ export function getLiveStudySession(activeTimer, task, now = Date.now()) {
     taskSnapshot: {
       categoryId: task.categoryId,
       subjectId: task.subjectId,
-      activityType: normalizeActivityType(task.activityType || inferLegacyActivityType(task.subjectId)),
+      activityType: normalizeActivityType(task.activityType || inferLegacyActivityType(task.subjectId, task.title)),
       title: task.title,
       type: task.type,
     },

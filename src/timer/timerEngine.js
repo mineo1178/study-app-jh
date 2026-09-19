@@ -1,4 +1,4 @@
-import { READING_CONTINUOUS_LIMIT_SECONDS } from '../integrity/validationConfig';
+import { READING_CONTINUOUS_LIMIT_SECONDS } from '../integrity/validationConfig.js';
 
 const number = (value) => (Number.isFinite(Number(value)) ? Number(value) : 0);
 

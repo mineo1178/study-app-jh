@@ -18,6 +18,10 @@ describe('study validation', () => {
   it.each([[179 * 60 + 59, 'valid'], [180 * 60, 'pending_review'], [180 * 60 + 1, 'pending_review']])('180分境界 %i', (duration, status) => {
     expect(validateStudySession(session(duration)).status).toBe(status);
   });
+  it('legacyの6時間・11時間はsegmentsがなければpending_reviewにする', () => {
+    expect(validateStudySession({ recordedSeconds: seconds(6), legacySource: { taskId: 'legacy', historyId: 'six' } }).status).toBe('pending_review');
+    expect(validateStudySession({ recordedSeconds: seconds(11), legacySource: { taskId: 'legacy', historyId: 'eleven' } }).status).toBe('pending_review');
+  });
   it.each([[seconds(4, 59, 59), 'pending_review'], [seconds(5), 'invalid'], [seconds(5, 0, 1), 'invalid']])('読書5時間境界 %i', (duration, status) => {
     expect(validateStudySession(session(duration, 'reading')).status).toBe(status);
   });
@@ -33,5 +37,16 @@ describe('study validation', () => {
   });
   it('開始終了逆転はinvalid', () => {
     expect(validateStudySession({ recordedSeconds: 20, segments: [{ startedAt: 2_000, endedAt: 1_000, durationSeconds: 20 }] }).status).toBe('invalid');
+  });
+  it('新しいnon-readingの単一10時間segmentはinvalid', () => {
+    expect(validateStudySession(session(seconds(10))).status).toBe('invalid');
+  });
+  it('開始終了時刻とdurationが5分超ずれればpending_review', () => {
+    const result = validateStudySession({
+      recordedSeconds: 3_659,
+      segments: [{ startedAt: 1_000, endedAt: 8_000, durationSeconds: 3_659 }],
+    });
+    expect(result.status).toBe('pending_review');
+    expect(result.reasonCodes).toContain('clock_mismatch');
   });
 });

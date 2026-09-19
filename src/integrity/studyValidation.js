@@ -5,7 +5,7 @@ import {
   READING_CONTINUOUS_LIMIT_SECONDS,
   REVIEW_SESSION_SECONDS,
   VALIDATION_VERSION,
-} from './validationConfig';
+} from './validationConfig.js';
 
 const asNumber = (value) => (Number.isFinite(Number(value)) ? Number(value) : 0);
 
@@ -44,7 +44,16 @@ export function validateStudySession(session, { previousIntervals = [] } = {}) {
   }
 
   const segmentTotal = segments.reduce((sum, segment) => sum + segmentDurationSeconds(segment), 0);
-  if (segments.length > 0 && Math.abs(recordedSeconds - segmentTotal) > CLOCK_MISMATCH_TOLERANCE_SECONDS && status !== 'invalid') {
+  const hasClockMismatch = segments.some((segment) => {
+    const startedAt = asNumber(segment?.startedAt);
+    const endedAt = asNumber(segment?.endedAt);
+    const explicitDuration = asNumber(segment?.durationSeconds);
+    return startedAt > 0
+      && endedAt >= startedAt
+      && explicitDuration > 0
+      && Math.abs(explicitDuration - Math.floor((endedAt - startedAt) / 1000)) > CLOCK_MISMATCH_TOLERANCE_SECONDS;
+  });
+  if ((hasClockMismatch || (segments.length > 0 && Math.abs(recordedSeconds - segmentTotal) > CLOCK_MISMATCH_TOLERANCE_SECONDS)) && status !== 'invalid') {
     reasonCodes.push('clock_mismatch');
     status = 'pending_review';
   }
@@ -57,8 +66,16 @@ export function validateStudySession(session, { previousIntervals = [] } = {}) {
   }
 
   if (session?.taskSnapshot?.activityType === 'reading'
+    && !session?.legacySource
     && getLongestSegmentSeconds(segments) >= READING_CONTINUOUS_LIMIT_SECONDS) {
     reasonCodes.push('reading_continuous_5h');
+    status = 'invalid';
+  }
+
+  if (!session?.legacySource
+    && session?.taskSnapshot?.activityType !== 'reading'
+    && getLongestSegmentSeconds(segments) >= 10 * 60 * 60) {
+    reasonCodes.push('extreme_continuous_10h');
     status = 'invalid';
   }
 

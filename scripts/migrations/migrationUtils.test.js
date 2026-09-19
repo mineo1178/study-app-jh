@@ -13,4 +13,14 @@ describe('migration dry-run report', () => {
     expect(report.invalidCandidateCount).toBe(0);
     expect(report.pendingReviewCandidateCount).toBe(1);
   });
+  it('migration済みlegacyをlegacySourceで除外する', () => {
+    const report = buildMigrationReport({
+      tasks: [{ id: 'math', subjectId: 's_math', history: [{ id: 'h1', duration: 600 }] }],
+      studySessions: [{ id: 'legacy-math-h1', legacySource: { taskId: 'math', historyId: 'h1' } }],
+    });
+    expect(report.migrationCandidateCount).toBe(0);
+    expect(report.alreadyMigratedCount).toBe(1);
+    expect(report.duplicateExcludedCount).toBe(1);
+    expect(report.expectedStudySessionCount).toBe(1);
+  });
 });
