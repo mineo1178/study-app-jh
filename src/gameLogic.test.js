@@ -262,4 +262,13 @@ describe('RPG calculation', () => {
     expect(progress.skills.map((skill) => skill.id)).toContain('double-strike');
     expect(weeklyAdventureDays(progress.records, '2026-09-09').days).toBe(3);
   });
+
+  it('invalidまたはpending_reviewのStudySessionはRPG対象外にする', () => {
+    const progress = gameProgress([], '2026-09-05', [
+      { id: 'valid', date: '2026-09-05', recordedSeconds: 30 * 60, taskSnapshot: { subjectId: 's_math' }, segments: [{ startedAt: 1_000, endedAt: 1_801_000 }], validation: { status: 'valid' } },
+      { id: 'invalid', date: '2026-09-05', recordedSeconds: 60 * 60, taskSnapshot: { subjectId: 's_math' }, segments: [{ startedAt: 2_000_000, endedAt: 5_600_000 }], validation: { status: 'invalid', reasonCodes: ['reading_continuous_5h'] } },
+      { id: 'pending', date: '2026-09-05', recordedSeconds: 60 * 60, taskSnapshot: { subjectId: 's_math' }, segments: [{ startedAt: 6_000_000, endedAt: 9_600_000 }], validation: { status: 'pending_review', reasonCodes: ['high_risk_session'] } },
+    ]);
+    expect(progress.rawExp).toBe(30);
+  });
 });

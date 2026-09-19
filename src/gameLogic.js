@@ -197,6 +197,19 @@ function overlapSeconds(start, end, intervals) {
 
 export function getCreditedStudySeconds(record, previousIntervals = []) {
   const integrity = recordIntegrity(record);
+  const validationStatus = record?.validation?.status;
+  if (validationStatus === 'invalid' || validationStatus === 'pending_review') {
+    const reasons = record.validation?.reasonCodes || [];
+    return {
+      creditedDuration: 0,
+      integrity: {
+        ...integrity,
+        needsReview: true,
+        flags: [...integrity.flags, validationStatus, ...reasons],
+      },
+      overlapDuration: 0,
+    };
+  }
   if (!record?.date || record.date < RPG_START_DATE || integrity.startsAfterEnd) {
     return { creditedDuration: 0, integrity, overlapDuration: 0 };
   }
@@ -225,14 +238,31 @@ export function getCreditedStudySeconds(record, previousIntervals = []) {
   };
 }
 
-export function collectStudyRecords(tasks = []) {
-  const rawRecords = tasks.flatMap((task) => (task.history || []).map((history) => ({
-    ...history,
-    taskId: task.id,
-    taskTitle: task.title,
-    categoryId: task.categoryId,
-    subjectId: task.subjectId,
-  }))).sort((a, b) => (a.startedAt || a.endedAt || 0) - (b.startedAt || b.endedAt || 0));
+export function collectStudyRecords(tasks = [], studySessions = null) {
+  const rawRecords = (studySessions
+    ? studySessions.map((session) => {
+      const segments = session.segments || [];
+      const first = segments[0] || {};
+      const last = segments[segments.length - 1] || first;
+      return {
+        ...session,
+        duration: Number(session.recordedSeconds ?? session.duration) || 0,
+        startedAt: first.startedAt || session.startedAt,
+        endedAt: last.endedAt || session.endedAt,
+        taskId: session.taskId,
+        taskTitle: session.taskSnapshot?.title,
+        categoryId: session.taskSnapshot?.categoryId,
+        subjectId: session.taskSnapshot?.subjectId,
+      };
+    })
+    : tasks.flatMap((task) => (task.history || []).map((history) => ({
+      ...history,
+      taskId: task.id,
+      taskTitle: task.title,
+      categoryId: task.categoryId,
+      subjectId: task.subjectId,
+    }))))
+    .sort((a, b) => (a.startedAt || a.endedAt || 0) - (b.startedAt || b.endedAt || 0));
 
   const creditedIntervals = [];
   return rawRecords.map((record) => {
@@ -400,8 +430,8 @@ export function weeklyMissions(records, today) {
   ];
 }
 
-export function gameProgress(tasks, today) {
-  const records = collectStudyRecords(tasks);
+export function gameProgress(tasks, today, studySessions = null) {
+  const records = collectStudyRecords(tasks, studySessions);
   const bonuses = questBonuses(records);
   const rawExp = records.reduce((sum, record) => sum + record.exp, 0);
   const balancedExp = uniqueDates(records).reduce((sum, date) => {

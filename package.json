@@ -8,6 +8,9 @@
     "build": "vite build",
     "lint": "eslint .",
     "test": "vitest run",
+    "migration:study-sessions": "node scripts/migrations/migrateStudySessions.js",
+    "migration:classify-activities": "node scripts/migrations/classifyActivityTypes.js",
+    "migration:detect-abnormal": "node scripts/migrations/detectAbnormalSessions.js",
     "preview": "vite preview"
   },
   "dependencies": {
