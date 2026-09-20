@@ -4,12 +4,12 @@ import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, Cart
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from 'firebase/auth';
 import { getFirestore, collection, doc, getDocs, updateDoc, deleteDoc, enableIndexedDbPersistence, addDoc, setDoc, onSnapshot } from 'firebase/firestore';
-import { HIGH_RISK_SESSION_MINUTES, LONG_SESSION_MINUTES, REVIEW_SESSION_MINUTES, damageForRecord, elapsedSeconds, gameProgress, getCreditedStudySeconds, getLastHeartbeatTime, getStaleSessionRecoveryDuration, isStaleRunningTask, recordIntegrity, taskStateAfterStaleRecovery, timerStateAfterContinueRunning, timerStateAfterPause, timerStateAfterStart, totalSecondsForFinish, validateStaleRecoveryEndTime } from './gameLogic';
+import { HIGH_RISK_SESSION_MINUTES, LONG_SESSION_MINUTES, REVIEW_SESSION_MINUTES, damageForRecord, elapsedSeconds, gameProgress, getCreditedStudySeconds, getLastHeartbeatTime, getStaleSessionRecoveryDuration, isStaleRunningTask, recordIntegrity, timerStateAfterPause, timerStateAfterStart, totalSecondsForFinish } from './gameLogic';
 import { ACTIVITY_TYPES, inferLegacyActivityType, normalizeActivityType } from './integrity/activityTypes';
 import { validateStudySession } from './integrity/studyValidation';
 import { getCurrentClientId, createTimerId } from './timer/timerClient';
 import { isActiveTimer, isStaleActiveTimer, isTimerOwner, shouldAutoFinishReading, timerRecordedSeconds, timerSegmentsAtEnd } from './timer/timerEngine';
-import { activeTimerRef, finishActiveTimer, heartbeatActiveTimer, pauseActiveTimer, resumeActiveTimer, startActiveTimer } from './data/activeTimerRepository';
+import { activeTimerRef, finishActiveTimer, heartbeatActiveTimer, invalidateStaleActiveTimer, pauseActiveTimer, resumeActiveTimer, startActiveTimer } from './data/activeTimerRepository';
 import { studySessionsCollection } from './data/studySessionRepository';
 import { formatHms, getEffectiveStudySeconds, getLiveStudySession, getSessionsForDate, getSessionsForTask, getUnifiedStudySessions } from './data/studySessionSelectors';
 import LiveStudyStatus from './components/study/LiveStudyStatus';
@@ -49,7 +49,7 @@ const getTasksCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-
 const getTestsCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tests');
 const getStudySessionsCol = () => studySessionsCollection(db, FAMILY_ID);
 const getActiveTimerRef = () => activeTimerRef(db, FAMILY_ID);
-const APP_VERSION = 'v1.67';
+const APP_VERSION = 'v1.68';
 const TIMER_HEARTBEAT_MS = 30 * 1000;
 const DAILY_TARGET_SECONDS = 2 * 60 * 60;
 const isDocumentHidden = () => typeof document !== 'undefined' && document.hidden;
@@ -489,7 +489,7 @@ const TodayTimeline = ({ tasks, sessions = null, liveSession = null }) => {
       </div>)}
     </div>);
 };
-const StrictTimer = ({ task, isAnyOtherRunning, isSaving, onUpdate, onSave, onRequestRecovery }) => {
+const StrictTimer = ({ task, isAnyOtherRunning, isSaving, onUpdate, onSave }) => {
     const [sessionElapsed, setSessionElapsed] = useState(0);
     const timerRef = useRef(null);
 
@@ -508,10 +508,7 @@ const StrictTimer = ({ task, isAnyOtherRunning, isSaving, onUpdate, onSave, onRe
     const stopTimer = useCallback(() => {
         if (!task.isRunning || !task.sessionStartTime)
             return;
-        if (isStaleRunningTask(task)) {
-            onRequestRecovery(task);
-            return;
-        }
+        if (isStaleRunningTask(task)) return;
         const now = Date.now();
         const nextTask = timerStateAfterPause(task, now);
         onUpdate(task.id, {
@@ -522,7 +519,7 @@ const StrictTimer = ({ task, isAnyOtherRunning, isSaving, onUpdate, onSave, onRe
             lastHeartbeatAt: nextTask.lastHeartbeatAt
         }, true);
         setSessionElapsed(0);
-    }, [task, onUpdate, onRequestRecovery]);
+    }, [task, onUpdate]);
 
     useEffect(() => {
         if (timerRef.current)
@@ -574,10 +571,7 @@ const StrictTimer = ({ task, isAnyOtherRunning, isSaving, onUpdate, onSave, onRe
     const handleSaveClick = () => {
         if (isSaving)
             return;
-        if (isStaleRunningTask(task)) {
-            onRequestRecovery(task);
-            return;
-        }
+        if (isStaleRunningTask(task)) return;
         const totalToSave = totalSecondsForFinish(task, Date.now());
         if (totalToSave < 10) {
             alert("学習時間が短すぎます（10秒以上必要です）。");
@@ -637,8 +631,8 @@ const StrictTimer = ({ task, isAnyOtherRunning, isSaving, onUpdate, onSave, onRe
       <div className="flex gap-3 w-full max-w-sm relative z-10">
         {!task.isRunning ? (<button type="button" onClick={handleStart} disabled={isSaving} className="flex-1 bg-white text-slate-950 font-black py-4 sm:py-5 rounded-xl sm:rounded-2xl shadow-lg active:scale-95 transition flex items-center justify-center gap-2 text-sm sm:text-lg uppercase leading-none hover:bg-blue-50 disabled:opacity-60">
             <Play size={20} fill="currentColor"/> START
-          </button>) : stale ? (<button type="button" onClick={() => onRequestRecovery(task)} disabled={isSaving} className="flex-1 bg-amber-400 text-slate-950 font-black py-4 sm:py-5 rounded-xl sm:rounded-2xl shadow-lg active:scale-95 transition flex items-center justify-center gap-2 text-sm sm:text-lg uppercase leading-none hover:bg-amber-300 disabled:opacity-60">
-            <Clock size={20}/> 確認する
+        </button>) : stale ? (<button type="button" disabled className="flex-1 cursor-not-allowed bg-slate-500 text-white font-black py-4 sm:py-5 rounded-xl sm:rounded-2xl text-sm sm:text-lg uppercase leading-none opacity-70">
+            自動無効化中
           </button>) : (<button type="button" onClick={stopTimer} disabled={isSaving} className="flex-1 bg-amber-400 text-slate-950 font-black py-4 sm:py-5 rounded-xl sm:rounded-2xl shadow-lg active:scale-95 transition flex items-center justify-center gap-2 text-sm sm:text-lg uppercase leading-none hover:bg-amber-300 disabled:opacity-60">
             <Pause size={20} fill="currentColor"/> PAUSE
           </button>)}
@@ -649,7 +643,7 @@ const StrictTimer = ({ task, isAnyOtherRunning, isSaving, onUpdate, onSave, onRe
     </div>);
 };
 
-const ActiveTimerSummary = ({ task, onHeartbeat, onRequestRecovery, canHeartbeat = false }) => {
+const ActiveTimerSummary = ({ task, onHeartbeat, canHeartbeat = false }) => {
     const [sessionElapsed, setSessionElapsed] = useState(0);
     const timerRef = useRef(null);
     const heartbeatRef = useRef(0);
@@ -733,10 +727,9 @@ const ActiveTimerSummary = ({ task, onHeartbeat, onRequestRecovery, canHeartbeat
             <span className="rounded-full bg-white/10 px-3 py-1.5 text-[10px] font-black text-blue-50 ring-1 ring-white/15">他端末同期中</span>
             <span className="rounded-full bg-white/10 px-3 py-1.5 text-[10px] font-black text-blue-50 ring-1 ring-white/15">{APP_VERSION}</span>
           </div>
-          <div className="text-xs font-black uppercase tracking-widest text-blue-100/80">{stale ? '計測内容の確認が必要です' : '現在計測中'}</div>
+          <div className="text-xs font-black uppercase tracking-widest text-blue-100/80">{stale ? '長時間停止を検出しました。自動無効化中です。' : '現在計測中'}</div>
           <div className="mt-1 truncate text-2xl sm:text-3xl font-black tracking-tight">{subjectLabel} / {task.title || 'Untitled'}</div>
           <div className="mt-2 text-xs font-bold text-blue-100/80">開始 {startedTime} ・ 最後の確認 {formatClockTime(getLastHeartbeatTime(task))}</div>
-          {stale && <button type="button" onClick={() => onRequestRecovery(task)} className="mt-4 rounded-2xl bg-amber-300 px-4 py-3 text-xs font-black text-slate-950 shadow-lg active:scale-95">計測内容を確認する</button>}
           {longSessionMessage && <div className="mt-3 rounded-2xl bg-amber-300/10 px-4 py-3 text-xs font-bold leading-relaxed text-amber-100 ring-1 ring-amber-200/20">{longSessionMessage}</div>}
         </div>
 
@@ -753,18 +746,6 @@ const ActiveTimerSummary = ({ task, onHeartbeat, onRequestRecovery, canHeartbeat
       </div>
     </div>);
 };
-const formatDateTimeLocalValue = (ms) => {
-    if (!ms)
-        return '';
-    const d = new Date(ms);
-    const yyyy = d.getFullYear();
-    const mm = `${d.getMonth() + 1}`.padStart(2, '0');
-    const dd = `${d.getDate()}`.padStart(2, '0');
-    const hh = `${d.getHours()}`.padStart(2, '0');
-    const mi = `${d.getMinutes()}`.padStart(2, '0');
-    return `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
-};
-
 const AdventureStatus = ({ adventure }) => {
     const { levelInfo, boss, daily, weekly, weeklyMissions, items, skills, chests, reviewRecords, balance } = adventure;
     const weaknessNames = (boss.boss?.weaknesses || []).map((id) => {
@@ -835,13 +816,12 @@ export default function App() {
     const [testEndDate, setTestEndDate] = useState(getTodayStr);
     const [visibleSubjects, setVisibleSubjects] = useState(['s_math', 's_english', 'j_math', 'average']);
     const [questResult, setQuestResult] = useState(null);
-    const [recoveryTaskId, setRecoveryTaskId] = useState(null);
-    const [manualRecoveryEnd, setManualRecoveryEnd] = useState('');
     const [staleCheckNow, setStaleCheckNow] = useState(() => Date.now());
     const [liveNow, setLiveNow] = useState(() => Date.now());
     const [isSavingRecord, setIsSavingRecord] = useState(false);
+    const [staleTimerNotice, setStaleTimerNotice] = useState(null);
     const savingRecordRef = useRef(false);
-    const recoverySavingRef = useRef(false);
+    const staleInvalidatingRef = useRef(false);
     const autoFinishHandlerRef = useRef(null);
     const currentClientId = useMemo(() => getCurrentClientId(), []);
     const unifiedSessions = useMemo(() => getUnifiedStudySessions(tasks, studySessions), [tasks, studySessions]);
@@ -850,12 +830,7 @@ export default function App() {
     const activeTimerIsOwner = useMemo(() => isTimerOwner(activeTimer, currentClientId), [activeTimer, currentClientId]);
     const isAnyTaskRunning = useMemo(() => isActiveTimer(activeTimer) || tasks.some(t => t.isRunning), [activeTimer, tasks]);
     const runningTask = useMemo(() => activeTimerTask || tasks.find(t => t.isRunning) || null, [activeTimerTask, tasks]);
-    const staleRunningTasks = useMemo(() => tasks.filter(t => isStaleRunningTask(t, staleCheckNow)), [tasks, staleCheckNow]);
-    const recoveryTask = useMemo(() => tasks.find(t => t.id === recoveryTaskId) || null, [tasks, recoveryTaskId]);
     const activeStaleTimer = useMemo(() => isStaleActiveTimer(activeTimer, staleCheckNow) ? activeTimer : null, [activeTimer, staleCheckNow]);
-    const recoveryTimerView = useMemo(() => recoveryTask && activeTimer?.taskId === recoveryTask.id
-      ? { ...recoveryTask, isRunning: activeTimer.state === 'running', sessionStartTime: activeTimer.segmentStartedAt, currentDuration: activeTimer.accumulatedSeconds || 0, lastHeartbeatAt: activeTimer.lastHeartbeatAt }
-      : recoveryTask, [activeTimer, recoveryTask]);
     const adventure = useMemo(() => gameProgress(tasks, getTodayStr(), unifiedSessions), [tasks, unifiedSessions]);
     const todayTaskSummaries = useMemo(() => {
         const todayStr = getTodayStr();
@@ -909,19 +884,22 @@ export default function App() {
         return () => clearInterval(interval);
     }, [activeTimer, activeTimerIsOwner, currentClientId, isSampleMode, user]);
     useEffect(() => {
-        if (!recoveryTaskId && (staleRunningTasks.length > 0 || activeStaleTimer)) {
-            const task = activeStaleTimer ? tasks.find((item) => item.id === activeStaleTimer.taskId) : staleRunningTasks[0];
-            if (!task) return;
-            queueMicrotask(() => {
-                setRecoveryTaskId(task.id);
-                setManualRecoveryEnd(formatDateTimeLocalValue(getLastHeartbeatTime(task)));
+        if (!activeStaleTimer || isSampleMode || !user || staleInvalidatingRef.current) return;
+        staleInvalidatingRef.current = true;
+        const task = tasks.find((item) => item.id === activeStaleTimer.taskId) || {};
+        invalidateStaleActiveTimer({ db, familyId: FAMILY_ID, task, now: Date.now() })
+            .then((result) => {
+                if (result.invalidated) {
+                    setStaleTimerNotice('長時間停止していた計測を無効にしました。この時間は学習実績には含まれません。');
+                    setSelectedTaskId(null);
+                }
+            })
+            .catch((err) => console.error('Stale timer invalidation failed:', err))
+            .finally(() => {
+                staleInvalidatingRef.current = false;
+                setStaleCheckNow(Date.now());
             });
-        }
-    }, [activeStaleTimer, recoveryTaskId, staleRunningTasks, tasks]);
-    useEffect(() => {
-        if (recoveryTimerView)
-            queueMicrotask(() => setManualRecoveryEnd(formatDateTimeLocalValue(getLastHeartbeatTime(recoveryTimerView))));
-    }, [recoveryTimerView]);
+    }, [activeStaleTimer, isSampleMode, tasks, user]);
     const handleCategoryChange = (categoryId) => {
         setActiveCategory(categoryId);
         setSelectedSubjectId(SUBJECT_DEFS[categoryId]?.[0]?.id || '');
@@ -1186,133 +1164,6 @@ export default function App() {
         }, 0);
         return () => clearTimeout(autoFinish);
     }, [activeTimer, activeTimerIsOwner, activeTimerTask, liveNow]);
-    const openRecoveryModal = useCallback((task) => {
-        if (!task)
-            return;
-        setRecoveryTaskId(task.id);
-        setManualRecoveryEnd(formatDateTimeLocalValue(getLastHeartbeatTime(task)));
-    }, []);
-    const handleContinueStaleTask = async () => {
-        if (!recoveryTask || recoverySavingRef.current)
-            return;
-        if (activeTimer?.taskId === recoveryTask.id) {
-            if (!activeTimerIsOwner) {
-                alert('このタイマーは開始した端末から復旧してください。');
-                return;
-            }
-            try {
-                await heartbeatActiveTimer({ db, familyId: FAMILY_ID, timerId: activeTimer.timerId, ownerClientId: currentClientId });
-                setRecoveryTaskId(null);
-                setStaleCheckNow(Date.now());
-            }
-            catch {
-                alert('復旧に失敗しました。');
-            }
-            return;
-        }
-        recoverySavingRef.current = true;
-        setIsSavingRecord(true);
-        try {
-            const now = Date.now();
-            const nextTask = timerStateAfterContinueRunning(recoveryTask, now);
-            const updates = { lastUpdatedAt: nextTask.lastUpdatedAt, lastHeartbeatAt: nextTask.lastHeartbeatAt };
-            if (!isSampleMode && user) {
-                await updateDoc(doc(getTasksCol(), recoveryTask.id), updates);
-            }
-            handleUpdateLocalTask(recoveryTask.id, updates);
-            setRecoveryTaskId(null);
-            setStaleCheckNow(now);
-        }
-        catch (err) {
-            console.error("Stale recovery continue failed:", err);
-            alert("復旧に失敗しました。");
-        }
-        finally {
-            recoverySavingRef.current = false;
-            setIsSavingRecord(false);
-        }
-    };
-    const handleFinishStaleTask = async (endTime, reasonLabel) => {
-        if (!recoveryTask || recoverySavingRef.current)
-            return;
-        if (activeTimer?.taskId === recoveryTask.id) {
-            if (!activeTimerIsOwner) {
-                alert('このタイマーは開始した端末から終了してください。');
-                return;
-            }
-            const now = Date.now();
-            const endAt = Math.min(Number(endTime) || now, Number(activeTimer.lastHeartbeatAt) || now);
-            if (!activeTimer.segmentStartedAt || endAt < activeTimer.segmentStartedAt) {
-                alert('終了時刻を確認してください。');
-                return;
-            }
-            await handleSaveRecord(recoveryTask, timerRecordedSeconds(activeTimer, endAt), { memoOverride: `復旧確認: ${reasonLabel}`, endAtOverride: endAt });
-            setRecoveryTaskId(null);
-            return;
-        }
-        recoverySavingRef.current = true;
-        setIsSavingRecord(true);
-        try {
-            const now = Date.now();
-            const validation = validateStaleRecoveryEndTime(recoveryTask, endTime, now);
-            if (!validation.valid) {
-                alert(validation.reason === 'beforeStart' ? "終了時刻は開始時刻より後にしてください。" : validation.reason === 'future' ? "未来の時刻は指定できません。" : "終了時刻を確認してください。");
-                return;
-            }
-            const totalSeconds = getStaleSessionRecoveryDuration(recoveryTask, validation.endTime);
-            if (totalSeconds < 10) {
-                alert("学習時間が短すぎます（10秒以上必要です）。");
-                return;
-            }
-            const beforeAdventure = gameProgress(tasks, getTodayStr());
-            const memo = `復旧確認: ${reasonLabel}`;
-            const result = taskStateAfterStaleRecovery(recoveryTask, validation.endTime, memo, now);
-            if (!result.valid)
-                return;
-            const updates = {
-                history: result.task.history,
-                currentDuration: result.task.currentDuration,
-                isRunning: result.task.isRunning,
-                sessionStartTime: result.task.sessionStartTime,
-                lastUpdatedAt: result.task.lastUpdatedAt,
-                lastHeartbeatAt: result.task.lastHeartbeatAt
-            };
-            if (!isSampleMode && user) {
-                await updateDoc(doc(getTasksCol(), recoveryTask.id), updates);
-            }
-            handleUpdateLocalTask(recoveryTask.id, updates);
-            setRecoveryTaskId(null);
-            setStaleCheckNow(now);
-            if (!result.alreadySaved) {
-                const projectedTasks = tasks.map((item) => item.id === recoveryTask.id ? { ...item, ...updates } : item);
-                const afterAdventure = gameProgress(projectedTasks, getTodayStr());
-                const savedRecord = afterAdventure.records.find((record) => record.id === result.historyItem.id);
-                const previousIntervals = beforeAdventure.records.map((record) => record.startedAt && record.creditedDuration > 0 ? { start: Number(record.startedAt), end: Number(record.startedAt) + record.creditedDuration * 1000 } : null).filter(Boolean);
-                const credited = getCreditedStudySeconds({ ...result.historyItem, subjectId: recoveryTask.subjectId }, previousIntervals);
-                const resultRecord = savedRecord || { ...result.historyItem, subjectId: recoveryTask.subjectId, creditedDuration: credited.creditedDuration, integrity: credited.integrity };
-                setQuestResult({
-                    exp: Math.max(0, afterAdventure.levelInfo.totalExp - beforeAdventure.levelInfo.totalExp),
-                    recordedDuration: result.historyItem.duration,
-                    creditedDuration: resultRecord.creditedDuration,
-                    damage: damageForRecord(resultRecord, beforeAdventure.boss.boss),
-                    levelUp: afterAdventure.levelInfo.level > beforeAdventure.levelInfo.level,
-                    newItems: afterAdventure.items.filter((item) => !beforeAdventure.items.some((previous) => previous.id === item.id)),
-                    newSkills: afterAdventure.skills.filter((skill) => !beforeAdventure.skills.some((previous) => previous.id === skill.id)),
-                    chest: afterAdventure.chests > beforeAdventure.chests,
-                    needsReview: resultRecord.integrity?.needsReview,
-                    flags: resultRecord.integrity?.flags || [],
-                });
-            }
-        }
-        catch (err) {
-            console.error("Stale recovery finish failed:", err);
-            alert("復旧に失敗しました。");
-        }
-        finally {
-            recoverySavingRef.current = false;
-            setIsSavingRecord(false);
-        }
-    };
     const handleAddTask = async (e) => {
         e.preventDefault();
         const fd = new FormData(e.currentTarget);
@@ -1516,6 +1367,7 @@ export default function App() {
     return (<div className={isMobileView
             ? "min-h-screen bg-slate-800 p-4 sm:p-8 flex justify-center items-center font-sans selection:bg-blue-100"
             : "min-h-screen bg-slate-50 text-slate-900 lg:pl-72 pb-24 lg:pb-0 font-sans selection:bg-blue-100 overflow-x-hidden text-left"}>
+      {staleTimerNotice && <div className="fixed right-4 top-4 z-[150] max-w-sm rounded-2xl bg-slate-900 px-4 py-3 text-xs font-bold text-white shadow-2xl"><div>{staleTimerNotice}</div><button type="button" onClick={() => setStaleTimerNotice(null)} className="mt-2 text-[10px] font-black text-blue-200">閉じる</button></div>}
       <div className={isMobileView
             ? "w-full max-w-[400px] h-[800px] bg-slate-50 rounded-[3rem] shadow-2xl relative overflow-hidden border-[12px] border-slate-900 text-slate-900 flex flex-col text-left"
             : "w-full h-full contents"}>
@@ -1690,7 +1542,7 @@ export default function App() {
                   <div className="mt-1 text-xl font-black text-slate-800">{liveSession.taskSnapshot.subjectId ? getTaskMeta(activeTimerTask).subjectLabel : '学習'} / {liveSession.taskSnapshot.title}</div>
                   <LiveStudyStatus session={liveSession} />
                 </div>
-              ) : <ActiveTimerSummary task={runningTask} onHeartbeat={handleUpdateLocalTask} onRequestRecovery={openRecoveryModal}/>}
+              ) : <ActiveTimerSummary task={runningTask} onHeartbeat={handleUpdateLocalTask}/>}
 
               <div className="flex gap-2 bg-slate-100 p-1.5 rounded-[1.75rem] w-full max-w-md mx-auto shadow-inner overflow-hidden leading-none text-center">
                     {Object.values(CATEGORIES).map(cat => (<button type="button" key={cat.id} onClick={() => handleCategoryChange(cat.id)} className={`flex-1 flex items-center justify-center gap-1.5 py-3 rounded-2xl text-[10px] font-black transition-all leading-none ${activeCategory === cat.id ? 'bg-white text-slate-900 shadow-md' : 'text-slate-400'}`}>
@@ -1961,38 +1813,6 @@ export default function App() {
           </div>
         </div>)}
 
-        {recoveryTask && (<div className={modalOverlayClass} role="dialog" aria-modal="true" aria-label="計測内容の確認">
-          <div className="w-full max-w-md rounded-[2rem] bg-white p-6 text-left shadow-2xl">
-            <div className="mb-4 flex items-start gap-3">
-              <div className="rounded-2xl bg-amber-50 p-3 text-amber-600"><Clock size={22}/></div>
-              <div className="min-w-0">
-                <div className="text-[10px] font-black tracking-[0.2em] text-amber-500">TIMER CHECK</div>
-                <h3 className="mt-1 text-xl font-black leading-tight text-slate-800">{recoveryTimerView?.title || 'Untitled'}の計測が長時間継続しています</h3>
-              </div>
-            </div>
-            <div className="rounded-2xl bg-slate-50 p-4 text-sm font-bold leading-relaxed text-slate-600">
-              <div>開始: {formatClockTime(recoveryTimerView?.sessionStartTime)}</div>
-              <div>最後の確認: {formatClockTime(getLastHeartbeatTime(recoveryTimerView))}</div>
-              <div className="mt-2 text-xs text-slate-400">その後も勉強を続けていましたか？ 未確認の時間は、確定するまで通常の学習時間やRPG報酬として扱いません。</div>
-            </div>
-            <div className="mt-5 space-y-3">
-              <button type="button" onClick={() => handleFinishStaleTask(getLastHeartbeatTime(recoveryTimerView), '最後の確認時刻で終了')} disabled={isSavingRecord} className="w-full rounded-2xl bg-slate-900 px-4 py-4 text-sm font-black text-white shadow-lg active:scale-95 disabled:opacity-60">
-                最後の確認時刻で終了
-              </button>
-              <button type="button" onClick={handleContinueStaleTask} disabled={isSavingRecord} className="w-full rounded-2xl bg-blue-50 px-4 py-4 text-sm font-black text-blue-700 ring-1 ring-blue-100 active:scale-95 disabled:opacity-60">
-                勉強を続けていた
-              </button>
-              <div className="rounded-2xl border border-slate-100 p-4">
-                <label className="mb-2 block text-[10px] font-black uppercase tracking-widest text-slate-400">終了時刻を修正</label>
-                <input type="datetime-local" value={manualRecoveryEnd} min={formatDateTimeLocalValue(recoveryTimerView?.sessionStartTime)} max={formatDateTimeLocalValue(staleCheckNow)} onChange={(e) => setManualRecoveryEnd(e.target.value)} className="w-full rounded-xl bg-slate-50 p-3 text-sm font-black text-slate-700 outline-none ring-1 ring-slate-100 focus:ring-blue-200"/>
-                <button type="button" onClick={() => handleFinishStaleTask(Date.parse(manualRecoveryEnd), '終了時刻を修正')} disabled={isSavingRecord} className="mt-3 w-full rounded-xl bg-amber-400 px-4 py-3 text-xs font-black text-slate-950 shadow-sm active:scale-95 disabled:opacity-60">
-                  この終了時刻で保存
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>)}
-
         {/* --- Modals --- */}
         {isAddingTask && (<div className={modalOverlayClass}>
              <div className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
@@ -2064,7 +1884,7 @@ export default function App() {
                          <button type="button" aria-label="学習項目詳細を閉じる" title="閉じる" onClick={() => setSelectedTaskId(null)} className="p-3 bg-white rounded-2xl shadow-sm hover:bg-slate-50 transition shrink-0 text-left"><X size={24}/></button>
                       </div>
                       <div className="flex-1 overflow-y-auto p-6 sm:p-10 space-y-10 no-scrollbar pb-32 text-left">
-                          <StrictTimer task={timerViewTask} isAnyOtherRunning={isAnyTaskRunning && activeTimerTask?.id !== task.id && !task.isRunning} isSaving={isSavingRecord || (activeTimerTask?.id === task.id && !activeTimerIsOwner)} onUpdate={handleTimerUpdate} onSave={handleSaveRecord} onRequestRecovery={openRecoveryModal}/>
+                          <StrictTimer task={timerViewTask} isAnyOtherRunning={isAnyTaskRunning && activeTimerTask?.id !== task.id && !task.isRunning} isSaving={isSavingRecord || (activeTimerTask?.id === task.id && !activeTimerIsOwner)} onUpdate={handleTimerUpdate} onSave={handleSaveRecord}/>
                           {activeTimerTask?.id === task.id && !activeTimerIsOwner && <div className="rounded-2xl bg-slate-50 p-3 text-xs font-bold text-slate-500">このタイマーは別の端末で開始されています。表示のみ可能です。</div>}
                          <div className="space-y-4 text-left">
                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 px-2 text-left"><Search size={14}/> 学習メモ</label>
