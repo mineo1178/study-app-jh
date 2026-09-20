@@ -6,6 +6,8 @@ const ACTIVE_TIMER_ID = 'current';
 export const activeTimerRef = (db, familyId) => doc(db, 'families', familyId, 'apps', 'junior-high', 'activeTimers', ACTIVE_TIMER_ID);
 export const staleTimerSessionId = (timer) => timer.timerId;
 export const canForceInvalidateStaleTimer = (timer, now = Date.now()) => isStaleActiveTimer(timer, now);
+export const canFinishActiveTimer = (timer, timerId) => Boolean(timer && timer.timerId === timerId && isActiveTimer(timer));
+export const canHeartbeatActiveTimer = (timer, timerId, ownerClientId) => Boolean(timer && timer.timerId === timerId && timer.ownerClientId === ownerClientId && timer.state === 'running');
 
 export async function startActiveTimer({ db, familyId, task, timerId, ownerClientId, now = Date.now() }) {
   const ref = activeTimerRef(db, familyId);
@@ -64,7 +66,7 @@ export async function heartbeatActiveTimer({ db, familyId, timerId, ownerClientI
   const ref = activeTimerRef(db, familyId);
   return runTransaction(db, async (transaction) => {
     const timer = (await transaction.get(ref)).data();
-    if (!timer || timer.timerId !== timerId || timer.ownerClientId !== ownerClientId || timer.state !== 'running') return false;
+    if (!canHeartbeatActiveTimer(timer, timerId, ownerClientId)) return false;
     transaction.update(ref, { lastHeartbeatAt: now, updatedAt: now });
     return true;
   });
@@ -115,42 +117,47 @@ export async function invalidateStaleActiveTimer({ db, familyId, task, now = Dat
   });
 }
 
-export async function finishActiveTimer({ db, familyId, task, timerId, ownerClientId, endAt = Date.now(), validation, memo = '' }) {
+export function buildFinishedTimerSession(timer, task = {}, { endAt = Date.now(), validation, memo = '' } = {}) {
+  const stale = timer.state === 'running' && isStaleActiveTimer(timer, endAt);
+  const safeEndAt = stale
+    ? Number(timer.lastHeartbeatAt) || endAt
+    : endAt;
+  const segments = timerSegmentsAtEnd(timer, safeEndAt);
+  const recordedSeconds = segments.reduce((sum, segment) => sum + (Number(segment.durationSeconds) || 0), 0);
+  return {
+    timerId: timer.timerId,
+    taskId: timer.taskId,
+    taskSnapshot: {
+      categoryId: task.categoryId,
+      subjectId: task.subjectId,
+      activityType: task.activityType || 'other',
+      title: task.title || '',
+      type: task.type || 'self',
+    },
+    date: new Date(safeEndAt).toLocaleDateString('sv-SE'),
+    segments,
+    recordedSeconds,
+    validation: stale ? { status: 'invalid', reasonCodes: ['stale_timer_forced_invalid'], validationVersion: VALIDATION_VERSION } : validation,
+    memo,
+    legacySource: null,
+    createdAt: endAt,
+    updatedAt: endAt,
+  };
+}
+
+export async function finishActiveTimer({ db, familyId, task, timerId, endAt = Date.now(), validation, memo = '' }) {
   const timerRef = activeTimerRef(db, familyId);
   const sessionRef = doc(db, 'families', familyId, 'apps', 'junior-high', 'studySessions', timerId);
   return runTransaction(db, async (transaction) => {
     const [timerSnap, existingSession] = await Promise.all([transaction.get(timerRef), transaction.get(sessionRef)]);
     if (existingSession.exists()) return { session: existingSession.data(), alreadyFinished: true };
     const timer = timerSnap.data();
-    if (!timer || timer.timerId !== timerId || timer.ownerClientId !== ownerClientId) throw new Error('TIMER_NOT_OWNER');
-    const stale = timer.state === 'running' && isStaleActiveTimer(timer, endAt);
-    const safeEndAt = stale
-      ? Number(timer.lastHeartbeatAt) || endAt
-      : endAt;
-    const segments = timerSegmentsAtEnd(timer, safeEndAt);
-    const recordedSeconds = segments.reduce((sum, segment) => sum + (Number(segment.durationSeconds) || 0), 0);
-    const session = {
-      timerId,
-      taskId: task.id,
-      taskSnapshot: {
-        categoryId: task.categoryId,
-        subjectId: task.subjectId,
-        activityType: task.activityType || 'other',
-        title: task.title || '',
-        type: task.type || 'self',
-      },
-      date: new Date(safeEndAt).toLocaleDateString('sv-SE'),
-      segments,
-      recordedSeconds,
-      validation: stale ? { status: 'invalid', reasonCodes: ['stale_timer_forced_invalid'], validationVersion: VALIDATION_VERSION } : validation,
-      memo,
-      legacySource: null,
-      createdAt: endAt,
-      updatedAt: endAt,
-    };
+    if (!canFinishActiveTimer(timer, timerId)) throw new Error('TIMER_NOT_ACTIVE');
+    const session = buildFinishedTimerSession(timer, task, { endAt, validation, memo });
     transaction.set(sessionRef, session);
-    if (stale) transaction.delete(timerRef);
-    else transaction.set(timerRef, { ...timer, state: 'finished', segmentStartedAt: null, accumulatedSeconds: recordedSeconds, updatedAt: endAt, finishedAt: endAt }, { merge: true });
+    // Delete only after the Session write is part of this same transaction. This also
+    // makes an owner heartbeat that races after STOP a no-op rather than a revival.
+    transaction.delete(timerRef);
     return { session, alreadyFinished: false };
   });
 }

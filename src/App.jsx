@@ -50,7 +50,7 @@ const getTasksCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-
 const getTestsCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tests');
 const getStudySessionsCol = () => studySessionsCollection(db, FAMILY_ID);
 const getActiveTimerRef = () => activeTimerRef(db, FAMILY_ID);
-const APP_VERSION = 'v1.69';
+const APP_VERSION = 'v1.70';
 const TIMER_HEARTBEAT_MS = 30 * 1000;
 const DAILY_TARGET_SECONDS = 2 * 60 * 60;
 const isDocumentHidden = () => typeof document !== 'undefined' && document.hidden;
@@ -490,7 +490,7 @@ const TodayTimeline = ({ tasks, sessions = null, liveSession = null }) => {
       </div>)}
     </div>);
 };
-const StrictTimer = ({ task, isAnyOtherRunning, isSaving, onUpdate, onSave }) => {
+const StrictTimer = ({ task, isAnyOtherRunning, isSaving, canPause = true, canStart = true, onUpdate, onSave }) => {
     const [sessionElapsed, setSessionElapsed] = useState(0);
     const timerRef = useRef(null);
 
@@ -630,11 +630,11 @@ const StrictTimer = ({ task, isAnyOtherRunning, isSaving, onUpdate, onSave }) =>
       </div>
 
       <div className="flex gap-3 w-full max-w-sm relative z-10">
-        {!task.isRunning ? (<button type="button" onClick={handleStart} disabled={isSaving} className="flex-1 bg-white text-slate-950 font-black py-4 sm:py-5 rounded-xl sm:rounded-2xl shadow-lg active:scale-95 transition flex items-center justify-center gap-2 text-sm sm:text-lg uppercase leading-none hover:bg-blue-50 disabled:opacity-60">
+        {!task.isRunning ? (<button type="button" onClick={handleStart} disabled={isSaving || !canStart} className="flex-1 bg-white text-slate-950 font-black py-4 sm:py-5 rounded-xl sm:rounded-2xl shadow-lg active:scale-95 transition flex items-center justify-center gap-2 text-sm sm:text-lg uppercase leading-none hover:bg-blue-50 disabled:opacity-60">
             <Play size={20} fill="currentColor"/> START
         </button>) : stale ? (<button type="button" disabled className="flex-1 cursor-not-allowed bg-slate-500 text-white font-black py-4 sm:py-5 rounded-xl sm:rounded-2xl text-sm sm:text-lg uppercase leading-none opacity-70">
             自動無効化中
-          </button>) : (<button type="button" onClick={stopTimer} disabled={isSaving} className="flex-1 bg-amber-400 text-slate-950 font-black py-4 sm:py-5 rounded-xl sm:rounded-2xl shadow-lg active:scale-95 transition flex items-center justify-center gap-2 text-sm sm:text-lg uppercase leading-none hover:bg-amber-300 disabled:opacity-60">
+          </button>) : (<button type="button" onClick={stopTimer} disabled={isSaving || !canPause} className="flex-1 bg-amber-400 text-slate-950 font-black py-4 sm:py-5 rounded-xl sm:rounded-2xl shadow-lg active:scale-95 transition flex items-center justify-center gap-2 text-sm sm:text-lg uppercase leading-none hover:bg-amber-300 disabled:opacity-60">
             <Pause size={20} fill="currentColor"/> PAUSE
           </button>)}
         <button type="button" onClick={handleSaveClick} disabled={isSaving} className="flex-1 bg-blue-600 text-white font-black py-4 sm:py-5 rounded-xl sm:rounded-2xl hover:bg-blue-500 transition flex items-center justify-center gap-2 text-sm sm:text-lg uppercase leading-none shadow-lg disabled:opacity-60">
@@ -1111,7 +1111,6 @@ export default function App() {
         savingRecordRef.current = true;
         setIsSavingRecord(true);
         try {
-            if (!activeTimerIsOwner) throw new Error('TIMER_NOT_OWNER');
             const memo = memoOverride ?? prompt('学習内容：') ?? '';
             const now = Date.now();
             const endAt = endAtOverride || (isStaleActiveTimer(activeTimer, now) ? activeTimer.lastHeartbeatAt : now);
@@ -1127,7 +1126,6 @@ export default function App() {
                 familyId: FAMILY_ID,
                 task,
                 timerId: activeTimer.timerId,
-                ownerClientId: currentClientId,
                 endAt,
                 validation,
                 memo,
@@ -1148,7 +1146,7 @@ export default function App() {
         }
         catch (err) {
             console.error('Study session finish failed:', err);
-            alert(err.message === 'TIMER_NOT_OWNER' ? 'このタイマーは開始した端末から終了してください。' : '保存に失敗しました。');
+            alert(err.message === 'TIMER_NOT_ACTIVE' ? 'このタイマーはすでに停止されています。' : '保存に失敗しました。');
         }
         finally {
             savingRecordRef.current = false;
@@ -1885,8 +1883,8 @@ export default function App() {
                          <button type="button" aria-label="学習項目詳細を閉じる" title="閉じる" onClick={() => setSelectedTaskId(null)} className="p-3 bg-white rounded-2xl shadow-sm hover:bg-slate-50 transition shrink-0 text-left"><X size={24}/></button>
                       </div>
                       <div className="flex-1 overflow-y-auto p-6 sm:p-10 space-y-10 no-scrollbar pb-32 text-left">
-                          <StrictTimer task={timerViewTask} isAnyOtherRunning={isAnyTaskRunning && activeTimerTask?.id !== task.id && !task.isRunning} isSaving={isSavingRecord || (activeTimerTask?.id === task.id && !activeTimerIsOwner)} onUpdate={handleTimerUpdate} onSave={handleSaveRecord}/>
-                          {activeTimerTask?.id === task.id && !activeTimerIsOwner && <div className="rounded-2xl bg-slate-50 p-3 text-xs font-bold text-slate-500">このタイマーは別の端末で開始されています。表示のみ可能です。</div>}
+                          <StrictTimer task={timerViewTask} isAnyOtherRunning={isAnyTaskRunning && activeTimerTask?.id !== task.id && !task.isRunning} isSaving={isSavingRecord} canPause={activeTimerTask?.id !== task.id || activeTimerIsOwner} canStart={activeTimerTask?.id !== task.id || activeTimerIsOwner} onUpdate={handleTimerUpdate} onSave={handleSaveRecord}/>
+                          {activeTimerTask?.id === task.id && !activeTimerIsOwner && <div className="rounded-2xl bg-slate-50 p-3 text-xs font-bold text-slate-500">別の端末で開始された計測です。この端末から停止できます。</div>}
                          <div className="space-y-4 text-left">
                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 px-2 text-left"><Search size={14}/> 学習メモ</label>
                             <textarea value={task.tempDetail || ""} onChange={(e) => handleUpdateLocalTask(task.id, { tempDetail: e.target.value })} placeholder="内容をメモ..." className="w-full h-28 bg-slate-50/50 border-none rounded-2xl p-4 font-black text-md resize-none shadow-inner outline-none focus:ring-2 focus:ring-blue-100 text-left leading-snug"/>

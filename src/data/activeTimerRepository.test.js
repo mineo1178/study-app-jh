@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildStaleTimerInvalidSession, canForceInvalidateStaleTimer, staleTimerSessionId } from './activeTimerRepository';
+import { buildFinishedTimerSession, buildStaleTimerInvalidSession, canFinishActiveTimer, canForceInvalidateStaleTimer, canHeartbeatActiveTimer, staleTimerSessionId } from './activeTimerRepository';
 import { getEffectiveStudySeconds } from './studySessionSelectors';
 import { gameProgress } from '../gameLogic';
 
@@ -35,5 +35,46 @@ describe('forced stale timer invalidation', () => {
     const now = start + 16 * 60 * 1000;
     expect(canForceInvalidateStaleTimer(staleTimer, now)).toBe(true);
     expect(canForceInvalidateStaleTimer({ ...staleTimer, lastHeartbeatAt: now - 30 * 1000 }, now)).toBe(false);
+  });
+});
+
+describe('cross-device timer finish', () => {
+  it('ownerClientIdが異なる端末でもrunning timerをSTOPでき、Firestore上のsegmentから時間を確定する', () => {
+    const timer = { ...staleTimer, lastHeartbeatAt: start + 30 * 1000, ownerClientId: 'device-a' };
+    const endAt = start + 120 * 1000;
+    expect(canFinishActiveTimer(timer, 'timer-stale-1')).toBe(true);
+    const session = buildFinishedTimerSession(timer, task, {
+      endAt,
+      validation: { status: 'valid', reasonCodes: [] },
+      memo: '端末Bで停止',
+    });
+    expect(session).toMatchObject({ timerId: 'timer-stale-1', recordedSeconds: 120, validation: { status: 'valid' } });
+    expect(session.validation.reasonCodes).not.toContain('stale_timer_forced_invalid');
+  });
+
+  it('PAUSE中は保存済みsegmentだけを確定し、pause後の時間を加算しない', () => {
+    const paused = {
+      ...staleTimer,
+      state: 'paused',
+      ownerClientId: 'device-a',
+      segmentStartedAt: null,
+      accumulatedSeconds: 75,
+      segments: [{ startedAt: start, endedAt: start + 75 * 1000, durationSeconds: 75 }],
+    };
+    const session = buildFinishedTimerSession(paused, task, { endAt: start + 600 * 1000, validation: { status: 'valid', reasonCodes: [] } });
+    expect(session.recordedSeconds).toBe(75);
+    expect(session.segments).toEqual(paused.segments);
+  });
+
+  it('決定的timerIdにより二重STOPは既存Sessionを検出してno-opにできる', () => {
+    expect(staleTimerSessionId(staleTimer)).toBe('timer-stale-1');
+    expect(canFinishActiveTimer(null, 'timer-stale-1')).toBe(false);
+  });
+
+  it('heartbeatは引き続きownerだけが送信でき、STOP後はno-opになる', () => {
+    const running = { ...staleTimer, ownerClientId: 'device-a' };
+    expect(canHeartbeatActiveTimer(running, 'timer-stale-1', 'device-a')).toBe(true);
+    expect(canHeartbeatActiveTimer(running, 'timer-stale-1', 'device-b')).toBe(false);
+    expect(canHeartbeatActiveTimer(null, 'timer-stale-1', 'device-a')).toBe(false);
   });
 });
