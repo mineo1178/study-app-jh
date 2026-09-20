@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import { inferLegacyActivityType, needsLegacyActivityTypeReview, normalizeActivityType } from '../../src/integrity/activityTypes.js';
 import { validateStudySession } from '../../src/integrity/studyValidation.js';
 import { normalizeLegacyHistory } from '../../src/data/studySessionSelectors.js';
+import { getLegacyReviewOverride } from './legacyReviewOverrides.js';
 
 function epochMillis(value) {
   if (typeof value === 'number') return value;
@@ -41,7 +42,27 @@ export function writeReport(argv, report) {
   process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
 }
 
-export function buildMigrationReport(data) {
+function evaluateLegacyCandidate(session) {
+  const validation = validateStudySession(session);
+  // Legacy history has no pause boundaries, so duration alone cannot prove five hours were continuous.
+  if (session.legacySource && session.taskSnapshot?.activityType === 'reading' && session.recordedSeconds >= 5 * 60 * 60) {
+    return { ...session, validation: { ...validation, status: 'pending_review', reasonCodes: [...validation.reasonCodes.filter((code) => code !== 'reading_continuous_5h'), 'legacy_reading_continuity_unknown'] } };
+  }
+  return { ...session, validation };
+}
+
+export function applyLegacyReviewOverride(session) {
+  const override = getLegacyReviewOverride(session?.legacySource?.taskId, session?.legacySource?.historyId);
+  if (!override) return session;
+  const reasonCodes = [...new Set([...(session.validation?.reasonCodes || []), override.reason])];
+  return {
+    ...session,
+    validation: { ...session.validation, status: override.validationStatus, reasonCodes },
+    migrationReview: { reviewed: true, decision: override.validationStatus, reason: override.reason },
+  };
+}
+
+export function buildLegacyMigrationCandidates(data) {
   const input = reviveExportInput(data);
   const tasks = input.tasks || [];
   const sessions = input.studySessions || [];
@@ -55,7 +76,14 @@ export function buildMigrationReport(data) {
     .map(({ task, history }) => normalizeLegacyHistory({
       ...task,
       activityType: normalizeActivityType(task.activityType || inferLegacyActivityType(task.subjectId, task.title)),
-    }, history));
+    }, history))
+    .map(evaluateLegacyCandidate)
+    .map(applyLegacyReviewOverride);
+  return { tasks, sessions, legacy, alreadyMigrated, candidates };
+}
+
+export function buildMigrationReport(data) {
+  const { tasks, sessions, legacy, alreadyMigrated, candidates } = buildLegacyMigrationCandidates(data);
   const typeCounts = ['reading', 'language_app', 'programming', 'other'].reduce((counts, activityType) => ({
     ...counts,
     [activityType]: tasks.filter((task) => normalizeActivityType(task.activityType || inferLegacyActivityType(task.subjectId, task.title)) === activityType).length,
@@ -65,14 +93,10 @@ export function buildMigrationReport(data) {
     && !needsLegacyActivityTypeReview(task.subjectId, task.title)
     && inferLegacyActivityType(task.subjectId, task.title) !== 'other').length;
   const legacyReadingUncertain = candidates.filter((session) => session.taskSnapshot?.activityType === 'reading' && session.recordedSeconds >= 5 * 60 * 60);
-  const evaluated = [...sessions, ...candidates].map((session) => {
-    const validation = validateStudySession(session);
-    // Legacy history has no pause boundaries, so duration alone cannot prove five hours were continuous.
-    if (session.legacySource && session.taskSnapshot?.activityType === 'reading' && session.recordedSeconds >= 5 * 60 * 60) {
-      return { ...session, validation: { ...validation, status: 'pending_review', reasonCodes: [...validation.reasonCodes.filter((code) => code !== 'reading_continuous_5h'), 'legacy_reading_continuity_unknown'] } };
-    }
-    return { ...session, validation };
-  });
+  const evaluated = [...sessions.map((session) => ({ ...session, validation: validateStudySession(session) })), ...candidates];
+  const manualInvalidCount = candidates.filter((session) => session.migrationReview?.decision === 'invalid').length;
+  const manualValidCount = candidates.filter((session) => session.migrationReview?.decision === 'valid').length;
+  const unresolvedPendingReviewCount = candidates.filter((session) => session.validation.status === 'pending_review').length;
   return {
     dryRun: true,
     taskCount: tasks.length,
@@ -91,7 +115,10 @@ export function buildMigrationReport(data) {
     fiveHourOrMoreCount: evaluated.filter((session) => session.recordedSeconds >= 5 * 60 * 60).length,
     tenHourOrMoreCount: evaluated.filter((session) => session.recordedSeconds >= 10 * 60 * 60).length,
     readingFiveHourCandidateCount: legacyReadingUncertain.length,
-    pendingReviewCandidateCount: evaluated.filter((session) => session.validation.status === 'pending_review').length,
+    manualInvalidCount,
+    manualValidCount,
+    pendingReviewCandidateCount: unresolvedPendingReviewCount,
+    unresolvedPendingReviewCount,
     invalidCandidateCount: evaluated.filter((session) => session.validation.status === 'invalid').length,
     durationMismatchCount: evaluated.filter((session) => session.validation.reasonCodes.includes('clock_mismatch')).length,
     startsAfterEndCount: evaluated.filter((session) => session.validation.reasonCodes.includes('starts_after_end')).length,
