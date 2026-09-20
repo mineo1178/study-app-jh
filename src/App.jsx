@@ -15,6 +15,7 @@ import { formatHms, getEffectiveStudySeconds, getLiveStudySession, getSessionsFo
 import LiveStudyStatus from './components/study/LiveStudyStatus';
 import MigrationExportButton from './components/dev/MigrationExportButton';
 import LegacyStudySessionMigrationPanel from './components/dev/LegacyStudySessionMigrationPanel';
+import { DESKTOP_SIDEBAR_NAV_CLASS, DESKTOP_SIDEBAR_SCROLL_CLASS } from './layout/sidebarLayout';
 // ==========================================
 // Firebase Initialization (Vite/Vercel Dedicated)
 // ==========================================
@@ -49,7 +50,7 @@ const getTasksCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-
 const getTestsCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tests');
 const getStudySessionsCol = () => studySessionsCollection(db, FAMILY_ID);
 const getActiveTimerRef = () => activeTimerRef(db, FAMILY_ID);
-const APP_VERSION = 'v1.68';
+const APP_VERSION = 'v1.69';
 const TIMER_HEARTBEAT_MS = 30 * 1000;
 const DAILY_TARGET_SECONDS = 2 * 60 * 60;
 const isDocumentHidden = () => typeof document !== 'undefined' && document.hidden;
@@ -1375,7 +1376,7 @@ export default function App() {
         {/* --- Sidebar (PC) --- */}
         <aside className={isMobileView
             ? "hidden"
-            : "hidden lg:flex flex-col fixed inset-y-0 left-0 w-72 bg-white border-r border-slate-100 p-8 z-40 text-left"}>
+            : DESKTOP_SIDEBAR_SCROLL_CLASS}>
           <div className="flex items-center gap-3 mb-4 text-left">
             <div className="bg-gradient-to-br from-blue-600 to-indigo-700 p-3 rounded-2xl text-white shadow-xl shadow-blue-200"><Trophy size={24}/></div>
             <h1 className="text-xl font-black tracking-tighter leading-none uppercase">Level Up<br /><span className="text-blue-600 text-md uppercase leading-none">Study JH</span></h1>
@@ -1387,7 +1388,7 @@ export default function App() {
               <span className="rounded-full bg-blue-100 px-2 py-1 text-[9px] font-black text-blue-700">Timer Sync</span>
             </div>
           </div>
-          <nav className="flex-1 space-y-2">
+          <nav className={DESKTOP_SIDEBAR_NAV_CLASS}>
             {[{ id: 'daily', label: '学習記録', icon: Zap }, { id: 'stats', label: '実績分析', icon: BarChart2 }, { id: 'tests', label: '成績推移', icon: TrendingUp }].map(item => (<button type="button" key={item.id} onClick={() => setActiveTab(item.id)} className={`w-full flex items-center gap-4 px-6 py-4 rounded-3xl font-black transition-all leading-none ${activeTab === item.id ? 'bg-blue-600 text-white shadow-2xl' : 'text-slate-400 hover:bg-slate-50'}`}>
                 <item.icon size={20}/> {item.label}
               </button>))}

@@ -88,7 +88,9 @@ export function getEffectiveStudySeconds(sessions = []) {
 }
 
 export function getLiveStudySession(activeTimer, task, now = Date.now()) {
-  if (!activeTimer || !task || activeTimer.taskId !== task.id) return null;
+  // A paused timer remains stored only so its owner can resume or finish it.
+  // It must not be rendered as a live stopwatch or contribute live seconds.
+  if (!activeTimer || activeTimer.state !== 'running' || !task || activeTimer.taskId !== task.id) return null;
   const recordedSeconds = timerRecordedSeconds(activeTimer, now);
   const segments = timerSegmentsAtEnd(activeTimer, isStaleActiveTimer(activeTimer, now) ? activeTimer.lastHeartbeatAt : now);
   const base = {

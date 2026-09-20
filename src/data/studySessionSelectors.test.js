@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatHms, getEffectiveStudySeconds, getUnifiedStudySessions, normalizeLegacyHistory } from './studySessionSelectors';
+import { formatHms, getEffectiveStudySeconds, getLiveStudySession, getUnifiedStudySessions, normalizeLegacyHistory } from './studySessionSelectors';
 
 const task = { id: 'math', categoryId: 'school', subjectId: 's_math', title: '問題集', history: [{ id: 'h1', date: '2026-09-19', duration: 600, startedAt: 1_000, endedAt: 601_000 }] };
 describe('study session selectors', () => {
@@ -23,6 +23,13 @@ describe('study session selectors', () => {
   });
   it('HH:MM:SSで表示する', () => {
     expect(formatHms(2262)).toBe('00:37:42');
+  });
+  it('PAUSE済みActiveTimerをライブのストップウォッチとして扱わない', () => {
+    const pausedTimer = {
+      timerId: 'paused', taskId: 'math', state: 'paused', startedAt: 1_000,
+      accumulatedSeconds: 60, segments: [{ startedAt: 1_000, endedAt: 61_000, durationSeconds: 60 }],
+    };
+    expect(getLiveStudySession(pausedTimer, task, 120_000)).toBeNull();
   });
   it('legacyの5時間読書は連続性不明としてpending_reviewにする', () => {
     const readingTask = { id: 'news', categoryId: 'etc', subjectId: 'e_news', history: [] };

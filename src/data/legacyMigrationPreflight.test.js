@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildLegacyMigrationCandidates } from '../../scripts/migrations/legacyMigrationCandidates';
-import { buildLegacyMigrationPreflight, isMigrationConfirmationValid, migrationConfirmationText } from './legacyMigrationPreflight';
+import { buildLegacyMigrationPreflight, isLegacyMigrationCompleted, isMigrationConfirmationValid, migrationConfirmationText } from './legacyMigrationPreflight';
 import { legacyMigrationDocument } from './studySessionRepository';
 
 const histories = (count) => Array.from({ length: count }, (_, index) => ({ id: `h${index}`, duration: 60, startedAt: index * 60_000 + 1_000, endedAt: (index + 1) * 60_000 + 1_000 }));
@@ -50,6 +50,8 @@ describe('legacy migration preflight', () => {
     const preflight = buildLegacyMigrationPreflight({ tasks: [{ id: 'math', subjectId: 's_math', history: [{ id: 'h1', duration: 600 }] }], studySessions: candidates });
     expect(preflight.migrationCandidateCount).toBe(0);
     expect(preflight.alreadyMigratedCount).toBe(1);
+    expect(isLegacyMigrationCompleted(preflight)).toBe(true);
+    expect(isMigrationConfirmationValid(preflight, 'MIGRATE 0')).toBe(false);
   });
   it('書込みdocumentはcandidateの監査情報を保持する', () => {
     const candidate = buildLegacyMigrationCandidates({

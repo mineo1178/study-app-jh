@@ -72,3 +72,17 @@ export function buildLegacyMigrationPreflight({ tasks = [], studySessions = [], 
 export function isMigrationConfirmationValid(preflight, confirmation) {
   return Boolean(preflight?.canApply && confirmation === migrationConfirmationText(preflight.migrationCandidateCount));
 }
+
+export function isLegacyMigrationCompleted(preflight) {
+  return Boolean(
+    preflight?.ok
+    && preflight.migrationCandidateCount === 0
+    && preflight.alreadyMigratedCount > 0
+    && preflight.unresolvedPendingReviewCount === 0
+    && preflight.activeTimerCount === 0
+    && preflight.existingSourceDuplicates?.length === 0
+    && preflight.candidateSourceDuplicates?.length === 0
+    && preflight.candidateIdDuplicates?.length === 0
+    && preflight.existingDocumentIdCollisions?.length === 0,
+  );
+}
