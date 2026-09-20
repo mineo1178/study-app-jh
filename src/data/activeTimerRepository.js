@@ -209,8 +209,8 @@ export function buildFinishedTimerSession(timer, task = {}, { endAt = Date.now()
     rewardPolicyVersion: REWARD_POLICY_VERSION,
     taskId: timer.taskId,
     taskSnapshot: {
-      categoryId: taskSnapshot.categoryId,
-      subjectId: taskSnapshot.subjectId,
+      categoryId: taskSnapshot.categoryId || null,
+      subjectId: taskSnapshot.subjectId || null,
       activityType: taskSnapshot.activityType || 'other',
       title: taskSnapshot.title || '',
       type: taskSnapshot.type || 'self',

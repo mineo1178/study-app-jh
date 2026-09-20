@@ -3,6 +3,7 @@ import { buildFinishedTimerSession, buildStaleTimerInvalidSession, buildTimerSwi
 import { getEffectiveStudySeconds } from './studySessionSelectors';
 import { gameProgress } from '../gameLogic';
 import { REWARD_POLICY_VERSION } from '../rpg/rewardConfig';
+import { findUndefinedPaths } from '../test/findUndefinedPaths.js';
 
 const start = 1_000_000;
 const staleTimer = {
@@ -83,6 +84,12 @@ describe('cross-device timer finish', () => {
       validation: { status: 'pending_review', reasonCodes: ['too_short'] },
     });
     expect(session.recordedSeconds).toBe(9);
+  });
+
+  it('optional task fieldsがないStudySessionでもundefinedを永続payloadへ含めない', () => {
+    const session = buildFinishedTimerSession(staleTimer, { id: 'math' }, { endAt: start + 60_000, validation: { status: 'valid', reasonCodes: [] } });
+    expect(findUndefinedPaths(session)).toEqual([]);
+    expect(session.taskSnapshot).toMatchObject({ categoryId: null, subjectId: null });
   });
 
   it('stale timerをSTOPした場合もinvalid SessionとしてActiveTimer解消へ進める', () => {

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { ENEMY_CATALOG } from '../rpg/enemyCatalog.js';
 import { prepareBattleAttack, prepareBattleStart } from './rpgBattleRepository.js';
 import { calculateSkillDamage, getElementMultiplier } from '../rpg/battleCalculator.js';
+import { findUndefinedPaths } from '../test/findUndefinedPaths.js';
 
 const now = 1000;
 const profile = { battleEnergy: 3, totalExp: 90, level: 1, ownedEquipment: { iron_sword: {} }, equipped: { weapon: 'iron_sword' } };
@@ -55,5 +56,15 @@ describe('battle transaction logic', () => {
     const turn = prepareBattleAttack({ battle: legacy, profile, actionId: 'legacy-a', now });
     expect(turn.battle.playerSnapshot.skills).toEqual({ flame_slash: { id: 'flame_slash', maxUses: 2, kind: 'attack' } });
     expect(turn.battle.playerSnapshot.skills.healing_light).toBeUndefined();
+  });
+  it('keeps every Firestore battle payload free of undefined optional fields', () => {
+    const start = prepareBattleStart({ profile, enemy: ENEMY_CATALOG.slime, battleId: 'persist', now });
+    const attack = prepareBattleAttack({ battle: start.battle, profile: start.profile, actionId: 'normal', now });
+    const flame = prepareBattleAttack({ battle: start.battle, profile: start.profile, actionId: 'flame', now, action: { kind: 'skill', damage: 12, poweredDamage: 12, elementResult: { type: 'normal', percent: 100 }, skill: { ...start.battle.playerSnapshot.skills.flame_slash, useNumber: 1 } } });
+    const heal = prepareBattleAttack({ battle: { ...start.battle, playerHp: 20 }, profile: start.profile, actionId: 'heal', now, action: { kind: 'skill', healing: { playerHpBefore: 20, calculatedHeal: 14, actualHeal: 14, playerHpAfterHeal: 34 }, skill: { ...start.battle.playerSnapshot.skills.healing_light, useNumber: 1 } } });
+    const guard = prepareBattleAttack({ battle: start.battle, profile: start.profile, actionId: 'guard', now, action: { kind: 'skill', skill: { ...start.battle.playerSnapshot.skills.guard_stance, useNumber: 1 } } });
+    const victory = prepareBattleAttack({ battle: { ...start.battle, enemyHp: 1 }, profile: start.profile, actionId: 'victory', now });
+    const defeat = prepareBattleAttack({ battle: { ...start.battle, playerHp: 1 }, profile: start.profile, actionId: 'defeat', now });
+    [start.battle, start.ledger, start.profile, attack.attackLedger, flame.attackLedger, heal.attackLedger, guard.attackLedger, victory.attackLedger, victory.victoryLedger, victory.profile, defeat.attackLedger, defeat.defeatLedger, defeat.profile].forEach((payload) => expect(findUndefinedPaths(payload)).toEqual([]));
   });
 });

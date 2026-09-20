@@ -17,12 +17,22 @@ export const createBattleActionId = () => `attack-${globalThis.crypto?.randomUUI
 const failure = (code) => Object.assign(new Error(code), { code });
 const number = (value) => Number(value) || 0;
 const equippedSnapshot = (profile) => ({ weapon: profile.equipped.weapon, armor: profile.equipped.armor, accessory: profile.equipped.accessory });
+// Firestore persistence rule: optional fields are omitted unless they have a
+// value; `undefined` must never cross a repository persistence boundary.
+export const buildBattleSkillSnapshot = (skill) => {
+  const base = { id: skill.id, name: skill.name, kind: skill.kind || 'attack', element: skill.element || 'neutral', maxUses: number(skill.maxUses) };
+  if (base.kind === 'attack') return { ...base, powerPercent: number(skill.powerPercent) };
+  if (base.kind === 'heal') return { ...base, healPercent: number(skill.healPercent) };
+  if (base.kind === 'guard') return { ...base, damageReductionPercent: number(skill.damageReductionPercent) };
+  return base;
+};
+const optional = (key, value) => value === undefined ? {} : { [key]: value };
 
 export function prepareBattleStart({ profile, enemy, battleId, now }) {
   const current = normalizePlayerProfile(profile);
   if (current.activeBattleId) throw failure('ACTIVE_BATTLE_EXISTS');
   if (number(current.battleEnergy) < enemy.energyCost) throw failure('INSUFFICIENT_BATTLE_ENERGY');
-  const skills = Object.fromEntries(Object.entries(SKILL_CATALOG).map(([id, skill]) => [id, { id: skill.id, name: skill.name, kind: skill.kind, element: skill.element, powerPercent: skill.powerPercent, healPercent: skill.healPercent, damageReductionPercent: skill.damageReductionPercent, maxUses: skill.maxUses }]));
+  const skills = Object.fromEntries(Object.entries(SKILL_CATALOG).map(([id, skill]) => [id, buildBattleSkillSnapshot(skill)]));
   const playerSnapshot = { level: current.level, maxHp: calculatePlayerMaxHp(current), attack: calculatePlayerAttack(current), defense: calculatePlayerDefense(current), equipped: equippedSnapshot(current), skills };
   const enemySnapshot = { name: enemy.name, element: enemy.element, weaknesses: [...enemy.weaknesses], resistances: [...enemy.resistances], maxHp: enemy.maxHp, attack: enemy.attack, energyCost: enemy.energyCost, expReward: enemy.expReward, catalogVersion: ENEMY_CATALOG_VERSION };
   return {
@@ -39,9 +49,9 @@ export function prepareBattleAttack({ battle: rawBattle, profile, actionId, now,
   const isAttack = !action.skill || skillKind === 'attack';
   const result = isAttack ? calculateAttackResult(battle.enemyHp, action.damage ?? battle.playerSnapshot?.attack) : { damage: 0, hpBefore: battle.enemyHp, hpAfter: battle.enemyHp, victory: false };
   const attackCount = number(battle.attackCount) + 1;
-  const playerAttack = isAttack ? { attack: battle.playerSnapshot?.attack, poweredDamage: action.poweredDamage, damage: result.damage, enemyHpBefore: result.hpBefore, enemyHpAfter: result.hpAfter } : null;
+  const playerAttack = isAttack ? { attack: battle.playerSnapshot?.attack, ...optional('poweredDamage', action.poweredDamage), damage: result.damage, enemyHpBefore: result.hpBefore, enemyHpAfter: result.hpAfter } : null;
   const skillUses = action.skill ? { ...battle.skillUses, [action.skill.id]: action.skill.useNumber } : battle.skillUses;
-  if (!result.victory) { const baseDamage = calculateEnemyCounterDamage(battle.enemySnapshot.attack, battle.playerSnapshot.defense); const damage = skillKind === 'guard' ? calculateGuardedDamage({ baseDamage, damageReductionPercent: action.skill.damageReductionPercent }) : baseDamage; const playerHpBefore = action.healing?.playerHpAfterHeal ?? battle.playerHp; const playerHpAfter = Math.max(0, playerHpBefore - damage); const lost = playerHpAfter === 0; const enemyCounter = { attack: battle.enemySnapshot.attack, playerDefense: battle.playerSnapshot.defense, damage, playerHpBefore, playerHpAfter }; const defeat = lost ? { playerHpBefore, playerHpAfter: 0, enemyHpAfter: result.hpAfter, triggeringActionId: actionId, defeatedAt: now } : null; const guard = skillKind === 'guard' ? { baseDamage, reductionPercent: action.skill.damageReductionPercent, finalDamage: damage } : undefined; const attackLedger = { schemaVersion: 1, type: 'attack', actionKind: action.kind, actionId, battleId: battle.battleId, attackNumber: attackCount, skill: action.skill || undefined, elementResult: action.elementResult, playerAttack, healing: action.healing, guard, enemyCounter, outcome: lost ? 'lost' : 'active', status: 'applied', appliedAt: now }; return { battle: { ...battle, enemyHp: result.hpAfter, playerHp: playerHpAfter, skillUses, status: lost ? 'lost' : 'active', defeat, attackCount, updatedAt: now }, attackLedger, victoryLedger: null, defeatLedger: lost ? { schemaVersion: 1, type: 'defeat', battleId: battle.battleId, enemyId: battle.enemyId, playerHpBefore, playerHpAfter: 0, enemyHpAfter: result.hpAfter, attackCount, triggeringActionId: actionId, expGranted: 0, status: 'applied', appliedAt: now } : null, profile: lost ? { ...normalizePlayerProfile(profile), activeBattleId: null, updatedAt: now } : null, result: { ...result, healing: action.healing, guard, enemyCounter, actionKind: action.kind, skill: action.skill, elementResult: action.elementResult }, };
+  if (!result.victory) { const baseDamage = calculateEnemyCounterDamage(battle.enemySnapshot.attack, battle.playerSnapshot.defense); const damage = skillKind === 'guard' ? calculateGuardedDamage({ baseDamage, damageReductionPercent: action.skill.damageReductionPercent }) : baseDamage; const playerHpBefore = action.healing?.playerHpAfterHeal ?? battle.playerHp; const playerHpAfter = Math.max(0, playerHpBefore - damage); const lost = playerHpAfter === 0; const enemyCounter = { attack: battle.enemySnapshot.attack, playerDefense: battle.playerSnapshot.defense, damage, playerHpBefore, playerHpAfter }; const defeat = lost ? { playerHpBefore, playerHpAfter: 0, enemyHpAfter: result.hpAfter, triggeringActionId: actionId, defeatedAt: now } : null; const guard = skillKind === 'guard' ? { baseDamage, reductionPercent: action.skill.damageReductionPercent, finalDamage: damage } : undefined; const attackLedger = { schemaVersion: 1, type: 'attack', actionKind: action.kind, actionId, battleId: battle.battleId, attackNumber: attackCount, ...optional('skill', action.skill), ...optional('elementResult', action.elementResult), ...optional('playerAttack', playerAttack), ...optional('healing', action.healing), ...optional('guard', guard), enemyCounter, outcome: lost ? 'lost' : 'active', status: 'applied', appliedAt: now }; return { battle: { ...battle, enemyHp: result.hpAfter, playerHp: playerHpAfter, skillUses, status: lost ? 'lost' : 'active', defeat, attackCount, updatedAt: now }, attackLedger, victoryLedger: null, defeatLedger: lost ? { schemaVersion: 1, type: 'defeat', battleId: battle.battleId, enemyId: battle.enemyId, playerHpBefore, playerHpAfter: 0, enemyHpAfter: result.hpAfter, attackCount, triggeringActionId: actionId, expGranted: 0, status: 'applied', appliedAt: now } : null, profile: lost ? { ...normalizePlayerProfile(profile), activeBattleId: null, updatedAt: now } : null, result: { ...result, ...optional('healing', action.healing), ...optional('guard', guard), enemyCounter, actionKind: action.kind, ...optional('skill', action.skill), ...optional('elementResult', action.elementResult) }, };
   }
   const current = normalizePlayerProfile(profile);
   const totalExpBefore = current.totalExp;
@@ -52,7 +62,7 @@ export function prepareBattleAttack({ battle: rawBattle, profile, actionId, now,
   return {
     battle: { ...battle, enemyHp: 0, skillUses, status: 'won', attackCount, updatedAt: now, victory, defeat: null },
     profile: { ...current, totalExp: totalExpAfter, level: levelAfter, activeBattleId: null, updatedAt: now },
-    attackLedger: { schemaVersion: 1, type: 'attack', actionKind: action.kind, actionId, battleId: battle.battleId, attackNumber: attackCount, skill: action.skill || undefined, elementResult: action.elementResult, playerAttack, enemyCounter: null, outcome: 'won', status: 'applied', appliedAt: now },
+    attackLedger: { schemaVersion: 1, type: 'attack', actionKind: action.kind, actionId, battleId: battle.battleId, attackNumber: attackCount, ...optional('skill', action.skill), ...optional('elementResult', action.elementResult), ...optional('playerAttack', playerAttack), enemyCounter: null, outcome: 'won', status: 'applied', appliedAt: now },
     victoryLedger: { schemaVersion: RPG_BATTLE_SCHEMA_VERSION, type: 'victory', battleId: battle.battleId, enemyId: battle.enemyId, expGranted, totalExpBefore, totalExpAfter, levelBefore: current.level, levelAfter, triggeringActionId: actionId, status: 'applied', appliedAt: now },
     result,
   };
@@ -102,7 +112,7 @@ export async function useBattleSkill({ db, familyId, battleId, skillId, actionId
     const kind = skill.kind || 'attack';
     if (!['attack', 'heal', 'guard'].includes(kind)) throw failure('SKILL_NOT_AVAILABLE');
     if (kind === 'heal' && battle.playerHp >= battle.playerSnapshot.maxHp) throw failure('HEAL_NOT_NEEDED');
-    const actionSkill = { id: skill.id, name: skill.name, kind, element: skill.element, powerPercent: skill.powerPercent, healPercent: skill.healPercent, damageReductionPercent: skill.damageReductionPercent, useNumber: used + 1, maxUses: skill.maxUses };
+    const actionSkill = { ...buildBattleSkillSnapshot({ ...skill, kind }), useNumber: used + 1 };
     const elementResult = kind === 'attack' ? getElementMultiplier({ attackElement: skill.element, weaknesses: battle.enemySnapshot.weaknesses, resistances: battle.enemySnapshot.resistances }) : undefined;
     const damageResult = kind === 'attack' ? calculateSkillDamage({ playerAttack: battle.playerSnapshot.attack, powerPercent: skill.powerPercent, elementPercent: elementResult.percent }) : null;
     const healing = kind === 'heal' ? calculateHealAmount({ playerMaxHp: battle.playerSnapshot.maxHp, playerHp: battle.playerHp, healPercent: skill.healPercent }) : undefined;

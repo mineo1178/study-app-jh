@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { buildLegacyMigrationCandidates } from '../../scripts/migrations/legacyMigrationCandidates';
 import { buildLegacyMigrationPreflight, isLegacyMigrationCompleted, isMigrationConfirmationValid, migrationConfirmationText } from './legacyMigrationPreflight';
 import { legacyMigrationDocument } from './studySessionRepository';
+import { findUndefinedPaths } from '../test/findUndefinedPaths.js';
 
 const histories = (count) => Array.from({ length: count }, (_, index) => ({ id: `h${index}`, duration: 60, startedAt: index * 60_000 + 1_000, endedAt: (index + 1) * 60_000 + 1_000 }));
 const reviewedSizeTask = { id: 'task', subjectId: 's_math', title: '数学', history: histories(292) };
@@ -61,5 +62,6 @@ describe('legacy migration preflight', () => {
     expect(candidate.id).toBe('legacy-PDZbVzVBXO4rThP2zgnp-1777954827448');
     expect(document).toMatchObject({ taskId: candidate.taskId, duration: 23_822, migrationVersion: 1, migratedAt: 123, legacySource: candidate.legacySource, migrationReview: { decision: 'invalid' } });
     expect(document.validation.status).toBe('invalid');
+    expect(findUndefinedPaths(document)).toEqual([]);
   });
 });
