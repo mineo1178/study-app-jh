@@ -8,6 +8,10 @@ export function getRunningTimerTask({ isSampleMode, activeTimerTask, tasks = [] 
   return isSampleMode ? tasks.find((task) => task.isRunning) || null : activeTimerTask || null;
 }
 
+export function getTaskLiveSession(liveSession, taskId) {
+  return liveSession?.taskId === taskId ? liveSession : null;
+}
+
 export function getTimerViewTask({ task, isSampleMode, activeTimer }) {
   if (isActiveTimer(activeTimer) && activeTimer.taskId === task.id) {
     return {

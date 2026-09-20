@@ -9,7 +9,7 @@ import { ACTIVITY_TYPES, inferLegacyActivityType, normalizeActivityType } from '
 import { validateStudySession } from './integrity/studyValidation';
 import { getCurrentClientId, createTimerId } from './timer/timerClient';
 import { isActiveTimer, isStaleActiveTimer, isTimerOwner, shouldAutoFinishReading, timerRecordedSeconds, timerSegmentsAtEnd } from './timer/timerEngine';
-import { getRunningTimerTask, getTimerViewTask, hasAnyRunningTimer } from './timer/timerRuntimeState';
+import { getRunningTimerTask, getTaskLiveSession, getTimerViewTask, hasAnyRunningTimer } from './timer/timerRuntimeState';
 import { activeTimerRef, finishActiveTimer, heartbeatActiveTimer, invalidateStaleActiveTimer, pauseActiveTimer, startOrSwitchActiveTimer } from './data/activeTimerRepository';
 import { studySessionsCollection } from './data/studySessionRepository';
 import { formatHms, getEffectiveStudySeconds, getLiveStudySession, getSessionsForDate, getSessionsForTask, getUnifiedStudySessions } from './data/studySessionSelectors';
@@ -51,7 +51,7 @@ const getTasksCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-
 const getTestsCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tests');
 const getStudySessionsCol = () => studySessionsCollection(db, FAMILY_ID);
 const getActiveTimerRef = () => activeTimerRef(db, FAMILY_ID);
-const APP_VERSION = 'v1.73';
+const APP_VERSION = 'v1.74';
 const TIMER_HEARTBEAT_MS = 30 * 1000;
 const DAILY_TARGET_SECONDS = 2 * 60 * 60;
 const isDocumentHidden = () => typeof document !== 'undefined' && document.hidden;
@@ -1571,21 +1571,22 @@ export default function App() {
                         const monthlyHistories = getSessionsForTask(unifiedSessions, task.id).filter((session) => getHistoryMonth(session) === selectedMonth);
                         const monthlyTime = getEffectiveStudySeconds(monthlyHistories);
                         const latestMonthlyTimestamp = monthlyHistories.length ? Math.max(...monthlyHistories.map((session) => session.segments?.at(-1)?.endedAt || 0)) : 0;
-                        const isTaskLive = activeTimerTask?.id === task.id;
+                        const taskLiveSession = getTaskLiveSession(liveSession, task.id);
+                        const isTaskLive = Boolean(taskLiveSession);
                         return (<div key={task.id} onClick={() => setSelectedTaskId(task.id)} className={`p-4 sm:p-6 rounded-[1.5rem] sm:rounded-[2rem] border shadow-sm hover:shadow-xl transition-all cursor-pointer relative overflow-hidden text-left group ${isTaskLive ? 'bg-gradient-to-br from-blue-600 to-indigo-800 text-white border-blue-400 shadow-blue-200' : 'bg-white border-slate-100'}`}>
                                     <div className="flex justify-between items-start mb-2 sm:mb-3 text-left">
                                       <div className="flex items-center gap-1.5 sm:gap-2 leading-none text-left">
                                         <span className={`text-[8px] sm:text-[9px] font-black px-2 py-0.5 rounded-full leading-none ${CATEGORIES[task.categoryId.toUpperCase()].bg} ${CATEGORIES[task.categoryId.toUpperCase()].color}`}>{task.type === 'homework' ? '宿題' : '自習'}</span>
                                       </div>
-                                      {isTaskLive && <div className={`rounded-full px-2 py-1 text-[8px] font-black ring-1 ${liveSession?.isStale ? 'bg-amber-300 text-slate-950 ring-amber-100' : 'bg-white/15 text-white ring-white/20'}`}>{liveSession?.isStale ? '要確認' : 'LIVE'}</div>}
+                                      {isTaskLive && <div className={`rounded-full px-2 py-1 text-[8px] font-black ring-1 ${taskLiveSession?.isStale ? 'bg-amber-300 text-slate-950 ring-amber-100' : 'bg-white/15 text-white ring-white/20'}`}>{taskLiveSession?.isStale ? '要確認' : 'LIVE'}</div>}
                                     </div>
                                     <div className={`text-[9px] sm:text-[10px] font-bold mb-2 sm:mb-3 ${isTaskLive ? 'text-blue-100/80' : 'text-slate-400'}`}>
-                                       {isTaskLive ? liveSession?.isStale ? '計測内容を確認してください' : '現在計測中' : `${formatRecordDate(latestMonthlyTimestamp)} 記録`}
+                                       {isTaskLive ? taskLiveSession?.isStale ? '計測内容を確認してください' : '現在計測中' : `${formatRecordDate(latestMonthlyTimestamp)} 記録`}
                                     </div>
                                     <h4 className={`font-black text-base sm:text-lg mb-3 sm:mb-4 truncate leading-tight text-left ${isTaskLive ? 'text-white' : 'text-slate-800'}`}>{task.title || "Untitled"}</h4>
                                     <div className={`flex justify-between items-end border-t pt-3 sm:pt-4 leading-none text-left ${isTaskLive ? 'border-white/15' : 'border-slate-50'}`}>
                                        <div className={`text-[9px] sm:text-[10px] font-black flex items-center gap-1 uppercase leading-none text-left ${isTaskLive ? 'text-blue-100/80' : 'text-slate-300'}`}><History size={12}/> {monthlyHistories.length}回</div>
-                                       <p className={`text-lg sm:text-xl font-black font-mono tracking-tighter leading-none text-left ${isTaskLive ? 'text-white' : 'text-blue-600'}`}>{isTaskLive && !liveSession?.isStale ? formatHms(monthlyTime + liveSession.recordedSeconds) : formatDuration(monthlyTime)}</p>
+                                       <p className={`text-lg sm:text-xl font-black font-mono tracking-tighter leading-none text-left ${isTaskLive ? 'text-white' : 'text-blue-600'}`}>{isTaskLive && !taskLiveSession?.isStale ? formatHms(monthlyTime + (taskLiveSession?.recordedSeconds || 0)) : formatDuration(monthlyTime)}</p>
                                     </div>
                                   </div>);
                     })}

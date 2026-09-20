@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getRunningTimerTask, getTimerViewTask, hasAnyRunningTimer } from './timerRuntimeState';
+import { getRunningTimerTask, getTaskLiveSession, getTimerViewTask, hasAnyRunningTimer } from './timerRuntimeState';
 
 const legacyRunningTask = { id: 'legacy', isRunning: true, sessionStartTime: 1_000, currentDuration: 300 };
 const newTask = { id: 'new', isRunning: false };
@@ -30,5 +30,13 @@ describe('canonical timer runtime state', () => {
   it('Sample Modeは従来どおりlocal task.isRunningを利用する', () => {
     expect(hasAnyRunningTimer({ isSampleMode: true, activeTimer: null, tasks: [legacyRunningTask] })).toBe(true);
     expect(getTimerViewTask({ task: legacyRunningTask, isSampleMode: true, activeTimer: null })).toBe(legacyRunningTask);
+  });
+
+  it('running ActiveTimerだけをLIVE表示し、paused ActiveTimerではnullを返す', () => {
+    const runningLiveSession = { taskId: 'legacy', recordedSeconds: 120, isStale: false };
+    expect(getTaskLiveSession(runningLiveSession, 'legacy')).toBe(runningLiveSession);
+    // paused ActiveTimerではgetLiveStudySessionがnullを返すため、カードはLIVE扱いにしない。
+    expect(getTaskLiveSession(null, 'legacy')).toBeNull();
+    expect(getTaskLiveSession(null, 'new')).toBeNull();
   });
 });
