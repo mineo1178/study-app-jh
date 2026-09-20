@@ -1,3 +1,3 @@
 import { describe, expect, it } from 'vitest';
 import { SKILL_CATALOG } from './skillCatalog.js';
-describe('starter skills', () => { it('defines three valid attack skills', () => { expect(Object.keys(SKILL_CATALOG)).toHaveLength(3); Object.values(SKILL_CATALOG).forEach((skill) => expect(skill).toMatchObject({ id: expect.any(String), name: expect.any(String), powerPercent: 125, maxUses: 2 })); }); });
+describe('starter skills', () => { it('defines three attack skills plus heal and guard', () => { expect(Object.keys(SKILL_CATALOG)).toHaveLength(5); Object.values(SKILL_CATALOG).forEach((skill) => expect(skill).toMatchObject({ id: expect.any(String), name: expect.any(String), kind: expect.any(String), maxUses: 2 })); expect(SKILL_CATALOG.healing_light).toMatchObject({ kind: 'heal', healPercent: 35 }); expect(SKILL_CATALOG.guard_stance).toMatchObject({ kind: 'guard', damageReductionPercent: 50 }); }); });

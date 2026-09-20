@@ -31,7 +31,7 @@ describe('battle transaction logic', () => {
   });
   it('snapshots starter skills and applies weak skill damage atomically', () => {
     const start = prepareBattleStart({ profile, enemy: ENEMY_CATALOG.slime, battleId: 'battle-skill', now });
-    expect(start.battle).toMatchObject({ schemaVersion: 3, skillUses: { flame_slash: 0, aqua_edge: 0, thunder_strike: 0 } });
+    expect(start.battle).toMatchObject({ schemaVersion: 4, skillUses: { flame_slash: 0, aqua_edge: 0, thunder_strike: 0, healing_light: 0, guard_stance: 0 } });
     const skill = start.battle.playerSnapshot.skills.flame_slash;
     const elementResult = getElementMultiplier({ attackElement: skill.element, weaknesses: start.battle.enemySnapshot.weaknesses, resistances: start.battle.enemySnapshot.resistances });
     const damage = calculateSkillDamage({ playerAttack: 10, powerPercent: skill.powerPercent, elementPercent: elementResult.percent });
@@ -39,5 +39,21 @@ describe('battle transaction logic', () => {
     const result = prepareBattleAttack({ battle: start.battle, profile: start.profile, actionId: 'skill-1', now, action: { kind: 'skill', damage: damage.damage, poweredDamage: damage.poweredDamage, elementResult, skill: { ...skill, useNumber: 1 } } });
     expect(result.battle).toMatchObject({ enemyHp: 2, skillUses: { flame_slash: 1 } });
     expect(result.attackLedger).toMatchObject({ actionKind: 'skill', elementResult: { type: 'weak', percent: 150 }, skill: { id: 'flame_slash', useNumber: 1 } });
+  });
+  it('snapshots five v4 skills and applies heal and guard through the shared action path', () => {
+    const start = prepareBattleStart({ profile, enemy: ENEMY_CATALOG.slime, battleId: 'battle-v4', now });
+    expect(start.battle).toMatchObject({ schemaVersion: 4, skillUses: { flame_slash: 0, aqua_edge: 0, thunder_strike: 0, healing_light: 0, guard_stance: 0 } });
+    const heal = prepareBattleAttack({ battle: { ...start.battle, playerHp: 20 }, profile: start.profile, actionId: 'heal-1', now, action: { kind: 'skill', healing: { playerHpBefore: 20, calculatedHeal: 14, actualHeal: 14, playerHpAfterHeal: 34 }, skill: { ...start.battle.playerSnapshot.skills.healing_light, useNumber: 1 } } });
+    expect(heal.battle).toMatchObject({ enemyHp: 20, playerHp: 31, skillUses: { healing_light: 1 }, attackCount: 1 });
+    expect(heal.attackLedger).toMatchObject({ healing: { actualHeal: 14 }, playerAttack: null, enemyCounter: { damage: 3, playerHpBefore: 34, playerHpAfter: 31 } });
+    const guard = prepareBattleAttack({ battle: { ...start.battle, playerHp: 10 }, profile: start.profile, actionId: 'guard-1', now, action: { kind: 'skill', skill: { ...start.battle.playerSnapshot.skills.guard_stance, useNumber: 1 } } });
+    expect(guard.battle).toMatchObject({ enemyHp: 20, playerHp: 9, skillUses: { guard_stance: 1 } });
+    expect(guard.attackLedger).toMatchObject({ guard: { baseDamage: 3, reductionPercent: 50, finalDamage: 1 }, enemyCounter: { damage: 1 } });
+  });
+  it('keeps v3 skill snapshots attack-only while supplying their missing kind', () => {
+    const legacy = { schemaVersion: 3, battleId: 'legacy', enemyId: 'slime', enemyHp: 20, status: 'active', playerHp: 40, playerSnapshot: { attack: 5, maxHp: 40, skills: { flame_slash: { id: 'flame_slash', maxUses: 2 } } }, enemySnapshot: { maxHp: 20, attack: 1 } };
+    const turn = prepareBattleAttack({ battle: legacy, profile, actionId: 'legacy-a', now });
+    expect(turn.battle.playerSnapshot.skills).toEqual({ flame_slash: { id: 'flame_slash', maxUses: 2, kind: 'attack' } });
+    expect(turn.battle.playerSnapshot.skills.healing_light).toBeUndefined();
   });
 });
