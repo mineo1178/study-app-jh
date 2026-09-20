@@ -13,7 +13,10 @@ import { getRunningTimerTask, getTaskLiveSession, getTimerViewTask, hasAnyRunnin
 import { activeTimerRef, finishActiveTimer, heartbeatActiveTimer, invalidateStaleActiveTimer, pauseActiveTimer, resumeActiveTimer, startBreakActiveTimer, startOrSwitchActiveTimer } from './data/activeTimerRepository';
 import { studySessionsCollection } from './data/studySessionRepository';
 import { applyStudySessionReward } from './data/rewardLedgerRepository';
+import { emptyPlayerProfile, playerProfileRef } from './data/rewardLedgerRepository';
 import { isStudySessionRewardEligible } from './rpg/rewardCalculator';
+import RpgWalletPanel from './components/rpg/RpgWalletPanel';
+import RewardResultModal from './components/rpg/RewardResultModal';
 import { formatHms, getEffectiveStudySeconds, getLiveStudySession, getSessionsForDate, getSessionsForTask, getUnifiedStudySessions } from './data/studySessionSelectors';
 import LiveStudyStatus from './components/study/LiveStudyStatus';
 import MigrationExportButton from './components/dev/MigrationExportButton';
@@ -53,7 +56,7 @@ const getTasksCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-
 const getTestsCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tests');
 const getStudySessionsCol = () => studySessionsCollection(db, FAMILY_ID);
 const getActiveTimerRef = () => activeTimerRef(db, FAMILY_ID);
-const APP_VERSION = 'v1.76';
+const APP_VERSION = 'v1.77';
 const TIMER_HEARTBEAT_MS = 30 * 1000;
 const DAILY_TARGET_SECONDS = 2 * 60 * 60;
 const isDocumentHidden = () => typeof document !== 'undefined' && document.hidden;
@@ -833,6 +836,7 @@ export default function App() {
     const [selectedSubjectId, setSelectedSubjectId] = useState('s_math');
     const [tasks, setTasks] = useState([]);
     const [studySessions, setStudySessions] = useState([]);
+    const [playerProfile, setPlayerProfile] = useState(emptyPlayerProfile());
     const [activeTimer, setActiveTimer] = useState(null);
     const [tests, setTests] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -851,6 +855,7 @@ export default function App() {
     const [testEndDate, setTestEndDate] = useState(getTodayStr);
     const [visibleSubjects, setVisibleSubjects] = useState(['s_math', 's_english', 'j_math', 'average']);
     const [questResult, setQuestResult] = useState(null);
+    const [rewardResult, setRewardResult] = useState(null);
     const [staleCheckNow, setStaleCheckNow] = useState(() => Date.now());
     const [liveNow, setLiveNow] = useState(() => Date.now());
     const [isSavingRecord, setIsSavingRecord] = useState(false);
@@ -917,6 +922,10 @@ export default function App() {
               .catch((err) => { console.error('Study reward reconciliation failed:', err); rewardProcessingRef.current.delete(session.id); });
         });
     }, [isSampleMode, studySessions, user]);
+    useEffect(() => {
+        if (isSampleMode || !user) return undefined;
+        return onSnapshot(playerProfileRef(db, FAMILY_ID), (snap) => setPlayerProfile(snap.exists() ? snap.data() : emptyPlayerProfile()), (err) => console.error('PlayerProfile realtime sync error:', err));
+    }, [isSampleMode, user]);
     useEffect(() => {
         if (!activeTimerIsOwner || activeTimer?.state !== 'running' || isSampleMode || !user) return;
         const sendHeartbeat = () => heartbeatActiveTimer({
@@ -1185,6 +1194,14 @@ export default function App() {
                 validation,
                 memo,
             });
+            if (!result.alreadyFinished && result.session.rewardPolicyVersion) {
+                try {
+                    const reward = await applyStudySessionReward({ db, familyId: FAMILY_ID, session: { ...result.session, id: activeTimer.timerId } });
+                    setRewardResult({ recordedSeconds: result.session.recordedSeconds, rewards: reward.applied ? reward.rewards : null, deferred: !reward.applied });
+                } catch {
+                    setRewardResult({ recordedSeconds: result.session.recordedSeconds, rewards: null, deferred: true });
+                }
+            }
             if (!result.alreadyFinished) {
                 setQuestResult({
                     exp: validation.status === 'valid' ? 0 : 0,
@@ -1537,6 +1554,7 @@ export default function App() {
               </div>
             </div>
 
+            {!isSampleMode && <RpgWalletPanel profile={playerProfile}/>}
             <AdventureStatus adventure={adventure}/>
 
             <div className={`grid gap-3 sm:gap-4 text-center ${isMobileView ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-4'}`}>
@@ -1867,6 +1885,7 @@ export default function App() {
             <button type="button" aria-label="学習結果を閉じる" onClick={() => setQuestResult(null)} className="mt-6 w-full rounded-2xl bg-indigo-600 py-4 text-sm font-black text-white">冒険を続ける</button>
           </div>
         </div>)}
+        <RewardResultModal result={rewardResult} profile={playerProfile} onClose={() => setRewardResult(null)} />
 
         {/* --- Modals --- */}
         {isAddingTask && (<div className={modalOverlayClass}>
