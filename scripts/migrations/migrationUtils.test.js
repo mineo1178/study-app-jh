@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getEffectiveStudySeconds } from '../../src/data/studySessionSelectors';
+import { getEffectiveStudySeconds, getUnifiedStudySessions } from '../../src/data/studySessionSelectors';
 import { LEGACY_REVIEW_OVERRIDES } from './legacyReviewOverrides';
 import { buildLegacyMigrationCandidates, buildMigrationReport } from './migrationUtils';
 
@@ -57,5 +57,13 @@ describe('migration dry-run report', () => {
     expect(candidates[0].validation.reasonCodes).toContain('clock_mismatch');
     expect(candidates[0].recordedSeconds).toBe(498);
     expect(candidates[0].segments[0]).toMatchObject({ startedAt: 1_000, endedAt: 3_000, durationSeconds: 498 });
+  });
+  it('manual valid overrideは統合selectorの再validationでも保持する', () => {
+    const { candidates } = buildLegacyMigrationCandidates({
+      tasks: [{ id: '8XmPF1TJGBs9W7RmP08D', subjectId: 'e_manga', title: '歴史', history: [{ id: '1779504538581', duration: 498, startedAt: 1_000, endedAt: 3_000 }] }],
+    });
+    const unified = getUnifiedStudySessions([], candidates);
+    expect(unified[0].validation.status).toBe('valid');
+    expect(getEffectiveStudySeconds(unified)).toBe(498);
   });
 });

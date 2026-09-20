@@ -59,7 +59,9 @@ export function getUnifiedStudySessions(tasks = [], studySessions = []) {
   return normalized.map((session) => {
     const computed = validateStudySession(session, { previousIntervals });
     const existing = session.validation || { status: 'valid', reasonCodes: [] };
-    const validation = existing.status === 'invalid' || existing.status === 'pending_review'
+    const validation = session.migrationReview?.reviewed
+      ? existing
+      : existing.status === 'invalid' || existing.status === 'pending_review'
       ? existing
       : computed;
     if (validation.status === 'valid') {
