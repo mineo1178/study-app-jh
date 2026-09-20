@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ENEMY_CATALOG } from '../rpg/enemyCatalog.js';
 import { prepareBattleAttack, prepareBattleStart } from './rpgBattleRepository.js';
+import { calculateSkillDamage, getElementMultiplier } from '../rpg/battleCalculator.js';
 
 const now = 1000;
 const profile = { battleEnergy: 3, totalExp: 90, level: 1, ownedEquipment: { iron_sword: {} }, equipped: { weapon: 'iron_sword' } };
@@ -27,5 +28,16 @@ describe('battle transaction logic', () => {
     expect(final.profile).toMatchObject({ totalExp: 110, level: 2, activeBattleId: null });
     expect(final.victoryLedger).toMatchObject({ type: 'victory', expGranted: 20, totalExpBefore: 90, totalExpAfter: 110, levelAfter: 2 });
     expect(() => prepareBattleAttack({ battle: final.battle, profile: final.profile, actionId: 'later', now })).toThrow('BATTLE_ALREADY_COMPLETED');
+  });
+  it('snapshots starter skills and applies weak skill damage atomically', () => {
+    const start = prepareBattleStart({ profile, enemy: ENEMY_CATALOG.slime, battleId: 'battle-skill', now });
+    expect(start.battle).toMatchObject({ schemaVersion: 3, skillUses: { flame_slash: 0, aqua_edge: 0, thunder_strike: 0 } });
+    const skill = start.battle.playerSnapshot.skills.flame_slash;
+    const elementResult = getElementMultiplier({ attackElement: skill.element, weaknesses: start.battle.enemySnapshot.weaknesses, resistances: start.battle.enemySnapshot.resistances });
+    const damage = calculateSkillDamage({ playerAttack: 10, powerPercent: skill.powerPercent, elementPercent: elementResult.percent });
+    expect(damage).toEqual({ poweredDamage: 12, damage: 18 });
+    const result = prepareBattleAttack({ battle: start.battle, profile: start.profile, actionId: 'skill-1', now, action: { kind: 'skill', damage: damage.damage, poweredDamage: damage.poweredDamage, elementResult, skill: { ...skill, useNumber: 1 } } });
+    expect(result.battle).toMatchObject({ enemyHp: 2, skillUses: { flame_slash: 1 } });
+    expect(result.attackLedger).toMatchObject({ actionKind: 'skill', elementResult: { type: 'weak', percent: 150 }, skill: { id: 'flame_slash', useNumber: 1 } });
   });
 });
