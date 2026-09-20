@@ -1,11 +1,27 @@
 import { doc, runTransaction } from 'firebase/firestore';
-import { MATERIAL_KEYS, REWARD_POLICY_VERSION, REWARD_SCHEMA_VERSION } from '../rpg/rewardConfig.js';
+import { REWARD_POLICY_VERSION, REWARD_SCHEMA_VERSION } from '../rpg/rewardConfig.js';
+import { createEmptyPlayerProfile, normalizePlayerProfile } from '../rpg/playerProfile.js';
 import { calculateStudyReward, isStudySessionRewardEligible } from '../rpg/rewardCalculator.js';
 
 const appPath = (familyId, collectionName, id) => ['families', familyId, 'apps', 'junior-high', collectionName, id];
 export const rewardLedgerRef = (db, familyId, sessionId) => doc(db, ...appPath(familyId, 'rewardLedger', sessionId));
 export const playerProfileRef = (db, familyId) => doc(db, ...appPath(familyId, 'rpg', 'playerProfile'));
-export const emptyPlayerProfile = () => ({ schemaVersion: 1, gold: 0, battleEnergy: 0, materials: Object.fromEntries(MATERIAL_KEYS.map((key) => [key, 0])) });
+export const emptyPlayerProfile = createEmptyPlayerProfile;
+
+export function applyRewardToPlayerProfile(profile, rewards, updatedAt) {
+  const current = normalizePlayerProfile(profile);
+  const materials = {
+    ...current.materials,
+    [rewards.material.key]: (Number(current.materials?.[rewards.material.key]) || 0) + rewards.material.quantity,
+  };
+  return {
+    ...current,
+    gold: (Number(current.gold) || 0) + rewards.gold,
+    battleEnergy: (Number(current.battleEnergy) || 0) + rewards.battleEnergy,
+    materials,
+    updatedAt,
+  };
+}
 
 export async function applyStudySessionReward({ db, familyId, session }) {
   if (!isStudySessionRewardEligible(session)) return { applied: false, reason: 'INELIGIBLE' };
@@ -16,9 +32,8 @@ export async function applyStudySessionReward({ db, familyId, session }) {
     if (ledgerSnap.exists()) return { applied: false, reason: 'ALREADY_APPLIED' };
     if (!isStudySessionRewardEligible(session)) return { applied: false, reason: 'INELIGIBLE' };
     const rewards = calculateStudyReward(session);
-    const current = profileSnap.exists() ? profileSnap.data() : emptyPlayerProfile();
-    const materials = { ...emptyPlayerProfile().materials, ...(current.materials || {}), [rewards.material.key]: (Number(current.materials?.[rewards.material.key]) || 0) + rewards.material.quantity };
-    transaction.set(profile, { ...current, schemaVersion: 1, gold: (Number(current.gold) || 0) + rewards.gold, battleEnergy: (Number(current.battleEnergy) || 0) + rewards.battleEnergy, materials, updatedAt: Date.now() });
+    const nextProfile = applyRewardToPlayerProfile(profileSnap.exists() ? profileSnap.data() : emptyPlayerProfile(), rewards, Date.now());
+    transaction.set(profile, nextProfile);
     transaction.set(ledger, { schemaVersion: REWARD_SCHEMA_VERSION, studySessionId: session.id, timerId: session.timerId || null, rewardPolicyVersion: REWARD_POLICY_VERSION, basis: { recordedSeconds: session.recordedSeconds, subjectId: session.taskSnapshot?.subjectId || session.subjectId || null, categoryId: session.taskSnapshot?.categoryId || null, activityType: session.taskSnapshot?.activityType || null }, rewards, status: 'applied', appliedAt: Date.now(), reversal: null });
     return { applied: true, rewards };
   });

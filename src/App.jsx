@@ -12,11 +12,15 @@ import { breakRemainingSeconds, isActiveTimer, isBreakFinished, isStaleActiveTim
 import { getRunningTimerTask, getTaskLiveSession, getTimerViewTask, hasAnyRunningTimer } from './timer/timerRuntimeState';
 import { activeTimerRef, finishActiveTimer, heartbeatActiveTimer, invalidateStaleActiveTimer, pauseActiveTimer, resumeActiveTimer, startBreakActiveTimer, startOrSwitchActiveTimer } from './data/activeTimerRepository';
 import { studySessionsCollection } from './data/studySessionRepository';
-import { applyStudySessionReward } from './data/rewardLedgerRepository';
-import { emptyPlayerProfile, playerProfileRef } from './data/rewardLedgerRepository';
+import { applyStudySessionReward, emptyPlayerProfile, playerProfileRef } from './data/rewardLedgerRepository';
+import { createRpgActionId, equipItem, purchaseEquipment, unequipSlot } from './data/rpgShopRepository';
+import { getEquipmentCatalogItem } from './rpg/equipmentCatalog';
+import { normalizePlayerProfile } from './rpg/playerProfile';
 import { isStudySessionRewardEligible } from './rpg/rewardCalculator';
 import RpgWalletPanel from './components/rpg/RpgWalletPanel';
 import RewardResultModal from './components/rpg/RewardResultModal';
+import RpgHub from './components/rpg/RpgHub';
+import PurchaseConfirmModal from './components/rpg/PurchaseConfirmModal';
 import { formatHms, getEffectiveStudySeconds, getLiveStudySession, getSessionsForDate, getSessionsForTask, getUnifiedStudySessions } from './data/studySessionSelectors';
 import LiveStudyStatus from './components/study/LiveStudyStatus';
 import MigrationExportButton from './components/dev/MigrationExportButton';
@@ -56,7 +60,7 @@ const getTasksCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-
 const getTestsCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tests');
 const getStudySessionsCol = () => studySessionsCollection(db, FAMILY_ID);
 const getActiveTimerRef = () => activeTimerRef(db, FAMILY_ID);
-const APP_VERSION = 'v1.77';
+const APP_VERSION = 'v1.78';
 const TIMER_HEARTBEAT_MS = 30 * 1000;
 const DAILY_TARGET_SECONDS = 2 * 60 * 60;
 const isDocumentHidden = () => typeof document !== 'undefined' && document.hidden;
@@ -837,6 +841,10 @@ export default function App() {
     const [tasks, setTasks] = useState([]);
     const [studySessions, setStudySessions] = useState([]);
     const [playerProfile, setPlayerProfile] = useState(emptyPlayerProfile());
+    const [purchaseCandidate, setPurchaseCandidate] = useState(null);
+    const [rpgStatus, setRpgStatus] = useState(null);
+    const [pendingPurchaseItemId, setPendingPurchaseItemId] = useState(null);
+    const [pendingEquipmentAction, setPendingEquipmentAction] = useState(null);
     const [activeTimer, setActiveTimer] = useState(null);
     const [tests, setTests] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -924,7 +932,7 @@ export default function App() {
     }, [isSampleMode, studySessions, user]);
     useEffect(() => {
         if (isSampleMode || !user) return undefined;
-        return onSnapshot(playerProfileRef(db, FAMILY_ID), (snap) => setPlayerProfile(snap.exists() ? snap.data() : emptyPlayerProfile()), (err) => console.error('PlayerProfile realtime sync error:', err));
+        return onSnapshot(playerProfileRef(db, FAMILY_ID), (snap) => setPlayerProfile(normalizePlayerProfile(snap.exists() ? snap.data() : emptyPlayerProfile())), (err) => console.error('PlayerProfile realtime sync error:', err));
     }, [isSampleMode, user]);
     useEffect(() => {
         if (!activeTimerIsOwner || activeTimer?.state !== 'running' || isSampleMode || !user) return;
@@ -1047,6 +1055,7 @@ export default function App() {
             const { tasks: sTasks, tests: sTests } = generateSampleData();
             setTasks(sTasks);
             setTests(sTests);
+            setActiveTab('daily');
             setIsSampleMode(true);
             setLoading(false);
         }
@@ -1071,6 +1080,59 @@ export default function App() {
             }
         }
     }, [isSampleMode, user]);
+    const rpgErrorMessage = (error) => ({
+        INSUFFICIENT_GOLD: 'GOLDが足りません',
+        INSUFFICIENT_MATERIALS: '素材が足りません',
+        ALREADY_OWNED: 'すでに所有しています',
+        ITEM_NOT_OWNED: 'この装備は所有していません',
+        ALREADY_EQUIPPED: 'すでに装備中です',
+        ALREADY_UNEQUIPPED: 'すでに解除されています',
+    }[error?.code || error?.message] || '操作に失敗しました。もう一度お試しください。');
+    const handlePurchaseRequest = (item) => {
+        if (isSampleMode || !user || pendingPurchaseItemId) return;
+        setRpgStatus(null);
+        setPurchaseCandidate(item);
+    };
+    const handlePurchaseConfirm = async () => {
+        if (!purchaseCandidate || isSampleMode || !user || pendingPurchaseItemId) return;
+        const item = purchaseCandidate;
+        setPendingPurchaseItemId(item.id);
+        try {
+            const result = await purchaseEquipment({ db, familyId: FAMILY_ID, itemId: item.id, actionId: createRpgActionId('purchase') });
+            setPurchaseCandidate(null);
+            setRpgStatus(result.applied ? { kind: 'success', message: `${item.name}を購入しました` } : { kind: 'error', message: rpgErrorMessage({ code: result.reason }) });
+        } catch (error) {
+            setRpgStatus({ kind: 'error', message: rpgErrorMessage(error) });
+        } finally {
+            setPendingPurchaseItemId(null);
+        }
+    };
+    const handleEquip = async (itemId) => {
+        if (isSampleMode || !user || pendingEquipmentAction) return;
+        setPendingEquipmentAction(`equip:${itemId}`);
+        try {
+            const result = await equipItem({ db, familyId: FAMILY_ID, itemId, actionId: createRpgActionId('equip') });
+            const itemName = getEquipmentCatalogItem(itemId)?.name || '装備';
+            setRpgStatus(result.applied ? { kind: 'success', message: `${itemName}を装備しました` } : { kind: 'error', message: rpgErrorMessage({ code: result.reason }) });
+        } catch (error) {
+            setRpgStatus({ kind: 'error', message: rpgErrorMessage(error) });
+        } finally {
+            setPendingEquipmentAction(null);
+        }
+    };
+    const handleUnequip = async (slot) => {
+        if (isSampleMode || !user || pendingEquipmentAction) return;
+        setPendingEquipmentAction(`unequip:${slot}`);
+        try {
+            const result = await unequipSlot({ db, familyId: FAMILY_ID, slot, actionId: createRpgActionId('unequip') });
+            const slotLabel = { weapon: '武器', armor: '防具', accessory: 'アクセサリー' }[slot] || '装備';
+            setRpgStatus(result.applied ? { kind: 'success', message: `${slotLabel}を解除しました` } : { kind: 'error', message: rpgErrorMessage({ code: result.reason }) });
+        } catch (error) {
+            setRpgStatus({ kind: 'error', message: rpgErrorMessage(error) });
+        } finally {
+            setPendingEquipmentAction(null);
+        }
+    };
     const handleSaveLegacyRecord = async (task, totalSeconds) => {
         if (savingRecordRef.current)
             return;
@@ -1459,7 +1521,7 @@ export default function App() {
             </div>
           </div>
           <nav className={DESKTOP_SIDEBAR_NAV_CLASS}>
-            {[{ id: 'daily', label: '学習記録', icon: Zap }, { id: 'stats', label: '実績分析', icon: BarChart2 }, { id: 'tests', label: '成績推移', icon: TrendingUp }].map(item => (<button type="button" key={item.id} onClick={() => setActiveTab(item.id)} className={`w-full flex items-center gap-4 px-6 py-4 rounded-3xl font-black transition-all leading-none ${activeTab === item.id ? 'bg-blue-600 text-white shadow-2xl' : 'text-slate-400 hover:bg-slate-50'}`}>
+            {[{ id: 'daily', label: '学習記録', icon: Zap }, { id: 'stats', label: '実績分析', icon: BarChart2 }, { id: 'tests', label: '成績推移', icon: TrendingUp }, ...(!isSampleMode ? [{ id: 'rpg', label: 'RPG', icon: Trophy }] : [])].map(item => (<button type="button" key={item.id} onClick={() => setActiveTab(item.id)} className={`w-full flex items-center gap-4 px-6 py-4 rounded-3xl font-black transition-all leading-none ${activeTab === item.id ? 'bg-blue-600 text-white shadow-2xl' : 'text-slate-400 hover:bg-slate-50'}`}>
                 <item.icon size={20}/> {item.label}
               </button>))}
           </nav>
@@ -1864,6 +1926,9 @@ export default function App() {
                   </div>
                 </div>
               </div>)}
+            {activeTab === 'rpg' && !isSampleMode && (
+              <RpgHub profile={playerProfile} onPurchaseRequest={handlePurchaseRequest} onEquip={handleEquip} onUnequip={handleUnequip} pendingItemId={pendingPurchaseItemId} pendingAction={pendingEquipmentAction} status={rpgStatus}/>
+            )}
           </main>
         </div>
 
@@ -1886,6 +1951,7 @@ export default function App() {
           </div>
         </div>)}
         <RewardResultModal result={rewardResult} profile={playerProfile} onClose={() => setRewardResult(null)} />
+        <PurchaseConfirmModal item={purchaseCandidate} profile={playerProfile} purchasing={Boolean(pendingPurchaseItemId)} onCancel={() => !pendingPurchaseItemId && setPurchaseCandidate(null)} onConfirm={handlePurchaseConfirm}/>
 
         {/* --- Modals --- */}
         {isAddingTask && (<div className={modalOverlayClass}>
@@ -2037,7 +2103,7 @@ export default function App() {
         <nav className={isMobileView
             ? "absolute bottom-0 left-0 right-0 bg-white/90 backdrop-blur-3xl border-t border-slate-100 flex justify-around p-3 pb-8 z-50 rounded-t-[1.75rem] shadow-2xl leading-none text-center"
             : "lg:hidden fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-3xl border-t border-slate-100 flex justify-around p-3 pb-8 z-50 rounded-t-[1.75rem] shadow-2xl leading-none text-center"}>
-          {[{ id: 'daily', label: '学習記録', icon: Zap }, { id: 'stats', label: '実績分析', icon: BarChart2 }, { id: 'tests', label: '成績推移', icon: TrendingUp }].map(item => (<button type="button" key={item.id} aria-label={item.label} title={item.label} onClick={() => setActiveTab(item.id)} className={`p-4 rounded-2xl transition-all duration-300 leading-none text-center ${activeTab === item.id ? 'bg-blue-600 text-white shadow-xl -translate-y-2 text-center' : 'text-slate-300 text-center'}`}><item.icon size={22}/></button>))}
+          {[{ id: 'daily', label: '学習記録', icon: Zap }, { id: 'stats', label: '実績分析', icon: BarChart2 }, { id: 'tests', label: '成績推移', icon: TrendingUp }, ...(!isSampleMode ? [{ id: 'rpg', label: 'RPG', icon: Trophy }] : [])].map(item => (<button type="button" key={item.id} aria-label={item.label} title={item.label} onClick={() => setActiveTab(item.id)} className={`min-w-0 flex-1 p-2.5 sm:p-4 rounded-2xl transition-all duration-300 leading-none text-center ${activeTab === item.id ? 'bg-blue-600 text-white shadow-xl -translate-y-2 text-center' : 'text-slate-300 text-center'}`}><item.icon size={20}/><span className="mt-1 block text-[8px] font-black sm:hidden">{item.id === 'daily' ? '学習' : item.id === 'stats' ? '実績' : item.id === 'tests' ? '成績' : 'RPG'}</span></button>))}
         </nav>
       </div>
     </div>);
