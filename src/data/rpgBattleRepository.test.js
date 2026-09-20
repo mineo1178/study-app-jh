@@ -17,7 +17,7 @@ describe('battle transaction logic', () => {
     const start = prepareBattleStart({ profile, enemy: ENEMY_CATALOG.slime, battleId: 'battle-a', now });
     const attack = prepareBattleAttack({ battle: start.battle, profile: start.profile, actionId: 'attack-a', now: now + 1 });
     expect(attack.battle).toMatchObject({ enemyHp: 10, attackCount: 1, status: 'active' });
-    expect(attack.attackLedger).toMatchObject({ damage: 10, hpBefore: 20, hpAfter: 10, victory: false });
+    expect(attack.attackLedger).toMatchObject({ playerAttack: { damage: 10, enemyHpBefore: 20, enemyHpAfter: 10 }, enemyCounter: { damage: 3, playerHpBefore: 40, playerHpAfter: 37 }, outcome: 'active' });
     expect(attack.profile).toBeNull();
   });
   it('makes victory atomic: hp floor, EXP once, level update, and active battle clear', () => {

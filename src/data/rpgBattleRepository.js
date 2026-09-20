@@ -1,11 +1,12 @@
 import { doc, runTransaction } from 'firebase/firestore';
-import { calculateAttackResult, calculatePlayerAttack } from '../rpg/battleCalculator.js';
+import { calculateAttackResult, calculateEnemyCounterDamage, calculatePlayerAttack, calculatePlayerDefense, calculatePlayerMaxHp } from '../rpg/battleCalculator.js';
 import { ENEMY_CATALOG_VERSION, getEnemyCatalogItem } from '../rpg/enemyCatalog.js';
 import { levelForTotalExp } from '../rpg/levelSystem.js';
 import { normalizePlayerProfile } from '../rpg/playerProfile.js';
+import { normalizeBattle } from '../rpg/battleState.js';
 import { playerProfileRef } from './rewardLedgerRepository.js';
 
-export const RPG_BATTLE_SCHEMA_VERSION = 1;
+export const RPG_BATTLE_SCHEMA_VERSION = 2;
 const appPath = (familyId, collectionName, id) => ['families', familyId, 'apps', 'junior-high', collectionName, id];
 export const rpgBattleRef = (db, familyId, battleId) => doc(db, ...appPath(familyId, 'rpgBattles', battleId));
 export const rpgBattleLedgerRef = (db, familyId, ledgerId) => doc(db, ...appPath(familyId, 'rpgBattleLedger', ledgerId));
@@ -20,21 +21,23 @@ export function prepareBattleStart({ profile, enemy, battleId, now }) {
   const current = normalizePlayerProfile(profile);
   if (current.activeBattleId) throw failure('ACTIVE_BATTLE_EXISTS');
   if (number(current.battleEnergy) < enemy.energyCost) throw failure('INSUFFICIENT_BATTLE_ENERGY');
-  const playerSnapshot = { level: current.level, attack: calculatePlayerAttack(current), equipped: equippedSnapshot(current) };
-  const enemySnapshot = { name: enemy.name, maxHp: enemy.maxHp, energyCost: enemy.energyCost, expReward: enemy.expReward, catalogVersion: ENEMY_CATALOG_VERSION };
+  const playerSnapshot = { level: current.level, maxHp: calculatePlayerMaxHp(current), attack: calculatePlayerAttack(current), defense: calculatePlayerDefense(current), equipped: equippedSnapshot(current) };
+  const enemySnapshot = { name: enemy.name, maxHp: enemy.maxHp, attack: enemy.attack, energyCost: enemy.energyCost, expReward: enemy.expReward, catalogVersion: ENEMY_CATALOG_VERSION };
   return {
     profile: { ...current, battleEnergy: number(current.battleEnergy) - enemy.energyCost, activeBattleId: battleId, updatedAt: now },
-    battle: { schemaVersion: RPG_BATTLE_SCHEMA_VERSION, battleId, enemyId: enemy.id, enemySnapshot, enemyHp: enemy.maxHp, status: 'active', playerSnapshot, attackCount: 0, startedAt: now, updatedAt: now, victory: null },
+    battle: { schemaVersion: RPG_BATTLE_SCHEMA_VERSION, battleId, enemyId: enemy.id, enemySnapshot, enemyHp: enemy.maxHp, status: 'active', playerSnapshot, playerHp: playerSnapshot.maxHp, attackCount: 0, startedAt: now, updatedAt: now, victory: null, defeat: null },
     ledger: { schemaVersion: RPG_BATTLE_SCHEMA_VERSION, type: 'battle_start', battleId, enemyId: enemy.id, energySpent: enemy.energyCost, enemySnapshot, playerSnapshot, status: 'applied', appliedAt: now },
   };
 }
 
-export function prepareBattleAttack({ battle, profile, actionId, now }) {
+export function prepareBattleAttack({ battle: rawBattle, profile, actionId, now }) {
+  const battle = normalizeBattle(rawBattle);
   if (battle.status !== 'active') throw failure('BATTLE_ALREADY_COMPLETED');
   const result = calculateAttackResult(battle.enemyHp, battle.playerSnapshot?.attack);
   const attackCount = number(battle.attackCount) + 1;
-  const attackLedger = { schemaVersion: RPG_BATTLE_SCHEMA_VERSION, type: 'attack', actionId, battleId: battle.battleId, attackNumber: attackCount, damage: result.damage, hpBefore: result.hpBefore, hpAfter: result.hpAfter, victory: result.victory, status: 'applied', appliedAt: now };
-  if (!result.victory) return { battle: { ...battle, enemyHp: result.hpAfter, attackCount, updatedAt: now }, attackLedger, victoryLedger: null, profile: null, result };
+  const playerAttack = { attack: result.damage, damage: result.damage, enemyHpBefore: result.hpBefore, enemyHpAfter: result.hpAfter };
+  if (!result.victory) { const damage = calculateEnemyCounterDamage(battle.enemySnapshot.attack, battle.playerSnapshot.defense); const playerHpBefore = battle.playerHp; const playerHpAfter = Math.max(0, playerHpBefore - damage); const lost = playerHpAfter === 0; const enemyCounter = { attack: battle.enemySnapshot.attack, playerDefense: battle.playerSnapshot.defense, damage, playerHpBefore, playerHpAfter }; const defeat = lost ? { playerHpBefore, playerHpAfter: 0, enemyHpAfter: result.hpAfter, triggeringActionId: actionId, defeatedAt: now } : null; const attackLedger = { schemaVersion: 1, type: 'attack', actionId, battleId: battle.battleId, attackNumber: attackCount, playerAttack, enemyCounter, outcome: lost ? 'lost' : 'active', status: 'applied', appliedAt: now }; return { battle: { ...battle, enemyHp: result.hpAfter, playerHp: playerHpAfter, status: lost ? 'lost' : 'active', defeat, attackCount, updatedAt: now }, attackLedger, victoryLedger: null, defeatLedger: lost ? { schemaVersion: 1, type: 'defeat', battleId: battle.battleId, enemyId: battle.enemyId, playerHpBefore, playerHpAfter: 0, enemyHpAfter: result.hpAfter, attackCount, triggeringActionId: actionId, expGranted: 0, status: 'applied', appliedAt: now } : null, profile: lost ? { ...normalizePlayerProfile(profile), activeBattleId: null, updatedAt: now } : null, result: { ...result, enemyCounter }, };
+  }
   const current = normalizePlayerProfile(profile);
   const totalExpBefore = current.totalExp;
   const expGranted = number(battle.enemySnapshot?.expReward);
@@ -42,9 +45,9 @@ export function prepareBattleAttack({ battle, profile, actionId, now }) {
   const levelAfter = levelForTotalExp(totalExpAfter);
   const victory = { expGranted, totalExpBefore, totalExpAfter, levelBefore: current.level, levelAfter, actionId, grantedAt: now };
   return {
-    battle: { ...battle, enemyHp: 0, status: 'won', attackCount, updatedAt: now, victory },
+    battle: { ...battle, enemyHp: 0, status: 'won', attackCount, updatedAt: now, victory, defeat: null },
     profile: { ...current, totalExp: totalExpAfter, level: levelAfter, activeBattleId: null, updatedAt: now },
-    attackLedger,
+    attackLedger: { schemaVersion: 1, type: 'attack', actionId, battleId: battle.battleId, attackNumber: attackCount, playerAttack, enemyCounter: null, outcome: 'won', status: 'applied', appliedAt: now },
     victoryLedger: { schemaVersion: RPG_BATTLE_SCHEMA_VERSION, type: 'victory', battleId: battle.battleId, enemyId: battle.enemyId, expGranted, totalExpBefore, totalExpAfter, levelBefore: current.level, levelAfter, triggeringActionId: actionId, status: 'applied', appliedAt: now },
     result,
   };
@@ -64,16 +67,17 @@ export async function startBattle({ db, familyId, enemyId, battleId }) {
 }
 
 export async function attackBattle({ db, familyId, battleId, actionId }) {
-  const profile = playerProfileRef(db, familyId); const battleRef = rpgBattleRef(db, familyId, battleId); const attackLedgerRef = rpgBattleLedgerRef(db, familyId, actionId); const victoryLedgerRef = rpgBattleLedgerRef(db, familyId, `victory-${battleId}`); const now = Date.now();
+  const profile = playerProfileRef(db, familyId); const battleRef = rpgBattleRef(db, familyId, battleId); const attackLedgerRef = rpgBattleLedgerRef(db, familyId, actionId); const victoryLedgerRef = rpgBattleLedgerRef(db, familyId, `victory-${battleId}`); const defeatLedgerRef = rpgBattleLedgerRef(db, familyId, `defeat-${battleId}`); const now = Date.now();
   return runTransaction(db, async (transaction) => {
-    const [battleSnap, attackLedgerSnap, victoryLedgerSnap, profileSnap] = await Promise.all([transaction.get(battleRef), transaction.get(attackLedgerRef), transaction.get(victoryLedgerRef), transaction.get(profile)]);
+    const [battleSnap, attackLedgerSnap, victoryLedgerSnap, defeatLedgerSnap, profileSnap] = await Promise.all([transaction.get(battleRef), transaction.get(attackLedgerRef), transaction.get(victoryLedgerRef), transaction.get(defeatLedgerRef), transaction.get(profile)]);
     if (attackLedgerSnap.exists()) return { applied: false, reason: 'ALREADY_APPLIED' };
     if (!battleSnap.exists()) throw failure('BATTLE_NOT_FOUND');
-    const battle = battleSnap.data();
-    if (battle.status !== 'active' || victoryLedgerSnap.exists()) throw failure('BATTLE_ALREADY_COMPLETED');
+    const battle = normalizeBattle(battleSnap.data());
+    if (battle.status !== 'active' || victoryLedgerSnap.exists() || defeatLedgerSnap.exists()) throw failure('BATTLE_ALREADY_COMPLETED');
     const change = prepareBattleAttack({ battle, profile: profileSnap.exists() ? profileSnap.data() : {}, actionId, now });
     transaction.set(battleRef, change.battle); transaction.set(attackLedgerRef, change.attackLedger);
     if (change.victoryLedger) { transaction.set(profile, change.profile); transaction.set(victoryLedgerRef, change.victoryLedger); }
-    return { applied: true, battle: change.battle, result: change.result, victory: Boolean(change.victoryLedger) };
+    if (change.defeatLedger) { transaction.set(profile, change.profile); transaction.set(defeatLedgerRef, change.defeatLedger); }
+    return { applied: true, battle: change.battle, result: change.result, victory: Boolean(change.victoryLedger), defeat: Boolean(change.defeatLedger) };
   });
 }

@@ -16,6 +16,7 @@ import { applyStudySessionReward, emptyPlayerProfile, playerProfileRef } from '.
 import { createRpgActionId, equipItem, purchaseEquipment, unequipSlot } from './data/rpgShopRepository';
 import { attackBattle, createBattleActionId, createBattleId, rpgBattleRef, startBattle } from './data/rpgBattleRepository';
 import { getEquipmentCatalogItem } from './rpg/equipmentCatalog';
+import { normalizeBattle } from './rpg/battleState';
 import { normalizePlayerProfile } from './rpg/playerProfile';
 import { isStudySessionRewardEligible } from './rpg/rewardCalculator';
 import RpgWalletPanel from './components/rpg/RpgWalletPanel';
@@ -62,7 +63,7 @@ const getTasksCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-
 const getTestsCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tests');
 const getStudySessionsCol = () => studySessionsCollection(db, FAMILY_ID);
 const getActiveTimerRef = () => activeTimerRef(db, FAMILY_ID);
-const APP_VERSION = 'v1.79';
+const APP_VERSION = 'v1.80';
 const TIMER_HEARTBEAT_MS = 30 * 1000;
 const DAILY_TARGET_SECONDS = 2 * 60 * 60;
 const isDocumentHidden = () => typeof document !== 'undefined' && document.hidden;
@@ -944,7 +945,7 @@ export default function App() {
     useEffect(() => {
         const battleId = playerProfile.activeBattleId;
         if (isSampleMode || !user || !battleId) return undefined;
-        return onSnapshot(rpgBattleRef(db, FAMILY_ID, battleId), (snap) => { const next = snap.exists() ? snap.data() : null; setActiveBattle(next); if (next?.status === 'won') setLastBattle(next); }, (err) => console.error('Battle realtime sync error:', err));
+        return onSnapshot(rpgBattleRef(db, FAMILY_ID, battleId), (snap) => { const next = snap.exists() ? normalizeBattle(snap.data()) : null; setActiveBattle(next); if (next?.status === 'won' || next?.status === 'lost') setLastBattle(next); }, (err) => console.error('Battle realtime sync error:', err));
     }, [isSampleMode, playerProfile.activeBattleId, user]);
     useEffect(() => {
         if (!activeTimerIsOwner || activeTimer?.state !== 'running' || isSampleMode || !user) return;
@@ -1970,7 +1971,7 @@ export default function App() {
                 </div>
               </div>)}
             {activeTab === 'rpg' && !isSampleMode && (
-              <RpgHub profile={playerProfile} onPurchaseRequest={handlePurchaseRequest} onEquip={handleEquip} onUnequip={handleUnequip} pendingItemId={pendingPurchaseItemId} pendingAction={pendingEquipmentAction} status={rpgStatus} battle={activeBattle || lastBattle} onStartBattleRequest={handleBattleStartRequest} onAttackBattle={handleAttackBattle} startingEnemyId={pendingBattleEnemyId} attacking={isAttackingBattle}/>
+              <RpgHub profile={playerProfile} onPurchaseRequest={handlePurchaseRequest} onEquip={handleEquip} onUnequip={handleUnequip} pendingItemId={pendingPurchaseItemId} pendingAction={pendingEquipmentAction} status={rpgStatus} battle={activeBattle || lastBattle} onStartBattleRequest={handleBattleStartRequest} onAttackBattle={handleAttackBattle} startingEnemyId={pendingBattleEnemyId} attacking={isAttackingBattle} onBattleBack={() => setLastBattle(null)}/>
             )}
           </main>
         </div>
