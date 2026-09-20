@@ -12,6 +12,8 @@ import { breakRemainingSeconds, isActiveTimer, isBreakFinished, isStaleActiveTim
 import { getRunningTimerTask, getTaskLiveSession, getTimerViewTask, hasAnyRunningTimer } from './timer/timerRuntimeState';
 import { activeTimerRef, finishActiveTimer, heartbeatActiveTimer, invalidateStaleActiveTimer, pauseActiveTimer, resumeActiveTimer, startBreakActiveTimer, startOrSwitchActiveTimer } from './data/activeTimerRepository';
 import { studySessionsCollection } from './data/studySessionRepository';
+import { applyStudySessionReward } from './data/rewardLedgerRepository';
+import { isStudySessionRewardEligible } from './rpg/rewardCalculator';
 import { formatHms, getEffectiveStudySeconds, getLiveStudySession, getSessionsForDate, getSessionsForTask, getUnifiedStudySessions } from './data/studySessionSelectors';
 import LiveStudyStatus from './components/study/LiveStudyStatus';
 import MigrationExportButton from './components/dev/MigrationExportButton';
@@ -51,7 +53,7 @@ const getTasksCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-
 const getTestsCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tests');
 const getStudySessionsCol = () => studySessionsCollection(db, FAMILY_ID);
 const getActiveTimerRef = () => activeTimerRef(db, FAMILY_ID);
-const APP_VERSION = 'v1.75';
+const APP_VERSION = 'v1.76';
 const TIMER_HEARTBEAT_MS = 30 * 1000;
 const DAILY_TARGET_SECONDS = 2 * 60 * 60;
 const isDocumentHidden = () => typeof document !== 'undefined' && document.hidden;
@@ -856,6 +858,7 @@ export default function App() {
     const savingRecordRef = useRef(false);
     const staleInvalidatingRef = useRef(false);
     const autoFinishHandlerRef = useRef(null);
+    const rewardProcessingRef = useRef(new Set());
     const currentClientId = useMemo(() => getCurrentClientId(), []);
     const unifiedSessions = useMemo(() => getUnifiedStudySessions(tasks, studySessions), [tasks, studySessions]);
     const activeTimerTask = useMemo(() => isActiveTimer(activeTimer) ? tasks.find((task) => task.id === activeTimer.taskId) || null : null, [activeTimer, tasks]);
@@ -905,6 +908,15 @@ export default function App() {
         const interval = setInterval(() => setLiveNow(Date.now()), 1000);
         return () => clearInterval(interval);
     }, [activeTimer]);
+    useEffect(() => {
+        if (isSampleMode || !user) return;
+        studySessions.filter(isStudySessionRewardEligible).slice(0, 20).forEach((session) => {
+            if (rewardProcessingRef.current.has(session.id)) return;
+            rewardProcessingRef.current.add(session.id);
+            applyStudySessionReward({ db, familyId: FAMILY_ID, session })
+              .catch((err) => { console.error('Study reward reconciliation failed:', err); rewardProcessingRef.current.delete(session.id); });
+        });
+    }, [isSampleMode, studySessions, user]);
     useEffect(() => {
         if (!activeTimerIsOwner || activeTimer?.state !== 'running' || isSampleMode || !user) return;
         const sendHeartbeat = () => heartbeatActiveTimer({

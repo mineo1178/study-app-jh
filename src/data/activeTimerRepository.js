@@ -1,6 +1,7 @@
 import { doc, runTransaction } from 'firebase/firestore';
 import { VALIDATION_VERSION } from '../integrity/validationConfig.js';
 import { validateStudySession } from '../integrity/studyValidation.js';
+import { REWARD_POLICY_VERSION } from '../rpg/rewardConfig.js';
 import { closeSegment, isActiveTimer, isStaleActiveTimer, timerRecordedSeconds, timerSegmentsAtEnd } from '../timer/timerEngine.js';
 
 const ACTIVE_TIMER_ID = 'current';
@@ -109,6 +110,7 @@ export function buildForcedInvalidTimerSession(timer, task = {}, reasonCode, now
   const segments = timerSegmentsAtEnd(timer, endAt);
   return {
     timerId: timer.timerId,
+    rewardPolicyVersion: REWARD_POLICY_VERSION,
     taskId: timer.taskId,
     taskSnapshot: {
       categoryId: taskSnapshot.categoryId || null,
@@ -204,6 +206,7 @@ export function buildFinishedTimerSession(timer, task = {}, { endAt = Date.now()
   const recordedSeconds = segments.reduce((sum, segment) => sum + (Number(segment.durationSeconds) || 0), 0);
   return {
     timerId: timer.timerId,
+    rewardPolicyVersion: REWARD_POLICY_VERSION,
     taskId: timer.taskId,
     taskSnapshot: {
       categoryId: taskSnapshot.categoryId,
