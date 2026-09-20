@@ -21,6 +21,7 @@ export function getTimerViewTask({ task, isSampleMode, activeTimer }) {
       currentDuration: activeTimer.accumulatedSeconds || 0,
       lastHeartbeatAt: activeTimer.lastHeartbeatAt,
       lastUpdatedAt: activeTimer.updatedAt,
+      break: activeTimer.break || null,
     };
   }
   if (isSampleMode) return task;

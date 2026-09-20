@@ -8,9 +8,9 @@ import { HIGH_RISK_SESSION_MINUTES, LONG_SESSION_MINUTES, REVIEW_SESSION_MINUTES
 import { ACTIVITY_TYPES, inferLegacyActivityType, normalizeActivityType } from './integrity/activityTypes';
 import { validateStudySession } from './integrity/studyValidation';
 import { getCurrentClientId, createTimerId } from './timer/timerClient';
-import { isActiveTimer, isStaleActiveTimer, isTimerOwner, shouldAutoFinishReading, timerRecordedSeconds, timerSegmentsAtEnd } from './timer/timerEngine';
+import { breakRemainingSeconds, isActiveTimer, isBreakFinished, isStaleActiveTimer, isTimerOwner, shouldAutoFinishReading, timerRecordedSeconds, timerSegmentsAtEnd } from './timer/timerEngine';
 import { getRunningTimerTask, getTaskLiveSession, getTimerViewTask, hasAnyRunningTimer } from './timer/timerRuntimeState';
-import { activeTimerRef, finishActiveTimer, heartbeatActiveTimer, invalidateStaleActiveTimer, pauseActiveTimer, startOrSwitchActiveTimer } from './data/activeTimerRepository';
+import { activeTimerRef, finishActiveTimer, heartbeatActiveTimer, invalidateStaleActiveTimer, pauseActiveTimer, resumeActiveTimer, startBreakActiveTimer, startOrSwitchActiveTimer } from './data/activeTimerRepository';
 import { studySessionsCollection } from './data/studySessionRepository';
 import { formatHms, getEffectiveStudySeconds, getLiveStudySession, getSessionsForDate, getSessionsForTask, getUnifiedStudySessions } from './data/studySessionSelectors';
 import LiveStudyStatus from './components/study/LiveStudyStatus';
@@ -51,7 +51,7 @@ const getTasksCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-
 const getTestsCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tests');
 const getStudySessionsCol = () => studySessionsCollection(db, FAMILY_ID);
 const getActiveTimerRef = () => activeTimerRef(db, FAMILY_ID);
-const APP_VERSION = 'v1.74';
+const APP_VERSION = 'v1.75';
 const TIMER_HEARTBEAT_MS = 30 * 1000;
 const DAILY_TARGET_SECONDS = 2 * 60 * 60;
 const isDocumentHidden = () => typeof document !== 'undefined' && document.hidden;
@@ -493,8 +493,12 @@ const TodayTimeline = ({ tasks, sessions = null, liveSession = null, isSampleMod
       </div>)}
     </div>);
 };
-const StrictTimer = ({ task, isAnyOtherRunning, isSaving, canPause = true, canStart = true, canStop = false, onUpdate, onSave }) => {
+const StrictTimer = ({ task, isAnyOtherRunning, isSaving, canPause = true, canStart = true, canStop = false, onUpdate, onBreak, onSave }) => {
     const [sessionElapsed, setSessionElapsed] = useState(0);
+    const [breakPicker, setBreakPicker] = useState(false);
+    const [breakMinutes, setBreakMinutes] = useState(10);
+    const [alarmEnabled, setAlarmEnabled] = useState(true);
+    const [breakNow, setBreakNow] = useState(() => Date.now());
     const timerRef = useRef(null);
 
     const getAccurateElapsed = useCallback(() => {
@@ -579,6 +583,30 @@ const StrictTimer = ({ task, isAnyOtherRunning, isSaving, canPause = true, canSt
         onSave({ ...task, currentDuration: totalToSave, isRunning: false, sessionStartTime: null }, totalToSave);
     };
 
+    const breakActive = Boolean(task.break?.active);
+    const breakFinished = isBreakFinished({ break: task.break }, breakNow);
+    const remainingBreakSeconds = breakRemainingSeconds({ break: task.break }, breakNow);
+    useEffect(() => {
+        if (!breakActive) return undefined;
+        const interval = setInterval(() => setBreakNow(Date.now()), 1000);
+        return () => clearInterval(interval);
+    }, [breakActive]);
+    useEffect(() => {
+        if (!breakFinished || !task.break?.alarmEnabled) return;
+        if (typeof window !== 'undefined' && window.Notification?.permission === 'granted') new window.Notification('休憩終了', { body: '学習を再開してください。' });
+        try {
+            const context = new AudioContext();
+            const oscillator = context.createOscillator();
+            oscillator.connect(context.destination); oscillator.start(); oscillator.stop(context.currentTime + 0.25);
+        } catch { /* Audio is optional when the browser blocks it. */ }
+    }, [breakFinished, task.break]);
+
+    const startBreak = () => {
+        if (alarmEnabled && typeof window !== 'undefined' && window.Notification?.permission === 'default') window.Notification.requestPermission();
+        onBreak?.(task.id, breakMinutes * 60, alarmEnabled);
+        setBreakPicker(false);
+    };
+
     const totalSeconds = getAccurateTotal();
     const stale = isStaleRunningTask(task);
     const totalMinutes = Math.floor(totalSeconds / 60);
@@ -593,7 +621,11 @@ const StrictTimer = ({ task, isAnyOtherRunning, isSaving, canPause = true, canSt
       <div className="absolute -top-24 -right-24 w-56 h-56 bg-blue-500/20 rounded-full blur-3xl"/>
       <div className="absolute -bottom-28 -left-20 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl"/>
       <div className="mb-8 flex flex-col items-center justify-center w-full relative z-10">
-        {task.isRunning && stale ? (<>
+        {breakActive ? (<>
+            <span className="text-[10px] sm:text-xs font-black text-amber-200 uppercase tracking-widest mb-2">休憩中</span>
+            <div className="text-5xl sm:text-7xl font-mono font-black tracking-tighter text-white leading-none">{breakFinished ? '休憩終了' : `残り ${formatDuration(remainingBreakSeconds)}`}</div>
+            <div className="mt-3 text-xs font-bold text-amber-100">{breakFinished ? '学習を再開してください' : '休憩時間は学習実績に加算されません'}</div>
+          </>) : task.isRunning && stale ? (<>
             <div className="mb-4 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-300/10 border border-amber-200/20 text-amber-100 text-[10px] sm:text-xs font-black uppercase tracking-widest">
               <span className="w-2 h-2 rounded-full bg-amber-300"/> 要確認
             </div>
@@ -628,17 +660,19 @@ const StrictTimer = ({ task, isAnyOtherRunning, isSaving, canPause = true, canSt
       </div>
 
       <div className="flex gap-3 w-full max-w-sm relative z-10">
-        {!task.isRunning ? (<button type="button" onClick={handleStart} disabled={isSaving || !canStart} className="flex-1 bg-white text-slate-950 font-black py-4 sm:py-5 rounded-xl sm:rounded-2xl shadow-lg active:scale-95 transition flex items-center justify-center gap-2 text-sm sm:text-lg uppercase leading-none hover:bg-blue-50 disabled:opacity-60">
+        {breakActive ? <button type="button" onClick={handleStart} disabled={isSaving || !canStart} className="flex-1 bg-white text-slate-950 font-black py-4 sm:py-5 rounded-xl sm:rounded-2xl shadow-lg text-sm sm:text-lg uppercase"><Play size={20} fill="currentColor"/> 学習を再開</button> : !task.isRunning ? (<button type="button" onClick={handleStart} disabled={isSaving || !canStart} className="flex-1 bg-white text-slate-950 font-black py-4 sm:py-5 rounded-xl sm:rounded-2xl shadow-lg active:scale-95 transition flex items-center justify-center gap-2 text-sm sm:text-lg uppercase leading-none hover:bg-blue-50 disabled:opacity-60">
             <Play size={20} fill="currentColor"/> START
         </button>) : stale ? (<button type="button" disabled className="flex-1 cursor-not-allowed bg-slate-500 text-white font-black py-4 sm:py-5 rounded-xl sm:rounded-2xl text-sm sm:text-lg uppercase leading-none opacity-70">
             自動無効化中
           </button>) : (<button type="button" onClick={stopTimer} disabled={isSaving || !canPause} className="flex-1 bg-amber-400 text-slate-950 font-black py-4 sm:py-5 rounded-xl sm:rounded-2xl shadow-lg active:scale-95 transition flex items-center justify-center gap-2 text-sm sm:text-lg uppercase leading-none hover:bg-amber-300 disabled:opacity-60">
             <Pause size={20} fill="currentColor"/> PAUSE
           </button>)}
+        {task.isRunning && !breakActive && canPause && <button type="button" onClick={() => setBreakPicker(true)} className="flex-1 bg-amber-100 text-amber-900 font-black py-4 sm:py-5 rounded-xl sm:rounded-2xl text-sm sm:text-lg">休憩</button>}
         {canStop && <button type="button" onClick={handleSaveClick} disabled={isSaving} className="flex-1 bg-blue-600 text-white font-black py-4 sm:py-5 rounded-xl sm:rounded-2xl hover:bg-blue-500 transition flex items-center justify-center gap-2 text-sm sm:text-lg uppercase leading-none shadow-lg disabled:opacity-60">
           <Save size={20}/> {isSaving ? 'STOPPING' : 'STOP'}
         </button>}
       </div>
+      {breakPicker && <div className="mt-4 w-full max-w-sm rounded-2xl bg-white/10 p-3 text-left text-white"><div className="grid grid-cols-4 gap-2">{[5, 10, 15, 25].map((minutes) => <button type="button" key={minutes} onClick={() => setBreakMinutes(minutes)} className={`rounded-lg p-2 text-xs font-black ${breakMinutes === minutes ? 'bg-white text-slate-900' : 'bg-white/10'}`}>{minutes}分</button>)}</div><input type="number" min="1" value={breakMinutes} onChange={(event) => setBreakMinutes(Math.max(1, Number(event.target.value) || 1))} className="mt-2 w-full rounded-lg p-2 text-slate-900" aria-label="自由入力の休憩分数"/><label className="mt-2 flex gap-2 text-xs"><input type="checkbox" checked={alarmEnabled} onChange={(event) => setAlarmEnabled(event.target.checked)}/>終了時にアラーム</label><button type="button" onClick={startBreak} className="mt-3 w-full rounded-lg bg-amber-300 p-2 text-xs font-black text-slate-900">{breakMinutes}分休憩を開始</button></div>}
     </div>);
 };
 
@@ -1081,7 +1115,9 @@ export default function App() {
         }
         try {
             if (updates.isRunning) {
-                const result = await startOrSwitchActiveTimer({ db, familyId: FAMILY_ID, task, tasks, timerId: createTimerId(), ownerClientId: currentClientId });
+                const result = activeTimer?.taskId === taskId && activeTimer.state === 'paused'
+                  ? await resumeActiveTimer({ db, familyId: FAMILY_ID, timerId: activeTimer.timerId, ownerClientId: currentClientId })
+                  : await startOrSwitchActiveTimer({ db, familyId: FAMILY_ID, task, tasks, timerId: createTimerId(), ownerClientId: currentClientId });
                 if (result.switched) {
                     const message = result.invalidatedPrevious
                       ? `停止したまま残っていた計測を無効化し、${task.title}を開始しました。`
@@ -1100,6 +1136,14 @@ export default function App() {
             alert(err.message === 'TIMER_NOT_OWNER' ? 'このタイマーは開始した端末から再開してください。' : 'タイマー操作に失敗しました。');
         }
     }, [activeTimer, currentClientId, handleUpdateLocalTask, isSampleMode, tasks, user]);
+    const handleBreak = useCallback(async (taskId, plannedSeconds, alarmEnabled) => {
+        if (isSampleMode || !user || activeTimer?.taskId !== taskId) return;
+        try {
+            await startBreakActiveTimer({ db, familyId: FAMILY_ID, timerId: activeTimer.timerId, ownerClientId: currentClientId, plannedSeconds, alarmEnabled });
+        } catch (err) {
+            alert(err.message === 'TIMER_NOT_OWNER' ? '休憩は開始した端末から開始してください。' : '休憩の開始に失敗しました。');
+        }
+    }, [activeTimer, currentClientId, isSampleMode, user]);
     // The latest closure is deliberately mirrored into autoFinishHandlerRef for the five-hour timer callback.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     const handleSaveRecord = async (task, totalSeconds, { memoOverride = null, endAtOverride = null } = {}) => {
@@ -1874,7 +1918,7 @@ export default function App() {
                          <button type="button" aria-label="学習項目詳細を閉じる" title="閉じる" onClick={() => setSelectedTaskId(null)} className="p-3 bg-white rounded-2xl shadow-sm hover:bg-slate-50 transition shrink-0 text-left"><X size={24}/></button>
                       </div>
                       <div className="flex-1 overflow-y-auto p-6 sm:p-10 space-y-10 no-scrollbar pb-32 text-left">
-                          <StrictTimer task={timerViewTask} isAnyOtherRunning={isSampleMode && isAnyTaskRunning && activeTimerTask?.id !== task.id && !task.isRunning} isSaving={isSavingRecord} canPause={activeTimerTask?.id !== task.id || activeTimerIsOwner} canStart={activeTimerTask?.id !== task.id || activeTimerIsOwner} canStop={isSampleMode || activeTimerTask?.id === task.id} onUpdate={handleTimerUpdate} onSave={handleSaveRecord}/>
+                          <StrictTimer task={timerViewTask} isAnyOtherRunning={isSampleMode && isAnyTaskRunning && activeTimerTask?.id !== task.id && !task.isRunning} isSaving={isSavingRecord} canPause={activeTimerTask?.id !== task.id || activeTimerIsOwner} canStart={activeTimerTask?.id !== task.id || activeTimerIsOwner} canStop={isSampleMode || activeTimerTask?.id === task.id} onUpdate={handleTimerUpdate} onBreak={handleBreak} onSave={handleSaveRecord}/>
                           {activeTimerTask?.id === task.id && !activeTimerIsOwner && <div className="rounded-2xl bg-slate-50 p-3 text-xs font-bold text-slate-500">別の端末で開始された計測です。この端末から停止できます。</div>}
                          <div className="space-y-4 text-left">
                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 px-2 text-left"><Search size={14}/> 学習メモ</label>

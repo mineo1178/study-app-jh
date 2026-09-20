@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isStaleActiveTimer, isTimerOwner, timerRecordedSeconds, timerSegmentsAtEnd } from './timerEngine';
+import { breakRemainingSeconds, isBreakFinished, isStaleActiveTimer, isTimerOwner, timerRecordedSeconds, timerSegmentsAtEnd } from './timerEngine';
 
 const start = 1_000_000;
 describe('active timer engine', () => {
@@ -18,5 +18,11 @@ describe('active timer engine', () => {
   it('observerはownerではない', () => {
     expect(isTimerOwner({ ownerClientId: 'device:tab-a' }, 'device:tab-a')).toBe(true);
     expect(isTimerOwner({ ownerClientId: 'device:tab-a' }, 'device:tab-b')).toBe(false);
+  });
+  it('休憩の残り時間はendsAtから計算し、予定終了でも自動再開しない', () => {
+    const timer = { state: 'paused', break: { active: true, endsAt: start + 10 * 60 * 1000 } };
+    expect(breakRemainingSeconds(timer, start + 5 * 60 * 1000)).toBe(300);
+    expect(isBreakFinished(timer, start + 10 * 60 * 1000)).toBe(true);
+    expect(timer.state).toBe('paused');
   });
 });

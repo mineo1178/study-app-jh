@@ -16,6 +16,15 @@ export function isStaleActiveTimer(timer, now = Date.now(), thresholdMs = 15 * 6
   return heartbeat > 0 && now - heartbeat >= thresholdMs;
 }
 
+export function breakRemainingSeconds(timer, now = Date.now()) {
+  if (!timer?.break?.active) return 0;
+  return Math.max(0, Math.ceil((number(timer.break.endsAt) - now) / 1000));
+}
+
+export function isBreakFinished(timer, now = Date.now()) {
+  return Boolean(timer?.break?.active && breakRemainingSeconds(timer, now) === 0);
+}
+
 export function closeSegment(startedAt, endedAt) {
   const start = number(startedAt);
   const end = number(endedAt);

@@ -56,14 +56,36 @@ export async function pauseActiveTimer({ db, familyId, timerId, ownerClientId, n
   });
 }
 
+export async function startBreakActiveTimer({ db, familyId, timerId, ownerClientId, plannedSeconds, alarmEnabled, now = Date.now() }) {
+  const ref = activeTimerRef(db, familyId);
+  return runTransaction(db, async (transaction) => {
+    const timer = (await transaction.get(ref)).data();
+    if (!timer || timer.timerId !== timerId || timer.ownerClientId !== ownerClientId) throw new Error('TIMER_NOT_OWNER');
+    if (timer.state !== 'running') return timer;
+    const segment = closeSegment(timer.segmentStartedAt, now);
+    const accumulatedSeconds = timerRecordedSeconds(timer, now);
+    const breakInfo = { active: true, startedAt: now, plannedSeconds, endsAt: now + plannedSeconds * 1000, alarmEnabled: Boolean(alarmEnabled) };
+    transaction.update(ref, {
+      state: 'paused', segments: segment ? [...(timer.segments || []), segment] : (timer.segments || []),
+      segmentStartedAt: null, accumulatedSeconds, break: breakInfo, lastHeartbeatAt: now, updatedAt: now,
+    });
+    return { ...timer, state: 'paused', accumulatedSeconds, segmentStartedAt: null, break: breakInfo };
+  });
+}
+
 export async function resumeActiveTimer({ db, familyId, timerId, ownerClientId, now = Date.now() }) {
   const ref = activeTimerRef(db, familyId);
   return runTransaction(db, async (transaction) => {
     const timer = (await transaction.get(ref)).data();
     if (!timer || timer.timerId !== timerId || timer.ownerClientId !== ownerClientId) throw new Error('TIMER_NOT_OWNER');
     if (timer.state !== 'paused') return timer;
-    transaction.update(ref, { state: 'running', segmentStartedAt: now, lastHeartbeatAt: now, updatedAt: now });
-    return { ...timer, state: 'running', segmentStartedAt: now, lastHeartbeatAt: now };
+    const completedBreak = timer.break?.active ? {
+      startedAt: timer.break.startedAt, endedAt: now, plannedSeconds: timer.break.plannedSeconds,
+      actualSeconds: Math.max(0, Math.floor((now - timer.break.startedAt) / 1000)),
+    } : null;
+    const breaks = completedBreak ? [...(timer.breaks || []), completedBreak] : (timer.breaks || []);
+    transaction.update(ref, { state: 'running', segmentStartedAt: now, lastHeartbeatAt: now, updatedAt: now, break: null, breaks });
+    return { ...timer, state: 'running', segmentStartedAt: now, lastHeartbeatAt: now, break: null, breaks };
   });
 }
 
@@ -178,6 +200,7 @@ export function buildFinishedTimerSession(timer, task = {}, { endAt = Date.now()
     ? Number(timer.lastHeartbeatAt) || endAt
     : endAt;
   const segments = timerSegmentsAtEnd(timer, safeEndAt);
+  const activeBreak = timer.break?.active ? [{ startedAt: timer.break.startedAt, endedAt: endAt, plannedSeconds: timer.break.plannedSeconds, actualSeconds: Math.max(0, Math.floor((endAt - timer.break.startedAt) / 1000)) }] : [];
   const recordedSeconds = segments.reduce((sum, segment) => sum + (Number(segment.durationSeconds) || 0), 0);
   return {
     timerId: timer.timerId,
@@ -191,6 +214,7 @@ export function buildFinishedTimerSession(timer, task = {}, { endAt = Date.now()
     },
     date: new Date(safeEndAt).toLocaleDateString('sv-SE'),
     segments,
+    breaks: [...(timer.breaks || []), ...activeBreak],
     recordedSeconds,
     validation: stale ? { status: 'invalid', reasonCodes: ['stale_timer_forced_invalid'], validationVersion: VALIDATION_VERSION } : validation,
     memo,

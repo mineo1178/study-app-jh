@@ -66,6 +66,13 @@ describe('cross-device timer finish', () => {
     expect(session.segments).toEqual(paused.segments);
   });
 
+  it('休憩中STOPは学習segmentのみを記録し、休憩はbreaks監査情報へ分離する', () => {
+    const resting = { ...staleTimer, state: 'paused', segmentStartedAt: null, accumulatedSeconds: 60, segments: [{ startedAt: start, endedAt: start + 60_000, durationSeconds: 60 }], break: { active: true, startedAt: start + 60_000, plannedSeconds: 600, endsAt: start + 660_000 } };
+    const session = buildFinishedTimerSession(resting, task, { endAt: start + 360_000, validation: { status: 'valid', reasonCodes: [] } });
+    expect(session.recordedSeconds).toBe(60);
+    expect(session.breaks).toEqual([{ startedAt: start + 60_000, endedAt: start + 360_000, plannedSeconds: 600, actualSeconds: 300 }]);
+  });
+
   it('10秒未満でもSTOP transactionの対象としてSessionを確定できる', () => {
     const shortTimer = { ...staleTimer, ownerClientId: 'device-a', lastHeartbeatAt: start + 5_000 };
     expect(canFinishActiveTimer(shortTimer, shortTimer.timerId)).toBe(true);
