@@ -9,6 +9,7 @@ import { ACTIVITY_TYPES, inferLegacyActivityType, normalizeActivityType } from '
 import { validateStudySession } from './integrity/studyValidation';
 import { getCurrentClientId, createTimerId } from './timer/timerClient';
 import { isActiveTimer, isStaleActiveTimer, isTimerOwner, shouldAutoFinishReading, timerRecordedSeconds, timerSegmentsAtEnd } from './timer/timerEngine';
+import { getRunningTimerTask, getTimerViewTask, hasAnyRunningTimer } from './timer/timerRuntimeState';
 import { activeTimerRef, finishActiveTimer, heartbeatActiveTimer, invalidateStaleActiveTimer, pauseActiveTimer, resumeActiveTimer, startActiveTimer } from './data/activeTimerRepository';
 import { studySessionsCollection } from './data/studySessionRepository';
 import { formatHms, getEffectiveStudySeconds, getLiveStudySession, getSessionsForDate, getSessionsForTask, getUnifiedStudySessions } from './data/studySessionSelectors';
@@ -50,7 +51,7 @@ const getTasksCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-
 const getTestsCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tests');
 const getStudySessionsCol = () => studySessionsCollection(db, FAMILY_ID);
 const getActiveTimerRef = () => activeTimerRef(db, FAMILY_ID);
-const APP_VERSION = 'v1.71';
+const APP_VERSION = 'v1.72';
 const TIMER_HEARTBEAT_MS = 30 * 1000;
 const DAILY_TARGET_SECONDS = 2 * 60 * 60;
 const isDocumentHidden = () => typeof document !== 'undefined' && document.hidden;
@@ -236,17 +237,17 @@ const generateSampleData = () => {
 // ==========================================
 // Component: TodayTimeline (当日の学習タイムライン)
 // ==========================================
-const TodayTimeline = ({ tasks, sessions = null, liveSession = null }) => {
+const TodayTimeline = ({ tasks, sessions = null, liveSession = null, isSampleMode = false }) => {
     const [selectedHistory, setSelectedHistory] = useState(null);
     const [nowTick, setNowTick] = useState(() => Date.now());
 
     useEffect(() => {
-        const hasRunning = tasks.some(t => t.isRunning && t.sessionStartTime);
+        const hasRunning = isSampleMode && tasks.some(t => t.isRunning && t.sessionStartTime);
         if (!hasRunning)
             return;
         const interval = setInterval(() => setNowTick(Date.now()), 1000);
         return () => clearInterval(interval);
-    }, [tasks]);
+    }, [isSampleMode, tasks]);
 
     const todayHistories = useMemo(() => {
         const todayStr = getTodayStr();
@@ -296,7 +297,7 @@ const TodayTimeline = ({ tasks, sessions = null, liveSession = null }) => {
                     });
                 }
             });
-            if (t.isRunning && t.sessionStartTime) {
+            if (isSampleMode && t.isRunning && t.sessionStartTime) {
                 const start = Number(t.sessionStartTime);
                 const stale = isStaleRunningTask(t, nowTick);
                 const lastHeartbeat = getLastHeartbeatTime(t) || start;
@@ -326,21 +327,23 @@ const TodayTimeline = ({ tasks, sessions = null, liveSession = null }) => {
             }
         });
         return histories.sort((a, b) => (a.startedAt || 0) - (b.startedAt || 0));
-    }, [tasks, sessions, liveSession, nowTick]);
+    }, [isSampleMode, tasks, sessions, liveSession, nowTick]);
 
     const completedTodaySeconds = useMemo(() => {
         const todayStr = getTodayStr();
         if (sessions) return getEffectiveStudySeconds(sessions.filter((session) => session.date === todayStr));
+        if (!isSampleMode) return 0;
         return tasks.reduce((sum, t) => {
             return sum + (t.history || []).filter(h => h.date === todayStr).reduce((acc, h) => acc + (h.duration || 0), 0);
         }, 0);
-    }, [tasks, sessions]);
+    }, [isSampleMode, tasks, sessions]);
 
     const runningTodaySeconds = useMemo(() => {
         const todayStr = getTodayStr();
         if (liveSession) {
             return liveSession.date === todayStr && !liveSession.isStale && liveSession.validation?.status === 'valid' ? liveSession.recordedSeconds : 0;
         }
+        if (!isSampleMode) return 0;
         return tasks.reduce((sum, t) => {
             if (!t.isRunning || !t.sessionStartTime)
                 return sum;
@@ -353,12 +356,12 @@ const TodayTimeline = ({ tasks, sessions = null, liveSession = null }) => {
                 return sum;
             return sum + (t.currentDuration || 0) + Math.max(0, Math.floor((nowTick - start) / 1000));
         }, 0);
-    }, [tasks, liveSession, nowTick]);
+    }, [isSampleMode, tasks, liveSession, nowTick]);
 
     const totalTodaySeconds = completedTodaySeconds + runningTodaySeconds;
     const remainingSeconds = Math.max(0, DAILY_TARGET_SECONDS - totalTodaySeconds);
     const goalPercent = Math.min(100, Math.round((totalTodaySeconds / DAILY_TARGET_SECONDS) * 100));
-    const runningTask = tasks.find(t => t.isRunning);
+    const runningTask = liveSession || (isSampleMode ? tasks.find(t => t.isRunning) : null);
     const goalMessage = remainingSeconds === 0
         ? '今日の2時間目標は達成済みです。追加するなら苦手科目を短く積み増し。'
         : runningTask
@@ -824,8 +827,8 @@ export default function App() {
     const activeTimerTask = useMemo(() => isActiveTimer(activeTimer) ? tasks.find((task) => task.id === activeTimer.taskId) || null : null, [activeTimer, tasks]);
     const liveSession = useMemo(() => getLiveStudySession(activeTimer, activeTimerTask, liveNow), [activeTimer, activeTimerTask, liveNow]);
     const activeTimerIsOwner = useMemo(() => isTimerOwner(activeTimer, currentClientId), [activeTimer, currentClientId]);
-    const isAnyTaskRunning = useMemo(() => isActiveTimer(activeTimer) || tasks.some(t => t.isRunning), [activeTimer, tasks]);
-    const runningTask = useMemo(() => activeTimerTask || tasks.find(t => t.isRunning) || null, [activeTimerTask, tasks]);
+    const isAnyTaskRunning = useMemo(() => hasAnyRunningTimer({ isSampleMode, activeTimer, tasks }), [isSampleMode, activeTimer, tasks]);
+    const runningTask = useMemo(() => getRunningTimerTask({ isSampleMode, activeTimerTask, tasks }), [isSampleMode, activeTimerTask, tasks]);
     const activeStaleTimer = useMemo(() => isStaleActiveTimer(activeTimer, staleCheckNow) ? activeTimer : null, [activeTimer, staleCheckNow]);
     const adventure = useMemo(() => gameProgress(tasks, getTodayStr(), unifiedSessions), [tasks, unifiedSessions]);
     const todayTaskSummaries = useMemo(() => {
@@ -1528,7 +1531,7 @@ export default function App() {
               </div>
 
               {/* 当日のタイムライン */}
-              <TodayTimeline tasks={tasks} sessions={unifiedSessions} liveSession={liveSession}/>
+              <TodayTimeline tasks={tasks} sessions={unifiedSessions} liveSession={liveSession} isSampleMode={isSampleMode}/>
 
               {liveSession ? (
                 <div className="rounded-[2rem] border border-blue-100 bg-white p-5 shadow-sm">
@@ -1595,7 +1598,7 @@ export default function App() {
             {activeTab === 'stats' && (<div className="space-y-8 sm:space-y-10 animate-in slide-in-from-bottom-5 duration-500 text-center">
                 
                 {/* 追加: 当日の学習タイムラインを実績分析画面にも表示 */}
-                 <TodayTimeline tasks={tasks} sessions={unifiedSessions} liveSession={liveSession}/>
+                 <TodayTimeline tasks={tasks} sessions={unifiedSessions} liveSession={liveSession} isSampleMode={isSampleMode}/>
 
                 <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden text-center text-left">
                    <h3 className="text-lg font-black mb-6 flex items-center justify-center gap-2 leading-none text-center"><BarChart2 className="text-blue-600" size={20}/> 学習推移 (分)</h3>
@@ -1854,16 +1857,7 @@ export default function App() {
                  const task = tasks.find(t => t.id === selectedTaskId);
                  if (!task)
                      return null;
-                 const timerViewTask = activeTimerTask?.id === task.id
-                    ? {
-                        ...task,
-                        isRunning: activeTimer.state === 'running',
-                        sessionStartTime: activeTimer.segmentStartedAt,
-                        currentDuration: activeTimer.accumulatedSeconds || 0,
-                        lastHeartbeatAt: activeTimer.lastHeartbeatAt,
-                        lastUpdatedAt: activeTimer.updatedAt,
-                      }
-                    : task;
+                 const timerViewTask = getTimerViewTask({ task, isSampleMode, activeTimer });
                   const cat = CATEGORIES[task.categoryId.toUpperCase()];
                   const selectedMonthlySessions = getSessionsForTask(unifiedSessions, task.id).filter((session) => getHistoryMonth(session) === selectedMonth);
                 return (<>
