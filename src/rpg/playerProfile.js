@@ -1,6 +1,7 @@
 import { MATERIAL_KEYS } from './rewardConfig.js';
+import { levelForTotalExp } from './levelSystem.js';
 
-export const PLAYER_PROFILE_SCHEMA_VERSION = 2;
+export const PLAYER_PROFILE_SCHEMA_VERSION = 3;
 
 export const EMPTY_EQUIPMENT = Object.freeze({ weapon: null, armor: null, accessory: null });
 
@@ -11,10 +12,14 @@ export const createEmptyPlayerProfile = () => ({
   materials: Object.fromEntries(MATERIAL_KEYS.map((key) => [key, 0])),
   ownedEquipment: {},
   equipped: { ...EMPTY_EQUIPMENT },
+  totalExp: 0,
+  level: 1,
+  activeBattleId: null,
 });
 
 export const normalizePlayerProfile = (profile = {}) => {
   const empty = createEmptyPlayerProfile();
+  const totalExp = Math.max(0, Number(profile.totalExp) || 0);
   return {
     ...empty,
     ...profile,
@@ -26,5 +31,8 @@ export const normalizePlayerProfile = (profile = {}) => {
       armor: profile.equipped?.armor || null,
       accessory: profile.equipped?.accessory || null,
     },
+    totalExp,
+    level: levelForTotalExp(totalExp),
+    activeBattleId: typeof profile.activeBattleId === 'string' ? profile.activeBattleId : null,
   };
 };

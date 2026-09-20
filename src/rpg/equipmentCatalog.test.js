@@ -10,6 +10,7 @@ describe('equipment catalog', () => {
       expect(EQUIPMENT_SLOTS).toContain(item.slot);
       expect(item.cost.gold).toBeGreaterThanOrEqual(0);
       expect(item.cost.materials).toEqual(expect.any(Object));
+      expect(item.stats.attack).toBeGreaterThanOrEqual(0);
     }
   });
 

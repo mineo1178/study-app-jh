@@ -14,6 +14,7 @@ import { activeTimerRef, finishActiveTimer, heartbeatActiveTimer, invalidateStal
 import { studySessionsCollection } from './data/studySessionRepository';
 import { applyStudySessionReward, emptyPlayerProfile, playerProfileRef } from './data/rewardLedgerRepository';
 import { createRpgActionId, equipItem, purchaseEquipment, unequipSlot } from './data/rpgShopRepository';
+import { attackBattle, createBattleActionId, createBattleId, rpgBattleRef, startBattle } from './data/rpgBattleRepository';
 import { getEquipmentCatalogItem } from './rpg/equipmentCatalog';
 import { normalizePlayerProfile } from './rpg/playerProfile';
 import { isStudySessionRewardEligible } from './rpg/rewardCalculator';
@@ -21,6 +22,7 @@ import RpgWalletPanel from './components/rpg/RpgWalletPanel';
 import RewardResultModal from './components/rpg/RewardResultModal';
 import RpgHub from './components/rpg/RpgHub';
 import PurchaseConfirmModal from './components/rpg/PurchaseConfirmModal';
+import BattleStartConfirmModal from './components/rpg/BattleStartConfirmModal';
 import { formatHms, getEffectiveStudySeconds, getLiveStudySession, getSessionsForDate, getSessionsForTask, getUnifiedStudySessions } from './data/studySessionSelectors';
 import LiveStudyStatus from './components/study/LiveStudyStatus';
 import MigrationExportButton from './components/dev/MigrationExportButton';
@@ -60,7 +62,7 @@ const getTasksCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-
 const getTestsCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tests');
 const getStudySessionsCol = () => studySessionsCollection(db, FAMILY_ID);
 const getActiveTimerRef = () => activeTimerRef(db, FAMILY_ID);
-const APP_VERSION = 'v1.78';
+const APP_VERSION = 'v1.79';
 const TIMER_HEARTBEAT_MS = 30 * 1000;
 const DAILY_TARGET_SECONDS = 2 * 60 * 60;
 const isDocumentHidden = () => typeof document !== 'undefined' && document.hidden;
@@ -845,6 +847,11 @@ export default function App() {
     const [rpgStatus, setRpgStatus] = useState(null);
     const [pendingPurchaseItemId, setPendingPurchaseItemId] = useState(null);
     const [pendingEquipmentAction, setPendingEquipmentAction] = useState(null);
+    const [activeBattle, setActiveBattle] = useState(null);
+    const [lastBattle, setLastBattle] = useState(null);
+    const [battleCandidate, setBattleCandidate] = useState(null);
+    const [pendingBattleEnemyId, setPendingBattleEnemyId] = useState(null);
+    const [isAttackingBattle, setIsAttackingBattle] = useState(false);
     const [activeTimer, setActiveTimer] = useState(null);
     const [tests, setTests] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -934,6 +941,11 @@ export default function App() {
         if (isSampleMode || !user) return undefined;
         return onSnapshot(playerProfileRef(db, FAMILY_ID), (snap) => setPlayerProfile(normalizePlayerProfile(snap.exists() ? snap.data() : emptyPlayerProfile())), (err) => console.error('PlayerProfile realtime sync error:', err));
     }, [isSampleMode, user]);
+    useEffect(() => {
+        const battleId = playerProfile.activeBattleId;
+        if (isSampleMode || !user || !battleId) return undefined;
+        return onSnapshot(rpgBattleRef(db, FAMILY_ID, battleId), (snap) => { const next = snap.exists() ? snap.data() : null; setActiveBattle(next); if (next?.status === 'won') setLastBattle(next); }, (err) => console.error('Battle realtime sync error:', err));
+    }, [isSampleMode, playerProfile.activeBattleId, user]);
     useEffect(() => {
         if (!activeTimerIsOwner || activeTimer?.state !== 'running' || isSampleMode || !user) return;
         const sendHeartbeat = () => heartbeatActiveTimer({
@@ -1132,6 +1144,37 @@ export default function App() {
         } finally {
             setPendingEquipmentAction(null);
         }
+    };
+    const battleErrorMessage = (error) => ({
+        ENEMY_NOT_FOUND: '敵情報を確認できません',
+        INSUFFICIENT_BATTLE_ENERGY: 'Battle Energyが足りません',
+        ACTIVE_BATTLE_EXISTS: '進行中の戦闘があります',
+        BATTLE_NOT_FOUND: '戦闘情報を確認できません',
+        BATTLE_ALREADY_COMPLETED: 'この戦闘は終了しています',
+    }[error?.code || error?.message] || '戦闘処理に失敗しました。もう一度お試しください。');
+    const handleBattleStartRequest = (enemy) => {
+        if (isSampleMode || !user || playerProfile.activeBattleId || pendingBattleEnemyId) return;
+        setRpgStatus(null); setBattleCandidate(enemy);
+    };
+    const handleBattleStartConfirm = async () => {
+        if (!battleCandidate || isSampleMode || !user || pendingBattleEnemyId) return;
+        const enemy = battleCandidate; setPendingBattleEnemyId(enemy.id);
+        try {
+            setLastBattle(null);
+            const result = await startBattle({ db, familyId: FAMILY_ID, enemyId: enemy.id, battleId: createBattleId() });
+            setBattleCandidate(null);
+            setRpgStatus(result.applied ? { kind: 'success', message: `${enemy.name}との戦闘を開始しました` } : { kind: 'error', message: battleErrorMessage({ code: result.reason }) });
+        } catch (error) { setRpgStatus({ kind: 'error', message: battleErrorMessage(error) }); }
+        finally { setPendingBattleEnemyId(null); }
+    };
+    const handleAttackBattle = async () => {
+        if (!activeBattle?.battleId || isSampleMode || !user || isAttackingBattle) return;
+        setIsAttackingBattle(true);
+        try {
+            const result = await attackBattle({ db, familyId: FAMILY_ID, battleId: activeBattle.battleId, actionId: createBattleActionId() });
+            if (result.victory) setRpgStatus({ kind: 'success', message: `${activeBattle.enemySnapshot?.name || '敵'}に勝利しました` });
+        } catch (error) { setRpgStatus({ kind: 'error', message: battleErrorMessage(error) }); }
+        finally { setIsAttackingBattle(false); }
     };
     const handleSaveLegacyRecord = async (task, totalSeconds) => {
         if (savingRecordRef.current)
@@ -1927,7 +1970,7 @@ export default function App() {
                 </div>
               </div>)}
             {activeTab === 'rpg' && !isSampleMode && (
-              <RpgHub profile={playerProfile} onPurchaseRequest={handlePurchaseRequest} onEquip={handleEquip} onUnequip={handleUnequip} pendingItemId={pendingPurchaseItemId} pendingAction={pendingEquipmentAction} status={rpgStatus}/>
+              <RpgHub profile={playerProfile} onPurchaseRequest={handlePurchaseRequest} onEquip={handleEquip} onUnequip={handleUnequip} pendingItemId={pendingPurchaseItemId} pendingAction={pendingEquipmentAction} status={rpgStatus} battle={activeBattle || lastBattle} onStartBattleRequest={handleBattleStartRequest} onAttackBattle={handleAttackBattle} startingEnemyId={pendingBattleEnemyId} attacking={isAttackingBattle}/>
             )}
           </main>
         </div>
@@ -1952,6 +1995,7 @@ export default function App() {
         </div>)}
         <RewardResultModal result={rewardResult} profile={playerProfile} onClose={() => setRewardResult(null)} />
         <PurchaseConfirmModal item={purchaseCandidate} profile={playerProfile} purchasing={Boolean(pendingPurchaseItemId)} onCancel={() => !pendingPurchaseItemId && setPurchaseCandidate(null)} onConfirm={handlePurchaseConfirm}/>
+        <BattleStartConfirmModal enemy={battleCandidate} starting={Boolean(pendingBattleEnemyId)} onCancel={() => !pendingBattleEnemyId && setBattleCandidate(null)} onConfirm={handleBattleStartConfirm}/>
 
         {/* --- Modals --- */}
         {isAddingTask && (<div className={modalOverlayClass}>

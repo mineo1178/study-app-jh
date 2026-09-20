@@ -9,8 +9,9 @@ describe('study reward and equipment coexistence', () => {
       materials: { iron: 4 },
       ownedEquipment: { iron_sword: { acquiredAt: 1, sourceActionId: 'purchase-1' } },
       equipped: { weapon: 'iron_sword', armor: null, accessory: null },
+      totalExp: 100, level: 2, activeBattleId: 'battle-1',
     };
     const next = applyRewardToPlayerProfile(profile, { gold: 10, battleEnergy: 1, material: { key: 'iron', quantity: 2 } }, 99);
-    expect(next).toMatchObject({ gold: 110, battleEnergy: 3, materials: { iron: 6 }, ownedEquipment: profile.ownedEquipment, equipped: profile.equipped, updatedAt: 99 });
+    expect(next).toMatchObject({ gold: 110, battleEnergy: 3, materials: { iron: 6 }, ownedEquipment: profile.ownedEquipment, equipped: profile.equipped, totalExp: 100, level: 2, activeBattleId: 'battle-1', updatedAt: 99 });
   });
 });
