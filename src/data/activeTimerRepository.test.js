@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildFinishedTimerSession, buildStaleTimerInvalidSession, canFinishActiveTimer, canForceInvalidateStaleTimer, canHeartbeatActiveTimer, staleTimerSessionId } from './activeTimerRepository';
+import { buildFinishedTimerSession, buildStaleTimerInvalidSession, buildTimerSwitchPlan, canFinishActiveTimer, canForceInvalidateStaleTimer, canHeartbeatActiveTimer, staleTimerSessionId } from './activeTimerRepository';
 import { getEffectiveStudySeconds } from './studySessionSelectors';
 import { gameProgress } from '../gameLogic';
 
@@ -94,5 +94,33 @@ describe('cross-device timer finish', () => {
     expect(canHeartbeatActiveTimer(running, 'timer-stale-1', 'device-a')).toBe(true);
     expect(canHeartbeatActiveTimer(running, 'timer-stale-1', 'device-b')).toBe(false);
     expect(canHeartbeatActiveTimer(null, 'timer-stale-1', 'device-a')).toBe(false);
+  });
+});
+
+describe('start or switch active timer', () => {
+  const nextTask = { id: 'japanese', categoryId: 'school', subjectId: 's_japanese', activityType: 'problem_solving', title: '国語', type: 'self' };
+
+  it('ActiveTimerがなければSTARTできる', () => {
+    const plan = buildTimerSwitchPlan({ existingTimer: null, nextTask, nextTimerId: 'next', nextOwnerClientId: 'device-b', now: start });
+    expect(plan).toMatchObject({ switched: false, resumed: false, nextTimer: { timerId: 'next', taskId: 'japanese', state: 'running' } });
+  });
+
+  it('別Taskのrunning timerをSession化して新TaskをSTARTする', () => {
+    const plan = buildTimerSwitchPlan({ existingTimer: { ...staleTimer, ownerClientId: 'device-a', lastHeartbeatAt: start + 30_000 }, existingTask: task, nextTask, nextTimerId: 'next', nextOwnerClientId: 'device-b', now: start + 120_000 });
+    expect(plan).toMatchObject({ switched: true, invalidatedPrevious: false, nextTimer: { taskId: 'japanese' }, previousSession: { timerId: 'timer-stale-1', recordedSeconds: 120 } });
+  });
+
+  it('別Taskのpaused timerはpause後を加算せずSession化して新TaskをSTARTする', () => {
+    const paused = { ...staleTimer, state: 'paused', segmentStartedAt: null, accumulatedSeconds: 75, segments: [{ startedAt: start, endedAt: start + 75_000, durationSeconds: 75 }] };
+    const plan = buildTimerSwitchPlan({ existingTimer: paused, existingTask: task, nextTask, nextTimerId: 'next', nextOwnerClientId: 'device-b', now: start + 600_000 });
+    expect(plan.previousSession.recordedSeconds).toBe(75);
+    expect(plan.nextTimer.taskId).toBe('japanese');
+  });
+
+  it('staleまたはorphan timerはinvalid化して新TaskをSTARTする', () => {
+    const stalePlan = buildTimerSwitchPlan({ existingTimer: staleTimer, existingTask: task, nextTask, nextTimerId: 'next', nextOwnerClientId: 'device-b', now: start + 16 * 60_000 });
+    expect(stalePlan.previousSession.validation.reasonCodes).toEqual(['stale_timer_forced_invalid']);
+    const orphanPlan = buildTimerSwitchPlan({ existingTimer: staleTimer, existingTask: null, nextTask, nextTimerId: 'next', nextOwnerClientId: 'device-b', now: start + 120_000 });
+    expect(orphanPlan.previousSession.validation.reasonCodes).toEqual(['orphan_timer_forced_invalid']);
   });
 });

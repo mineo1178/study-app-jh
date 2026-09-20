@@ -1,5 +1,6 @@
 import { doc, runTransaction } from 'firebase/firestore';
 import { VALIDATION_VERSION } from '../integrity/validationConfig.js';
+import { validateStudySession } from '../integrity/studyValidation.js';
 import { closeSegment, isActiveTimer, isStaleActiveTimer, timerRecordedSeconds, timerSegmentsAtEnd } from '../timer/timerEngine.js';
 
 const ACTIVE_TIMER_ID = 'current';
@@ -9,23 +10,27 @@ export const canForceInvalidateStaleTimer = (timer, now = Date.now()) => isStale
 export const canFinishActiveTimer = (timer, timerId) => Boolean(timer && timer.timerId === timerId && isActiveTimer(timer));
 export const canHeartbeatActiveTimer = (timer, timerId, ownerClientId) => Boolean(timer && timer.timerId === timerId && timer.ownerClientId === ownerClientId && timer.state === 'running');
 
+export function buildActiveTimer({ task, timerId, ownerClientId, now = Date.now() }) {
+  return {
+    timerId,
+    taskId: task.id,
+    ownerClientId,
+    state: 'running',
+    segments: [],
+    segmentStartedAt: now,
+    accumulatedSeconds: 0,
+    startedAt: now,
+    lastHeartbeatAt: now,
+    updatedAt: now,
+  };
+}
+
 export async function startActiveTimer({ db, familyId, task, timerId, ownerClientId, now = Date.now() }) {
   const ref = activeTimerRef(db, familyId);
   return runTransaction(db, async (transaction) => {
     const existing = (await transaction.get(ref)).data();
     if (isActiveTimer(existing)) throw new Error('ACTIVE_TIMER_EXISTS');
-    const timer = {
-      timerId,
-      taskId: task.id,
-      ownerClientId,
-      state: 'running',
-      segments: [],
-      segmentStartedAt: now,
-      accumulatedSeconds: 0,
-      startedAt: now,
-      lastHeartbeatAt: now,
-      updatedAt: now,
-    };
+    const timer = buildActiveTimer({ task, timerId, ownerClientId, now });
     transaction.set(ref, timer);
     return timer;
   });
@@ -73,24 +78,29 @@ export async function heartbeatActiveTimer({ db, familyId, timerId, ownerClientI
 }
 
 export function buildStaleTimerInvalidSession(timer, task = {}, now = Date.now()) {
+  return buildForcedInvalidTimerSession(timer, task, 'stale_timer_forced_invalid', now);
+}
+
+export function buildForcedInvalidTimerSession(timer, task = {}, reasonCode, now = Date.now()) {
+  const taskSnapshot = task || {};
   const endAt = Number(timer.lastHeartbeatAt) || Number(timer.segmentStartedAt) || Number(timer.startedAt) || now;
   const segments = timerSegmentsAtEnd(timer, endAt);
   return {
     timerId: timer.timerId,
     taskId: timer.taskId,
     taskSnapshot: {
-      categoryId: task.categoryId || null,
-      subjectId: task.subjectId || null,
-      activityType: task.activityType || 'other',
-      title: task.title || '',
-      type: task.type || 'self',
+      categoryId: taskSnapshot.categoryId || null,
+      subjectId: taskSnapshot.subjectId || null,
+      activityType: taskSnapshot.activityType || 'other',
+      title: taskSnapshot.title || '',
+      type: taskSnapshot.type || 'self',
     },
     date: new Date(endAt).toLocaleDateString('sv-SE'),
     segments,
     recordedSeconds: timerRecordedSeconds(timer, endAt),
     validation: {
       status: 'invalid',
-      reasonCodes: ['stale_timer_forced_invalid'],
+      reasonCodes: [reasonCode],
       validationVersion: VALIDATION_VERSION,
     },
     memo: '長時間停止した計測を自動的に無効化',
@@ -98,6 +108,50 @@ export function buildStaleTimerInvalidSession(timer, task = {}, now = Date.now()
     createdAt: now,
     updatedAt: now,
   };
+}
+
+export function buildTimerSwitchPlan({ existingTimer, existingTask, nextTask, nextTimerId, nextOwnerClientId, now = Date.now() }) {
+  const nextTimer = buildActiveTimer({ task: nextTask, timerId: nextTimerId, ownerClientId: nextOwnerClientId, now });
+  if (!isActiveTimer(existingTimer)) return { nextTimer, previousSession: null, switched: false, resumed: false };
+  if (existingTimer.taskId === nextTask.id) {
+    if (existingTimer.state === 'paused') return { nextTimer: null, previousSession: null, switched: false, resumed: true };
+    return { nextTimer: null, previousSession: null, switched: false, resumed: false };
+  }
+  const orphan = !existingTask;
+  const stale = existingTimer.state === 'running' && isStaleActiveTimer(existingTimer, now);
+  const reasonCode = orphan ? 'orphan_timer_forced_invalid' : stale ? 'stale_timer_forced_invalid' : null;
+  const previousSession = reasonCode
+    ? buildForcedInvalidTimerSession(existingTimer, existingTask, reasonCode, now)
+    : buildFinishedTimerSession(existingTimer, existingTask, { endAt: now });
+  return { nextTimer, previousSession, switched: true, resumed: false, invalidatedPrevious: Boolean(reasonCode) };
+}
+
+export async function startOrSwitchActiveTimer({ db, familyId, task, tasks = [], timerId, ownerClientId, now = Date.now() }) {
+  const ref = activeTimerRef(db, familyId);
+  return runTransaction(db, async (transaction) => {
+    const timerSnap = await transaction.get(ref);
+    const existingTimer = timerSnap.exists() ? timerSnap.data() : null;
+    const existingTask = tasks.find((item) => item.id === existingTimer?.taskId) || null;
+    const plan = buildTimerSwitchPlan({ existingTimer, existingTask, nextTask: task, nextTimerId: timerId, nextOwnerClientId: ownerClientId, now });
+    if (plan.resumed) {
+      if (existingTimer.ownerClientId !== ownerClientId) throw new Error('TIMER_NOT_OWNER');
+      transaction.update(ref, { state: 'running', segmentStartedAt: now, lastHeartbeatAt: now, updatedAt: now });
+      return { ...plan, timer: { ...existingTimer, state: 'running', segmentStartedAt: now, lastHeartbeatAt: now } };
+    }
+    if (!plan.nextTimer) return { ...plan, timer: existingTimer };
+    if (plan.previousSession) {
+      const previousSessionRef = doc(db, 'families', familyId, 'apps', 'junior-high', 'studySessions', existingTimer.timerId);
+      const previousSessionSnap = await transaction.get(previousSessionRef);
+      if (!previousSessionSnap.exists()) {
+        const validation = plan.invalidatedPrevious
+          ? plan.previousSession.validation
+          : validateStudySession(plan.previousSession);
+        transaction.set(previousSessionRef, { ...plan.previousSession, validation });
+      }
+    }
+    transaction.set(ref, plan.nextTimer);
+    return { ...plan, timer: plan.nextTimer };
+  });
 }
 
 export async function invalidateStaleActiveTimer({ db, familyId, task, now = Date.now() }) {
@@ -118,6 +172,7 @@ export async function invalidateStaleActiveTimer({ db, familyId, task, now = Dat
 }
 
 export function buildFinishedTimerSession(timer, task = {}, { endAt = Date.now(), validation, memo = '' } = {}) {
+  const taskSnapshot = task || {};
   const stale = timer.state === 'running' && isStaleActiveTimer(timer, endAt);
   const safeEndAt = stale
     ? Number(timer.lastHeartbeatAt) || endAt
@@ -128,11 +183,11 @@ export function buildFinishedTimerSession(timer, task = {}, { endAt = Date.now()
     timerId: timer.timerId,
     taskId: timer.taskId,
     taskSnapshot: {
-      categoryId: task.categoryId,
-      subjectId: task.subjectId,
-      activityType: task.activityType || 'other',
-      title: task.title || '',
-      type: task.type || 'self',
+      categoryId: taskSnapshot.categoryId,
+      subjectId: taskSnapshot.subjectId,
+      activityType: taskSnapshot.activityType || 'other',
+      title: taskSnapshot.title || '',
+      type: taskSnapshot.type || 'self',
     },
     date: new Date(safeEndAt).toLocaleDateString('sv-SE'),
     segments,

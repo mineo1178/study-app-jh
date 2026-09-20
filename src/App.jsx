@@ -10,7 +10,7 @@ import { validateStudySession } from './integrity/studyValidation';
 import { getCurrentClientId, createTimerId } from './timer/timerClient';
 import { isActiveTimer, isStaleActiveTimer, isTimerOwner, shouldAutoFinishReading, timerRecordedSeconds, timerSegmentsAtEnd } from './timer/timerEngine';
 import { getRunningTimerTask, getTimerViewTask, hasAnyRunningTimer } from './timer/timerRuntimeState';
-import { activeTimerRef, finishActiveTimer, heartbeatActiveTimer, invalidateStaleActiveTimer, pauseActiveTimer, resumeActiveTimer, startActiveTimer } from './data/activeTimerRepository';
+import { activeTimerRef, finishActiveTimer, heartbeatActiveTimer, invalidateStaleActiveTimer, pauseActiveTimer, startOrSwitchActiveTimer } from './data/activeTimerRepository';
 import { studySessionsCollection } from './data/studySessionRepository';
 import { formatHms, getEffectiveStudySeconds, getLiveStudySession, getSessionsForDate, getSessionsForTask, getUnifiedStudySessions } from './data/studySessionSelectors';
 import LiveStudyStatus from './components/study/LiveStudyStatus';
@@ -51,7 +51,7 @@ const getTasksCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-
 const getTestsCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tests');
 const getStudySessionsCol = () => studySessionsCollection(db, FAMILY_ID);
 const getActiveTimerRef = () => activeTimerRef(db, FAMILY_ID);
-const APP_VERSION = 'v1.72';
+const APP_VERSION = 'v1.73';
 const TIMER_HEARTBEAT_MS = 30 * 1000;
 const DAILY_TARGET_SECONDS = 2 * 60 * 60;
 const isDocumentHidden = () => typeof document !== 'undefined' && document.hidden;
@@ -493,7 +493,7 @@ const TodayTimeline = ({ tasks, sessions = null, liveSession = null, isSampleMod
       </div>)}
     </div>);
 };
-const StrictTimer = ({ task, isAnyOtherRunning, isSaving, canPause = true, canStart = true, onUpdate, onSave }) => {
+const StrictTimer = ({ task, isAnyOtherRunning, isSaving, canPause = true, canStart = true, canStop = false, onUpdate, onSave }) => {
     const [sessionElapsed, setSessionElapsed] = useState(0);
     const timerRef = useRef(null);
 
@@ -635,9 +635,9 @@ const StrictTimer = ({ task, isAnyOtherRunning, isSaving, canPause = true, canSt
           </button>) : (<button type="button" onClick={stopTimer} disabled={isSaving || !canPause} className="flex-1 bg-amber-400 text-slate-950 font-black py-4 sm:py-5 rounded-xl sm:rounded-2xl shadow-lg active:scale-95 transition flex items-center justify-center gap-2 text-sm sm:text-lg uppercase leading-none hover:bg-amber-300 disabled:opacity-60">
             <Pause size={20} fill="currentColor"/> PAUSE
           </button>)}
-        <button type="button" onClick={handleSaveClick} disabled={isSaving} className="flex-1 bg-blue-600 text-white font-black py-4 sm:py-5 rounded-xl sm:rounded-2xl hover:bg-blue-500 transition flex items-center justify-center gap-2 text-sm sm:text-lg uppercase leading-none shadow-lg disabled:opacity-60">
+        {canStop && <button type="button" onClick={handleSaveClick} disabled={isSaving} className="flex-1 bg-blue-600 text-white font-black py-4 sm:py-5 rounded-xl sm:rounded-2xl hover:bg-blue-500 transition flex items-center justify-center gap-2 text-sm sm:text-lg uppercase leading-none shadow-lg disabled:opacity-60">
           <Save size={20}/> {isSaving ? 'STOPPING' : 'STOP'}
-        </button>
+        </button>}
       </div>
     </div>);
 };
@@ -1081,11 +1081,12 @@ export default function App() {
         }
         try {
             if (updates.isRunning) {
-                if (activeTimer?.taskId === taskId && activeTimer.state === 'paused') {
-                    await resumeActiveTimer({ db, familyId: FAMILY_ID, timerId: activeTimer.timerId, ownerClientId: currentClientId });
-                }
-                else {
-                    await startActiveTimer({ db, familyId: FAMILY_ID, task, timerId: createTimerId(), ownerClientId: currentClientId });
+                const result = await startOrSwitchActiveTimer({ db, familyId: FAMILY_ID, task, tasks, timerId: createTimerId(), ownerClientId: currentClientId });
+                if (result.switched) {
+                    const message = result.invalidatedPrevious
+                      ? `停止したまま残っていた計測を無効化し、${task.title}を開始しました。`
+                      : `前の計測を終了し、${task.title}を開始しました。`;
+                    setStaleTimerNotice(message);
                 }
             }
             else if (activeTimer?.taskId === taskId && activeTimer.state === 'running') {
@@ -1096,7 +1097,7 @@ export default function App() {
             }
         }
         catch (err) {
-            alert(err.message === 'ACTIVE_TIMER_EXISTS' ? '他の端末または教科を計測中です。' : 'このタイマーは開始した端末から操作してください。');
+            alert(err.message === 'TIMER_NOT_OWNER' ? 'このタイマーは開始した端末から再開してください。' : 'タイマー操作に失敗しました。');
         }
     }, [activeTimer, currentClientId, handleUpdateLocalTask, isSampleMode, tasks, user]);
     // The latest closure is deliberately mirrored into autoFinishHandlerRef for the five-hour timer callback.
@@ -1872,7 +1873,7 @@ export default function App() {
                          <button type="button" aria-label="学習項目詳細を閉じる" title="閉じる" onClick={() => setSelectedTaskId(null)} className="p-3 bg-white rounded-2xl shadow-sm hover:bg-slate-50 transition shrink-0 text-left"><X size={24}/></button>
                       </div>
                       <div className="flex-1 overflow-y-auto p-6 sm:p-10 space-y-10 no-scrollbar pb-32 text-left">
-                          <StrictTimer task={timerViewTask} isAnyOtherRunning={isAnyTaskRunning && activeTimerTask?.id !== task.id && !task.isRunning} isSaving={isSavingRecord} canPause={activeTimerTask?.id !== task.id || activeTimerIsOwner} canStart={activeTimerTask?.id !== task.id || activeTimerIsOwner} onUpdate={handleTimerUpdate} onSave={handleSaveRecord}/>
+                          <StrictTimer task={timerViewTask} isAnyOtherRunning={isSampleMode && isAnyTaskRunning && activeTimerTask?.id !== task.id && !task.isRunning} isSaving={isSavingRecord} canPause={activeTimerTask?.id !== task.id || activeTimerIsOwner} canStart={activeTimerTask?.id !== task.id || activeTimerIsOwner} canStop={isSampleMode || activeTimerTask?.id === task.id} onUpdate={handleTimerUpdate} onSave={handleSaveRecord}/>
                           {activeTimerTask?.id === task.id && !activeTimerIsOwner && <div className="rounded-2xl bg-slate-50 p-3 text-xs font-bold text-slate-500">別の端末で開始された計測です。この端末から停止できます。</div>}
                          <div className="space-y-4 text-left">
                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 px-2 text-left"><Search size={14}/> 学習メモ</label>
