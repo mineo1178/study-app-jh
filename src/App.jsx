@@ -14,6 +14,7 @@ import { studySessionsCollection } from './data/studySessionRepository';
 import { formatHms, getEffectiveStudySeconds, getLiveStudySession, getSessionsForDate, getSessionsForTask, getUnifiedStudySessions } from './data/studySessionSelectors';
 import LiveStudyStatus from './components/study/LiveStudyStatus';
 import MigrationExportButton from './components/dev/MigrationExportButton';
+import LegacyStudySessionMigrationPanel from './components/dev/LegacyStudySessionMigrationPanel';
 // ==========================================
 // Firebase Initialization (Vite/Vercel Dedicated)
 // ==========================================
@@ -1550,6 +1551,7 @@ export default function App() {
             </button>)}
 
            {import.meta.env.DEV && <MigrationExportButton tasks={tasks} studySessions={studySessions} activeTimer={activeTimer}/>}
+           {import.meta.env.DEV && !isSampleMode && <LegacyStudySessionMigrationPanel db={db} familyId={FAMILY_ID} tasks={tasks} studySessions={studySessions} activeTimer={activeTimer} onMigrationComplete={() => fetchData(true)}/>}
 
            {!isSampleMode && <button type="button" aria-label="ログアウト" title="ログアウト" onClick={() => signOut(auth)} className="mt-4 flex items-center gap-2 text-xs font-black text-slate-300 hover:text-rose-500 transition px-4 leading-none"><LogOut size={14}/> LOGOUT</button>}
         </aside>

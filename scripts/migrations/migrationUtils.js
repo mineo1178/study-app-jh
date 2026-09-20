@@ -2,33 +2,9 @@
 import fs from 'node:fs';
 import { inferLegacyActivityType, needsLegacyActivityTypeReview, normalizeActivityType } from '../../src/integrity/activityTypes.js';
 import { validateStudySession } from '../../src/integrity/studyValidation.js';
-import { normalizeLegacyHistory } from '../../src/data/studySessionSelectors.js';
-import { getLegacyReviewOverride } from './legacyReviewOverrides.js';
+import { buildLegacyMigrationCandidates } from './legacyMigrationCandidates.js';
 
-function epochMillis(value) {
-  if (typeof value === 'number') return value;
-  if (typeof value === 'string') {
-    const parsed = Date.parse(value);
-    return Number.isNaN(parsed) ? value : parsed;
-  }
-  return value;
-}
-
-function reviveExportInput(data) {
-  return {
-    ...data,
-    tasks: (data.tasks || []).map((task) => ({
-      ...task,
-      history: (task.history || []).map((history) => ({ ...history, startedAt: epochMillis(history.startedAt), endedAt: epochMillis(history.endedAt) })),
-    })),
-    studySessions: (data.studySessions || []).map((session) => ({
-      ...session,
-      segments: (session.segments || []).map((segment) => ({ ...segment, startedAt: epochMillis(segment.startedAt), endedAt: epochMillis(segment.endedAt) })),
-      createdAt: epochMillis(session.createdAt),
-      updatedAt: epochMillis(session.updatedAt),
-    })),
-  };
-}
+export { applyLegacyReviewOverride, buildLegacyMigrationCandidates } from './legacyMigrationCandidates.js';
 
 export function readMigrationInput(argv) {
   const inputIndex = argv.indexOf('--input');
@@ -40,46 +16,6 @@ export function writeReport(argv, report) {
   const outputIndex = argv.indexOf('--output');
   if (outputIndex >= 0 && argv[outputIndex + 1]) fs.writeFileSync(argv[outputIndex + 1], `${JSON.stringify(report, null, 2)}\n`);
   process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
-}
-
-function evaluateLegacyCandidate(session) {
-  const validation = validateStudySession(session);
-  // Legacy history has no pause boundaries, so duration alone cannot prove five hours were continuous.
-  if (session.legacySource && session.taskSnapshot?.activityType === 'reading' && session.recordedSeconds >= 5 * 60 * 60) {
-    return { ...session, validation: { ...validation, status: 'pending_review', reasonCodes: [...validation.reasonCodes.filter((code) => code !== 'reading_continuous_5h'), 'legacy_reading_continuity_unknown'] } };
-  }
-  return { ...session, validation };
-}
-
-export function applyLegacyReviewOverride(session) {
-  const override = getLegacyReviewOverride(session?.legacySource?.taskId, session?.legacySource?.historyId);
-  if (!override) return session;
-  const reasonCodes = [...new Set([...(session.validation?.reasonCodes || []), override.reason])];
-  return {
-    ...session,
-    validation: { ...session.validation, status: override.validationStatus, reasonCodes },
-    migrationReview: { reviewed: true, decision: override.validationStatus, reason: override.reason },
-  };
-}
-
-export function buildLegacyMigrationCandidates(data) {
-  const input = reviveExportInput(data);
-  const tasks = input.tasks || [];
-  const sessions = input.studySessions || [];
-  const legacy = tasks.flatMap((task) => (task.history || []).map((history) => ({ task, history })));
-  const existingLegacySources = new Set(sessions
-    .filter((session) => session.legacySource?.taskId)
-    .map((session) => `${session.legacySource.taskId}:${session.legacySource.historyId || ''}`));
-  const alreadyMigrated = legacy.filter(({ task, history }) => existingLegacySources.has(`${task.id}:${history.id || ''}`));
-  const candidates = legacy
-    .filter(({ task, history }) => !existingLegacySources.has(`${task.id}:${history.id || ''}`))
-    .map(({ task, history }) => normalizeLegacyHistory({
-      ...task,
-      activityType: normalizeActivityType(task.activityType || inferLegacyActivityType(task.subjectId, task.title)),
-    }, history))
-    .map(evaluateLegacyCandidate)
-    .map(applyLegacyReviewOverride);
-  return { tasks, sessions, legacy, alreadyMigrated, candidates };
 }
 
 export function buildMigrationReport(data) {
