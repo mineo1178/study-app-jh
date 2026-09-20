@@ -50,7 +50,7 @@ const getTasksCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-
 const getTestsCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tests');
 const getStudySessionsCol = () => studySessionsCollection(db, FAMILY_ID);
 const getActiveTimerRef = () => activeTimerRef(db, FAMILY_ID);
-const APP_VERSION = 'v1.70';
+const APP_VERSION = 'v1.71';
 const TIMER_HEARTBEAT_MS = 30 * 1000;
 const DAILY_TARGET_SECONDS = 2 * 60 * 60;
 const isDocumentHidden = () => typeof document !== 'undefined' && document.hidden;
@@ -572,12 +572,7 @@ const StrictTimer = ({ task, isAnyOtherRunning, isSaving, canPause = true, canSt
     const handleSaveClick = () => {
         if (isSaving)
             return;
-        if (isStaleRunningTask(task)) return;
         const totalToSave = totalSecondsForFinish(task, Date.now());
-        if (totalToSave < 10) {
-            alert("学習時間が短すぎます（10秒以上必要です）。");
-            return;
-        }
         onSave({ ...task, currentDuration: totalToSave, isRunning: false, sessionStartTime: null }, totalToSave);
     };
 
@@ -615,7 +610,7 @@ const StrictTimer = ({ task, isAnyOtherRunning, isSaving, canPause = true, canSt
               {formatDuration(sessionElapsed)}
             </div>
             <div className="mt-3 text-[10px] sm:text-xs font-black tracking-widest flex items-center gap-1.5 text-blue-200">
-                <Clock size={12}/> PAUSE または FINISH まで計測継続
+                <Clock size={12}/> PAUSE または STOP まで計測継続
             </div>
             <div className="mt-4 px-4 py-2 bg-white/10 border border-white/10 rounded-full text-xs sm:text-sm font-bold text-white/90 flex items-center gap-2 shadow-sm">
               <History size={14}/> 累計: {formatDuration(totalSeconds)}
@@ -638,7 +633,7 @@ const StrictTimer = ({ task, isAnyOtherRunning, isSaving, canPause = true, canSt
             <Pause size={20} fill="currentColor"/> PAUSE
           </button>)}
         <button type="button" onClick={handleSaveClick} disabled={isSaving} className="flex-1 bg-blue-600 text-white font-black py-4 sm:py-5 rounded-xl sm:rounded-2xl hover:bg-blue-500 transition flex items-center justify-center gap-2 text-sm sm:text-lg uppercase leading-none shadow-lg disabled:opacity-60">
-          <Save size={20}/> {isSaving ? 'SAVING' : 'FINISH'}
+          <Save size={20}/> {isSaving ? 'STOPPING' : 'STOP'}
         </button>
       </div>
     </div>);

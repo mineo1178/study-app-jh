@@ -66,6 +66,24 @@ describe('cross-device timer finish', () => {
     expect(session.segments).toEqual(paused.segments);
   });
 
+  it('10秒未満でもSTOP transactionの対象としてSessionを確定できる', () => {
+    const shortTimer = { ...staleTimer, ownerClientId: 'device-a', lastHeartbeatAt: start + 5_000 };
+    expect(canFinishActiveTimer(shortTimer, shortTimer.timerId)).toBe(true);
+    const session = buildFinishedTimerSession(shortTimer, task, {
+      endAt: start + 9_000,
+      validation: { status: 'pending_review', reasonCodes: ['too_short'] },
+    });
+    expect(session.recordedSeconds).toBe(9);
+  });
+
+  it('stale timerをSTOPした場合もinvalid SessionとしてActiveTimer解消へ進める', () => {
+    const session = buildFinishedTimerSession(staleTimer, task, {
+      endAt: start + 16 * 60 * 1000,
+      validation: { status: 'valid', reasonCodes: [] },
+    });
+    expect(session.validation).toMatchObject({ status: 'invalid', reasonCodes: ['stale_timer_forced_invalid'] });
+  });
+
   it('決定的timerIdにより二重STOPは既存Sessionを検出してno-opにできる', () => {
     expect(staleTimerSessionId(staleTimer)).toBe('timer-stale-1');
     expect(canFinishActiveTimer(null, 'timer-stale-1')).toBe(false);
