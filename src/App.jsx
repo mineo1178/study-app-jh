@@ -66,7 +66,7 @@ const getTasksCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-
 const getTestsCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tests');
 const getStudySessionsCol = () => studySessionsCollection(db, FAMILY_ID);
 const getActiveTimerRef = () => activeTimerRef(db, FAMILY_ID);
-const APP_VERSION = 'v1.83';
+const APP_VERSION = 'v1.83.1';
 const TIMER_HEARTBEAT_MS = 30 * 1000;
 const DAILY_TARGET_SECONDS = 2 * 60 * 60;
 const isDocumentHidden = () => typeof document !== 'undefined' && document.hidden;
@@ -954,7 +954,8 @@ export default function App() {
     useEffect(() => {
         const battleId = playerProfile.activeBattleId;
         if (isSampleMode || !user || !battleId) return undefined;
-        return onSnapshot(rpgBattleRef(db, FAMILY_ID, battleId), (snap) => { const next = snap.exists() ? normalizeBattle(snap.data()) : null; setActiveBattle(next); if (next?.status === 'won' || next?.status === 'lost') setLastBattle(next); }, (err) => console.error('Battle realtime sync error:', err));
+        const unsubscribe = onSnapshot(rpgBattleRef(db, FAMILY_ID, battleId), (snap) => { const next = snap.exists() ? normalizeBattle(snap.data()) : null; setActiveBattle(next); if (next?.status === 'won' || next?.status === 'lost') setLastBattle(next); }, (err) => console.error('Battle realtime sync error:', err));
+        return () => { unsubscribe(); setActiveBattle(null); };
     }, [isSampleMode, playerProfile.activeBattleId, user]);
     useEffect(() => {
         if (!activeTimerIsOwner || activeTimer?.state !== 'running' || isSampleMode || !user) return;
@@ -1160,12 +1161,13 @@ export default function App() {
         INSUFFICIENT_BATTLE_ENERGY: 'Battle Energyが足りません',
         ACTIVE_BATTLE_EXISTS: '進行中の戦闘があります',
         BATTLE_NOT_FOUND: '戦闘情報を確認できません',
-        BATTLE_ALREADY_COMPLETED: 'この戦闘は終了しています', HEAL_NOT_NEEDED: 'HPは満タンです',
+        BATTLE_ALREADY_COMPLETED: 'この戦闘は終了しています', HEAL_NOT_NEEDED: 'HPは満タンです', ENEMY_NOT_AVAILABLE_IN_CHAPTER: 'この敵は現在のChapterでは挑戦できません', BOSS_NOT_FOUND: 'Boss情報を確認できません', BOSS_LOCKED: 'Bossはまだ解放されていません', BOSS_NOT_AVAILABLE_IN_CHAPTER: 'このBossには現在挑戦できません', BOSS_ALREADY_CLEARED: 'このBossはすでに撃破済みです', CHAPTER_STATE_MISMATCH: 'Chapter進行の状態が一致しません',
     }[error?.code || error?.message] || '戦闘処理に失敗しました。もう一度お試しください。');
     const handleBattleStartRequest = (enemy) => {
         if (isSampleMode || !user || playerProfile.activeBattleId || pendingBattleEnemyId) return;
         setRpgStatus(null); setBattleCandidate(enemy);
     };
+    const handleBattleResultClose = () => { setActiveBattle(null); setLastBattle(null); setBattleTurnFeedback(null); setRpgStatus(null); };
     const handleBattleStartConfirm = async () => {
         if (!battleCandidate || isSampleMode || !user || pendingBattleEnemyId) return;
         const enemy = battleCandidate; setPendingBattleEnemyId(enemy.id);
@@ -1991,7 +1993,7 @@ export default function App() {
                 </div>
               </div>)}
             {activeTab === 'rpg' && !isSampleMode && (
-              <RpgHub profile={playerProfile} progress={rpgProgress} onPurchaseRequest={handlePurchaseRequest} onEquip={handleEquip} onUnequip={handleUnequip} pendingItemId={pendingPurchaseItemId} pendingAction={pendingEquipmentAction} status={rpgStatus} battle={activeBattle || lastBattle} onStartBattleRequest={handleBattleStartRequest} onAttackBattle={handleAttackBattle} onUseBattleSkill={handleUseBattleSkill} startingEnemyId={pendingBattleEnemyId} attacking={isAttackingBattle} onBattleBack={() => setLastBattle(null)} battleFeedback={battleTurnFeedback}/>
+              <RpgHub profile={playerProfile} progress={rpgProgress} onPurchaseRequest={handlePurchaseRequest} onEquip={handleEquip} onUnequip={handleUnequip} pendingItemId={pendingPurchaseItemId} pendingAction={pendingEquipmentAction} status={rpgStatus} battle={activeBattle || lastBattle} onStartBattleRequest={handleBattleStartRequest} onAttackBattle={handleAttackBattle} onUseBattleSkill={handleUseBattleSkill} startingEnemyId={pendingBattleEnemyId} attacking={isAttackingBattle} onBattleBack={handleBattleResultClose} battleFeedback={battleTurnFeedback}/>
             )}
           </main>
         </div>
