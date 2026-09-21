@@ -8,7 +8,7 @@ import { SKILL_CATALOG } from '../rpg/skillCatalog.js';
 import { playerProfileRef } from './rewardLedgerRepository.js';
 import { getChapter, CHAPTER_CATALOG_VERSION } from '../rpg/chapterCatalog.js';
 import { getBoss, BOSS_CATALOG_VERSION } from '../rpg/bossCatalog.js';
-import { applyBossClearProgress, applyNormalVictoryProgress, isBossUnlocked, normalizeRpgProgress } from '../rpg/rpgProgress.js';
+import { applyBossClearProgress, applyBossClearProgressFromSnapshot, applyNormalVictoryProgress, applyNormalVictoryProgressFromSnapshot, isBossUnlocked, normalizeRpgProgress } from '../rpg/rpgProgress.js';
 import { rpgProgressRef } from './rpgProgressRepository.js';
 import { enemyActionForTurn, snapshotEnemyActionPattern } from '../rpg/enemyActionCatalog.js';
 
@@ -40,10 +40,10 @@ export function prepareBattleStart({ profile, enemy, battleId, now, battleKind =
   const skills = Object.fromEntries(Object.entries(SKILL_CATALOG).map(([id, skill]) => [id, buildBattleSkillSnapshot(skill)]));
   const playerSnapshot = { level: current.level, maxHp: calculatePlayerMaxHp(current), attack: calculatePlayerAttack(current), defense: calculatePlayerDefense(current), equipped: equippedSnapshot(current), skills };
   const enemySnapshot = { name: enemy.name, element: enemy.element, weaknesses: [...enemy.weaknesses], resistances: [...enemy.resistances], maxHp: enemy.maxHp, attack: enemy.attack, energyCost: enemy.energyCost, expReward: enemy.expReward, actionPattern: snapshotEnemyActionPattern(enemy.actionPattern), ...(battleKind === 'boss' ? { firstClearReward: { gold: number(enemy.firstClearReward?.gold), materials: { ...(enemy.firstClearReward?.materials || {}) } } } : {}), catalogVersion: battleKind === 'boss' ? BOSS_CATALOG_VERSION : ENEMY_CATALOG_VERSION };
-  const chapterSnapshot = chapter ? { id: chapter.id, number: chapter.number, name: chapter.name, normalWinsRequired: chapter.normalWinsRequired, bossId: chapter.bossId, catalogVersion: CHAPTER_CATALOG_VERSION } : null;
+  const chapterSnapshot = chapter ? { id: chapter.id, number: chapter.number, name: chapter.name, normalWinsRequired: chapter.normalWinsRequired, bossId: chapter.bossId, nextChapterId: chapter.nextChapterId ?? null, catalogVersion: CHAPTER_CATALOG_VERSION } : null;
   return {
     profile: { ...current, battleEnergy: number(current.battleEnergy) - enemy.energyCost, activeBattleId: battleId, updatedAt: now },
-    battle: { schemaVersion: 6, battleId, battleKind, ...(bossId ? { bossId } : {}), chapterSnapshot, enemyId: enemy.id, enemySnapshot, enemyHp: enemy.maxHp, status: 'active', playerSnapshot, skillUses: Object.fromEntries(Object.keys(skills).map((id) => [id, 0])), playerHp: playerSnapshot.maxHp, attackCount: 0, startedAt: now, updatedAt: now, victory: null, defeat: null },
+    battle: { schemaVersion: 7, battleId, battleKind, ...(bossId ? { bossId } : {}), chapterSnapshot, enemyId: enemy.id, enemySnapshot, enemyHp: enemy.maxHp, status: 'active', playerSnapshot, skillUses: Object.fromEntries(Object.keys(skills).map((id) => [id, 0])), playerHp: playerSnapshot.maxHp, attackCount: 0, startedAt: now, updatedAt: now, victory: null, defeat: null },
     ledger: { schemaVersion: RPG_BATTLE_SCHEMA_VERSION, type: 'battle_start', battleId, battleKind, ...(bossId ? { bossId } : {}), chapterSnapshot, enemyId: enemy.id, energySpent: enemy.energyCost, enemySnapshot, playerSnapshot, status: 'applied', appliedAt: now },
   };
 }
@@ -67,8 +67,13 @@ export function prepareBattleAttack({ battle: rawBattle, profile, progress, acti
   const victory = { expGranted, totalExpBefore, totalExpAfter, levelBefore: current.level, levelAfter, actionId, grantedAt: now };
   let nextProfile = { ...current, totalExp: totalExpAfter, level: levelAfter, activeBattleId: null, updatedAt: now }; let nextProgress = null; let bossClearLedger = null; let bossClear = null;
   if (Number(battle.schemaVersion) >= 5 && battle.chapterSnapshot?.id) {
-    if (battle.battleKind === 'normal') nextProgress = applyNormalVictoryProgress(progress, battle.chapterSnapshot.id, now);
-    if (battle.battleKind === 'boss') { const reward = battle.enemySnapshot.firstClearReward || {}; nextProgress = applyBossClearProgress(progress, battle.chapterSnapshot.id, now); const materials = { ...nextProfile.materials }; Object.entries(reward.materials || {}).forEach(([key, quantity]) => { materials[key] = number(materials[key]) + number(quantity); }); nextProfile = { ...nextProfile, gold: number(nextProfile.gold) + number(reward.gold), materials }; bossClear = { chapterId: battle.chapterSnapshot.id, chapterBefore: battle.chapterSnapshot.id, chapterAfter: nextProgress.currentChapterId === battle.chapterSnapshot.id ? null : nextProgress.currentChapterId, firstClear: true, reward: { gold: number(reward.gold), materials: { ...(reward.materials || {}) } } }; bossClearLedger = { schemaVersion: 1, type: 'boss_clear', chapterId: bossClear.chapterId, bossId: battle.bossId, battleId: battle.battleId, expGranted, firstClearReward: bossClear.reward, chapterBefore: bossClear.chapterBefore, chapterAfter: bossClear.chapterAfter, status: 'applied', appliedAt: now }; }
+    const usesSnapshotProgress = Number(battle.schemaVersion) >= 7;
+    if (battle.battleKind === 'normal') nextProgress = usesSnapshotProgress
+      ? applyNormalVictoryProgressFromSnapshot(progress, battle.chapterSnapshot, now)
+      : applyNormalVictoryProgress(progress, battle.chapterSnapshot.id, now);
+    if (battle.battleKind === 'boss') { const reward = battle.enemySnapshot.firstClearReward || {}; nextProgress = usesSnapshotProgress
+      ? applyBossClearProgressFromSnapshot(progress, battle.chapterSnapshot, now)
+      : applyBossClearProgress(progress, battle.chapterSnapshot.id, now); const materials = { ...nextProfile.materials }; Object.entries(reward.materials || {}).forEach(([key, quantity]) => { materials[key] = number(materials[key]) + number(quantity); }); nextProfile = { ...nextProfile, gold: number(nextProfile.gold) + number(reward.gold), materials }; bossClear = { chapterId: battle.chapterSnapshot.id, chapterBefore: battle.chapterSnapshot.id, chapterAfter: nextProgress.currentChapterId === battle.chapterSnapshot.id ? null : nextProgress.currentChapterId, firstClear: true, reward: { gold: number(reward.gold), materials: { ...(reward.materials || {}) } } }; bossClearLedger = { schemaVersion: 1, type: 'boss_clear', chapterId: bossClear.chapterId, bossId: battle.bossId, battleId: battle.battleId, expGranted, firstClearReward: bossClear.reward, chapterBefore: bossClear.chapterBefore, chapterAfter: bossClear.chapterAfter, status: 'applied', appliedAt: now }; }
   }
   return {
     battle: { ...battle, enemyHp: 0, skillUses, status: 'won', attackCount, updatedAt: now, victory: bossClear ? { ...victory, bossClear } : victory, defeat: null },
