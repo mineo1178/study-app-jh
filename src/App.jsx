@@ -16,18 +16,22 @@ import { applyStudySessionReward, emptyPlayerProfile, playerProfileRef } from '.
 import { createRpgActionId, equipItem, purchaseEquipment, unequipSlot } from './data/rpgShopRepository';
 import { attackBattle, createBattleActionId, createBattleId, rpgBattleRef, startBattle, startBossBattle, useBattleSkill as runBattleSkill } from './data/rpgBattleRepository';
 import { rpgProgressRef } from './data/rpgProgressRepository';
+import { claimQuestReward, rpgQuestStateRef } from './data/rpgQuestRepository';
 import { normalizeRpgProgress } from './rpg/rpgProgress';
 import { buildBattleTurnFeedback } from './rpg/battleUiLogic';
 import { getEquipmentCatalogItem } from './rpg/equipmentCatalog';
 import { normalizeBattle } from './rpg/battleState';
 import { resolveBattleWatchSnapshot } from './rpg/battleLifecycle';
 import { normalizePlayerProfile } from './rpg/playerProfile';
+import { getQuest } from './rpg/questCatalog';
+import { normalizeQuestState } from './rpg/questState';
 import { isStudySessionRewardEligible } from './rpg/rewardCalculator';
 import RpgWalletPanel from './components/rpg/RpgWalletPanel';
 import RewardResultModal from './components/rpg/RewardResultModal';
 import RpgHub from './components/rpg/RpgHub';
 import PurchaseConfirmModal from './components/rpg/PurchaseConfirmModal';
 import BattleStartConfirmModal from './components/rpg/BattleStartConfirmModal';
+import QuestTreasureResult from './components/rpg/QuestTreasureResult';
 import { formatHms, getEffectiveStudySeconds, getLiveStudySession, getSessionsForDate, getSessionsForTask, getUnifiedStudySessions } from './data/studySessionSelectors';
 import LiveStudyStatus from './components/study/LiveStudyStatus';
 import MigrationExportButton from './components/dev/MigrationExportButton';
@@ -67,7 +71,7 @@ const getTasksCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-
 const getTestsCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tests');
 const getStudySessionsCol = () => studySessionsCollection(db, FAMILY_ID);
 const getActiveTimerRef = () => activeTimerRef(db, FAMILY_ID);
-const APP_VERSION = 'v1.85';
+const APP_VERSION = 'v1.86';
 const TIMER_HEARTBEAT_MS = 30 * 1000;
 const DAILY_TARGET_SECONDS = 2 * 60 * 60;
 const isDocumentHidden = () => typeof document !== 'undefined' && document.hidden;
@@ -849,6 +853,9 @@ export default function App() {
     const [studySessions, setStudySessions] = useState([]);
     const [playerProfile, setPlayerProfile] = useState(emptyPlayerProfile());
     const [rpgProgress, setRpgProgress] = useState(() => normalizeRpgProgress());
+    const [questState, setQuestState] = useState(() => normalizeQuestState());
+    const [pendingQuestId, setPendingQuestId] = useState(null);
+    const [questClaimResult, setQuestClaimResult] = useState(null);
     const [purchaseCandidate, setPurchaseCandidate] = useState(null);
     const [rpgStatus, setRpgStatus] = useState(null);
     const [pendingPurchaseItemId, setPendingPurchaseItemId] = useState(null);
@@ -952,6 +959,10 @@ export default function App() {
     useEffect(() => {
         if (isSampleMode || !user) return undefined;
         return onSnapshot(rpgProgressRef(db, FAMILY_ID), (snap) => setRpgProgress(normalizeRpgProgress(snap.exists() ? snap.data() : {})), (err) => console.error('RpgProgress realtime sync error:', err));
+    }, [isSampleMode, user]);
+    useEffect(() => {
+        if (isSampleMode || !user) return undefined;
+        return onSnapshot(rpgQuestStateRef(db, FAMILY_ID), (snap) => setQuestState(normalizeQuestState(snap.exists() ? snap.data() : {})), (err) => console.error('Quest state realtime sync error:', err));
     }, [isSampleMode, user]);
     useEffect(() => {
         if (isSampleMode || !user || !battleWatchId) return undefined;
@@ -1155,6 +1166,19 @@ export default function App() {
         } finally {
             setPendingEquipmentAction(null);
         }
+    };
+    const handleClaimQuest = async (questId) => {
+        if (isSampleMode || !user || pendingQuestId) return;
+        setPendingQuestId(questId); setRpgStatus(null);
+        try {
+            const result = await claimQuestReward({ db, familyId: FAMILY_ID, questId });
+            if (!result.applied) { setRpgStatus({ kind: 'error', message: 'このクエストはすでに受取済みです' }); return; }
+            const quest = getQuest(result.questId);
+            setQuestClaimResult({ name: quest?.name || 'クエスト報酬', reward: result.reward });
+        } catch (error) {
+            const code = error?.code || error?.message;
+            setRpgStatus({ kind: 'error', message: code === 'QUEST_NOT_COMPLETED' ? 'クエスト条件を達成していません' : code === 'QUEST_ALREADY_CLAIMED' ? 'このクエストはすでに受取済みです' : 'クエスト報酬の受取に失敗しました' });
+        } finally { setPendingQuestId(null); }
     };
     const battleErrorMessage = (error) => ({
         ENEMY_NOT_FOUND: '敵情報を確認できません',
@@ -1993,11 +2017,12 @@ export default function App() {
                 </div>
               </div>)}
             {activeTab === 'rpg' && !isSampleMode && (
-              <RpgHub profile={playerProfile} progress={rpgProgress} onPurchaseRequest={handlePurchaseRequest} onEquip={handleEquip} onUnequip={handleUnequip} pendingItemId={pendingPurchaseItemId} pendingAction={pendingEquipmentAction} status={rpgStatus} battle={activeBattle || lastBattle} onStartBattleRequest={handleBattleStartRequest} onAttackBattle={handleAttackBattle} onUseBattleSkill={handleUseBattleSkill} startingEnemyId={pendingBattleEnemyId} attacking={isAttackingBattle} onBattleBack={handleBattleResultClose} battleFeedback={battleTurnFeedback}/>
+              <RpgHub profile={playerProfile} progress={rpgProgress} questState={questState} onClaimQuest={handleClaimQuest} pendingQuestId={pendingQuestId} onPurchaseRequest={handlePurchaseRequest} onEquip={handleEquip} onUnequip={handleUnequip} pendingItemId={pendingPurchaseItemId} pendingAction={pendingEquipmentAction} status={rpgStatus} battle={activeBattle || lastBattle} onStartBattleRequest={handleBattleStartRequest} onAttackBattle={handleAttackBattle} onUseBattleSkill={handleUseBattleSkill} startingEnemyId={pendingBattleEnemyId} attacking={isAttackingBattle} onBattleBack={handleBattleResultClose} battleFeedback={battleTurnFeedback}/>
             )}
           </main>
         </div>
 
+        <QuestTreasureResult result={questClaimResult} onClose={() => setQuestClaimResult(null)}/>
         {questResult && (<div className={modalOverlayClass} role="dialog" aria-modal="true" aria-label="学習結果">
           <div className="w-full max-w-md rounded-[2rem] bg-white p-7 text-center shadow-2xl">
             <div className="text-xs font-black tracking-[0.24em] text-indigo-500">QUEST CLEAR!</div>

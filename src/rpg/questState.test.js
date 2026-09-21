@@ -1,0 +1,8 @@
+import { describe, expect, it } from 'vitest';
+import { createEmptyQuestState, getQuestStatus, isQuestCompleted, normalizeQuestState } from './questState.js';
+
+describe('quest state and eligibility', () => {
+  it('normalizes missing, duplicate, and unknown claim IDs', () => { expect(normalizeQuestState()).toEqual(createEmptyQuestState()); expect(normalizeQuestState({ claimedQuestIds: ['first_equipment', 'first_equipment', 'unknown'] }).claimedQuestIds).toEqual(['first_equipment']); });
+  it('evaluates all four canonical quest conditions', () => { expect(isQuestCompleted({ questId: 'first_equipment', profile: {} })).toBe(false); expect(isQuestCompleted({ questId: 'first_equipment', profile: { ownedEquipment: { iron_sword: {} } } })).toBe(true); expect(isQuestCompleted({ questId: 'full_loadout', profile: { equipped: { weapon: 'iron_sword', armor: 'mineral_armor' } } })).toBe(false); expect(isQuestCompleted({ questId: 'full_loadout', profile: { equipped: { weapon: 'iron_sword', armor: 'mineral_armor', accessory: 'history_charm' } } })).toBe(true); expect(isQuestCompleted({ questId: 'chapter_1_clear', progress: { completedChapterIds: [] } })).toBe(false); expect(isQuestCompleted({ questId: 'chapter_1_clear', progress: { completedChapterIds: ['chapter_1'] } })).toBe(true); expect(isQuestCompleted({ questId: 'campaign_clear', progress: { campaignCompleted: false } })).toBe(false); expect(isQuestCompleted({ questId: 'campaign_clear', progress: { campaignCompleted: true } })).toBe(true); });
+  it('prioritizes claimed status over a currently completed condition', () => { expect(getQuestStatus({ questId: 'first_equipment', profile: { ownedEquipment: { iron_sword: {} } }, questState: { claimedQuestIds: ['first_equipment'] } })).toBe('claimed'); });
+});
