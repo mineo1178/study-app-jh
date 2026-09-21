@@ -23,7 +23,12 @@ export const calculateAttackResult = (enemyHp, attack) => {
 };
 export const calculatePlayerDefense = (profile) => { const safe = normalizePlayerProfile(profile || {}); return BASE_PLAYER_DEFENSE + EQUIPMENT_SLOTS.reduce((total, slot) => { const id = safe.equipped[slot]; const item = EQUIPMENT_CATALOG[id]; return total + (item && item.slot === slot && safe.ownedEquipment[id] ? Math.max(0, Number(item.stats?.defense) || 0) : 0); }, 0); };
 export const calculatePlayerMaxHp = () => BASE_PLAYER_MAX_HP;
-export const calculateEnemyCounterDamage = (enemyAttack, playerDefense) => Math.max(1, (Number(enemyAttack) || 0) - (Number(playerDefense) || 0));
+export const calculateEnemyActionDamage = ({ enemyAttack, powerPercent = 100, playerDefense }) => {
+  const attack = Math.max(0, Number(enemyAttack) || 0);
+  const poweredAttack = Math.floor(attack * Math.max(0, Number(powerPercent) || 0) / 100);
+  return { attack, poweredAttack, damage: Math.max(1, poweredAttack - Math.max(0, Number(playerDefense) || 0)) };
+};
+export const calculateEnemyCounterDamage = (enemyAttack, playerDefense) => calculateEnemyActionDamage({ enemyAttack, powerPercent: 100, playerDefense }).damage;
 export const getElementMultiplier = ({ attackElement, weaknesses = [], resistances = [] }) => attackElement !== 'neutral' && weaknesses.includes(attackElement) ? { type: 'weak', percent: 150 } : attackElement !== 'neutral' && resistances.includes(attackElement) ? { type: 'resist', percent: 75 } : { type: 'normal', percent: 100 };
 export const calculateSkillDamage = ({ playerAttack, powerPercent, elementPercent }) => { const poweredDamage = Math.floor((Number(playerAttack) || 0) * (Number(powerPercent) || 0) / 100); return { poweredDamage, damage: Math.max(1, Math.floor(poweredDamage * (Number(elementPercent) || 100) / 100)) }; };
 export const calculateHealAmount = ({ playerMaxHp, playerHp, healPercent }) => { const calculatedHeal = Math.max(1, Math.floor((Number(playerMaxHp) || 0) * (Number(healPercent) || 0) / 100)); const playerHpBefore = Math.max(0, Number(playerHp) || 0); const playerHpAfterHeal = Math.min(Math.max(0, Number(playerMaxHp) || 0), playerHpBefore + calculatedHeal); return { calculatedHeal, actualHeal: Math.max(0, playerHpAfterHeal - playerHpBefore), playerHpBefore, playerHpAfterHeal }; };

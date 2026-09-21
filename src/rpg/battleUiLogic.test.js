@@ -1,3 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { battleEnergyState, battleHpPercent, battleIsActive } from './battleUiLogic.js';
+import { battleEnergyState, battleHpPercent, battleIsActive, buildBattleTurnFeedback } from './battleUiLogic.js';
 describe('battle UI logic', () => { it('handles energy, hp and active state safely', () => { expect(battleEnergyState({ battleEnergy: 0 }, { energyCost: 1 }).sufficient).toBe(false); expect(battleEnergyState({ battleEnergy: 2 }, { energyCost: 1 }).sufficient).toBe(true); expect(battleHpPercent({ enemyHp: 10, enemySnapshot: { maxHp: 20 } })).toBe(50); expect(battleHpPercent(null)).toBe(0); expect(battleIsActive({ status: 'active' })).toBe(true); }); });
+
+describe('enemy action feedback', () => { it('names normal and boss counter actions', () => { expect(buildBattleTurnFeedback({ damage: 5, enemyCounter: { actionName: '通常攻撃', damage: 3 } }, 'オークチーフ')).toEqual(['通常攻撃', '5 DAMAGE', 'オークチーフの通常攻撃！', '3 DAMAGE']); expect(buildBattleTurnFeedback({ skill: { kind: 'heal', name: 'ヒール' }, healing: { actualHeal: 14 }, enemyCounter: { actionName: '豪腕撃', damage: 6 } }, 'オークチーフ')).toEqual(['ヒール', 'HPを14回復した！', 'オークチーフの豪腕撃！', '6 DAMAGE']); }); });

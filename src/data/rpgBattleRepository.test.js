@@ -33,7 +33,7 @@ describe('battle transaction logic', () => {
   });
   it('snapshots starter skills and applies weak skill damage atomically', () => {
     const start = prepareBattleStart({ profile, enemy: ENEMY_CATALOG.slime, battleId: 'battle-skill', now });
-    expect(start.battle).toMatchObject({ schemaVersion: 5, skillUses: { flame_slash: 0, aqua_edge: 0, thunder_strike: 0, healing_light: 0, guard_stance: 0 } });
+    expect(start.battle).toMatchObject({ schemaVersion: 6, skillUses: { flame_slash: 0, aqua_edge: 0, thunder_strike: 0, healing_light: 0, guard_stance: 0 } });
     const skill = start.battle.playerSnapshot.skills.flame_slash;
     const elementResult = getElementMultiplier({ attackElement: skill.element, weaknesses: start.battle.enemySnapshot.weaknesses, resistances: start.battle.enemySnapshot.resistances });
     const damage = calculateSkillDamage({ playerAttack: 10, powerPercent: skill.powerPercent, elementPercent: elementResult.percent });
@@ -44,7 +44,7 @@ describe('battle transaction logic', () => {
   });
   it('snapshots five v4 skills and applies heal and guard through the shared action path', () => {
     const start = prepareBattleStart({ profile, enemy: ENEMY_CATALOG.slime, battleId: 'battle-v4', now });
-    expect(start.battle).toMatchObject({ schemaVersion: 5, skillUses: { flame_slash: 0, aqua_edge: 0, thunder_strike: 0, healing_light: 0, guard_stance: 0 } });
+    expect(start.battle).toMatchObject({ schemaVersion: 6, skillUses: { flame_slash: 0, aqua_edge: 0, thunder_strike: 0, healing_light: 0, guard_stance: 0 } });
     const heal = prepareBattleAttack({ battle: { ...start.battle, playerHp: 20 }, profile: start.profile, actionId: 'heal-1', now, action: { kind: 'skill', healing: { playerHpBefore: 20, calculatedHeal: 14, actualHeal: 14, playerHpAfterHeal: 34 }, skill: { ...start.battle.playerSnapshot.skills.healing_light, useNumber: 1 } } });
     expect(heal.battle).toMatchObject({ enemyHp: 20, playerHp: 31, skillUses: { healing_light: 1 }, attackCount: 1 });
     expect(heal.attackLedger).toMatchObject({ healing: { actualHeal: 14 }, playerAttack: null, enemyCounter: { damage: 3, playerHpBefore: 34, playerHpAfter: 31 } });
@@ -76,5 +76,60 @@ describe('battle transaction logic', () => {
     expect(final.progress).toMatchObject({ currentChapterId: 'chapter_2', normalWins: 0, completedChapterIds: ['chapter_1'] });
     expect(final.bossClearLedger).toMatchObject({ type: 'boss_clear', chapterId: 'chapter_1', bossId: 'orc_chief' });
     [final.battle, final.profile, final.progress, final.victoryLedger, final.bossClearLedger].forEach((payload) => expect(findUndefinedPaths(payload)).toEqual([]));
+  });
+  it('snapshots deterministic enemy actions for normal, skill, guard, heal, victory, and defeat turns', () => {
+    const defensiveProfile = { battleEnergy: 20, ownedEquipment: { iron_sword: {}, mineral_armor: {}, history_charm: {} }, equipped: { weapon: 'iron_sword', armor: 'mineral_armor', accessory: 'history_charm' } };
+    const normalStart = prepareBattleStart({ profile: defensiveProfile, enemy: ENEMY_CATALOG.slime, battleId: 'normal-actions', now });
+    const normal = prepareBattleAttack({ battle: normalStart.battle, profile: normalStart.profile, actionId: 'normal-actions-1', now });
+    expect(normal.attackLedger.enemyCounter).toMatchObject({ actionId: 'normal_attack', actionName: '通常攻撃', powerPercent: 100, attack: 3, poweredAttack: 3, playerDefense: 4, damage: 1 });
+
+    const orcStart = prepareBattleStart({ profile: defensiveProfile, enemy: BOSS_CATALOG.orc_chief, battleId: 'orc-actions', now, battleKind: 'boss', bossId: 'orc_chief', chapter: { id: 'chapter_1', number: 1, name: '草原', normalWinsRequired: 3, bossId: 'orc_chief' } });
+    expect(orcStart.battle).toMatchObject({ schemaVersion: 6, enemySnapshot: { actionPattern: [{ id: 'normal_attack' }, { id: 'normal_attack' }, { id: 'orc_heavy_strike', powerPercent: 150 }] } });
+    const healSkill = orcStart.battle.playerSnapshot.skills.healing_light;
+    const heal = prepareBattleAttack({ battle: { ...orcStart.battle, attackCount: 2, playerHp: 20 }, profile: orcStart.profile, actionId: 'orc-heal', now, action: { kind: 'skill', healing: { playerHpBefore: 20, calculatedHeal: 14, actualHeal: 14, playerHpAfterHeal: 34 }, skill: { ...healSkill, useNumber: 1 } } });
+    expect(heal.attackLedger.enemyCounter).toMatchObject({ actionId: 'orc_heavy_strike', actionName: '豪腕撃', poweredAttack: 7, damage: 3, playerHpBefore: 34, playerHpAfter: 31 });
+
+    const golemStart = prepareBattleStart({ profile: defensiveProfile, enemy: BOSS_CATALOG.ancient_golem, battleId: 'golem-actions', now, battleKind: 'boss', bossId: 'ancient_golem', chapter: { id: 'chapter_2', number: 2, name: '洞窟', normalWinsRequired: 4, bossId: 'ancient_golem' } });
+    const rockCrush = prepareBattleAttack({ battle: { ...golemStart.battle, attackCount: 1 }, profile: golemStart.profile, actionId: 'golem-rock', now });
+    expect(rockCrush.attackLedger.enemyCounter).toMatchObject({ actionId: 'golem_rock_crush', actionName: '岩砕き', poweredAttack: 10, damage: 6 });
+    const guardSkill = golemStart.battle.playerSnapshot.skills.guard_stance;
+    const earthquakeGuard = prepareBattleAttack({ battle: { ...golemStart.battle, attackCount: 3 }, profile: golemStart.profile, actionId: 'golem-guard', now, action: { kind: 'skill', skill: { ...guardSkill, useNumber: 1 } } });
+    expect(earthquakeGuard.attackLedger.enemyCounter).toMatchObject({ actionId: 'golem_earthquake', actionName: '大地震', poweredAttack: 12, damage: 4 });
+    expect(earthquakeGuard.attackLedger.guard).toMatchObject({ baseDamage: 8, reductionPercent: 50, finalDamage: 4 });
+
+    const victory = prepareBattleAttack({ battle: { ...orcStart.battle, enemyHp: 1, attackCount: 2 }, profile: orcStart.profile, progress: { currentChapterId: 'chapter_1', normalWins: 3 }, actionId: 'orc-victory', now });
+    expect(victory.attackLedger.enemyCounter).toBeNull();
+    const defeat = prepareBattleAttack({ battle: { ...golemStart.battle, attackCount: 3, playerHp: 8 }, profile: golemStart.profile, progress: { currentChapterId: 'chapter_2', normalWins: 4 }, actionId: 'golem-defeat', now });
+    expect(defeat).toMatchObject({ battle: { status: 'lost' }, profile: { activeBattleId: null, totalExp: 0 }, defeatLedger: { expGranted: 0 } });
+    expect(defeat.progress).toBeUndefined();
+    expect(defeat.bossClearLedger).toBeUndefined();
+    [normalStart.battle, normalStart.ledger, normal.attackLedger, orcStart.battle, orcStart.ledger, heal.attackLedger, golemStart.battle, golemStart.ledger, rockCrush.attackLedger, earthquakeGuard.attackLedger, victory.attackLedger, victory.victoryLedger, defeat.attackLedger, defeat.defeatLedger, defeat.profile].forEach((payload) => expect(findUndefinedPaths(payload)).toEqual([]));
+  });
+  it('keeps the bare Orc Chief beatable with the existing two Heals and deterministic skill sequence', () => {
+    const start = prepareBattleStart({ profile: { battleEnergy: 3 }, enemy: BOSS_CATALOG.orc_chief, battleId: 'bare-orc', now, battleKind: 'boss', bossId: 'orc_chief' });
+    let battle = start.battle;
+    const skillTurn = (skillId, useNumber, actionId) => {
+      const skill = battle.playerSnapshot.skills[skillId];
+      const elementResult = getElementMultiplier({ attackElement: skill.element, weaknesses: battle.enemySnapshot.weaknesses, resistances: battle.enemySnapshot.resistances });
+      const damage = calculateSkillDamage({ playerAttack: battle.playerSnapshot.attack, powerPercent: skill.powerPercent, elementPercent: elementResult.percent });
+      const result = prepareBattleAttack({ battle, profile: start.profile, actionId, now, action: { kind: 'skill', damage: damage.damage, poweredDamage: damage.poweredDamage, elementResult, skill: { ...skill, useNumber } } });
+      battle = result.battle;
+      return result;
+    };
+    const healTurn = (useNumber, actionId) => {
+      const skill = battle.playerSnapshot.skills.healing_light;
+      const healing = { playerHpBefore: battle.playerHp, calculatedHeal: 14, actualHeal: 14, playerHpAfterHeal: Math.min(40, battle.playerHp + 14) };
+      const result = prepareBattleAttack({ battle, profile: start.profile, actionId, now, action: { kind: 'skill', healing, skill: { ...skill, useNumber } } });
+      battle = result.battle;
+      return result;
+    };
+    skillTurn('aqua_edge', 1, 'bare-aqua-1'); skillTurn('aqua_edge', 2, 'bare-aqua-2'); skillTurn('thunder_strike', 1, 'bare-thunder-1'); skillTurn('thunder_strike', 2, 'bare-thunder-2'); skillTurn('flame_slash', 1, 'bare-flame-1');
+    healTurn(1, 'bare-heal-1'); skillTurn('flame_slash', 2, 'bare-flame-2');
+    let result = prepareBattleAttack({ battle, profile: start.profile, actionId: 'bare-normal-1', now }); battle = result.battle;
+    healTurn(2, 'bare-heal-2'); result = prepareBattleAttack({ battle, profile: start.profile, actionId: 'bare-normal-2', now }); battle = result.battle;
+    result = prepareBattleAttack({ battle, profile: start.profile, actionId: 'bare-normal-3', now }); battle = result.battle;
+    result = prepareBattleAttack({ battle, profile: start.profile, actionId: 'bare-normal-final', now });
+    expect(result.battle).toMatchObject({ status: 'won', enemyHp: 0, playerHp: 7 });
+    expect(result.attackLedger.enemyCounter).toBeNull();
   });
 });

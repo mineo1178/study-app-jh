@@ -3,7 +3,7 @@ import { applyRewardToPlayerProfile } from '../data/rewardLedgerRepository.js';
 import { prepareBattleAttack, prepareBattleStart } from '../data/rpgBattleRepository.js';
 import { prepareEquip, preparePurchase } from '../data/rpgShopRepository.js';
 import { findUndefinedPaths } from '../test/findUndefinedPaths.js';
-import { calculateEnemyCounterDamage, calculatePlayerAttack, calculatePlayerDefense, calculateSkillDamage } from './battleCalculator.js';
+import { calculateEnemyActionDamage, calculateEnemyCounterDamage, calculatePlayerAttack, calculatePlayerDefense, calculateSkillDamage } from './battleCalculator.js';
 import { BOSS_CATALOG } from './bossCatalog.js';
 import { getChapter } from './chapterCatalog.js';
 import { EQUIPMENT_CATALOG } from './equipmentCatalog.js';
@@ -13,6 +13,7 @@ import { createEmptyPlayerProfile } from './playerProfile.js';
 import { calculateStudyReward, isStudySessionRewardEligible } from './rewardCalculator.js';
 import { isBossUnlocked, normalizeRpgProgress } from './rpgProgress.js';
 import { normalizeBattle } from './battleState.js';
+import { enemyActionForTurn, snapshotEnemyActionPattern } from './enemyActionCatalog.js';
 
 const now = 1_000;
 const validStudySession = (id, subjectId, minutes) => ({
@@ -135,10 +136,13 @@ describe('RPG campaign scenario', () => {
     expect(attackCounts.ancient_golem.equipped).toBeLessThan(10);
     expect(calculateEnemyCounterDamage(BOSS_CATALOG.ancient_golem.attack, calculatePlayerDefense(equipped))).toBe(3);
     expect(calculateSkillDamage({ playerAttack: calculatePlayerAttack(bare), powerPercent: 125, elementPercent: 150 }).damage).toBe(9);
+    const ancientCounterDamage = [1, 2, 3, 4, 5, 6, 7].map((turn) => calculateEnemyActionDamage({ enemyAttack: BOSS_CATALOG.ancient_golem.attack, powerPercent: enemyActionForTurn(snapshotEnemyActionPattern(BOSS_CATALOG.ancient_golem.actionPattern), turn).powerPercent, playerDefense: calculatePlayerDefense(equipped) }).damage);
+    expect(ancientCounterDamage).toEqual([3, 6, 3, 8, 3, 6, 3]);
+    expect(ancientCounterDamage.reduce((total, damage) => total + damage, 0)).toBe(32);
   });
 
-  it('normalizes Battle v1 through v4 without applying campaign progress to legacy victories', () => {
-    [1, 2, 3, 4].forEach((schemaVersion) => {
+  it('normalizes Battle v1 through v5 without applying campaign progress to legacy victories', () => {
+    [1, 2, 3, 4, 5].forEach((schemaVersion) => {
       const legacy = normalizeBattle({
         schemaVersion,
         battleId: `legacy-${schemaVersion}`,
@@ -152,6 +156,8 @@ describe('RPG campaign scenario', () => {
       expect(final.battle.schemaVersion).toBe(schemaVersion);
       expect(final.battle.status).toBe('won');
       expect(final.progress).toBeNull();
+      const ongoing = prepareBattleAttack({ battle: { ...legacy, enemyHp: 20 }, profile: createEmptyPlayerProfile(), actionId: `legacy-${schemaVersion}-counter`, now });
+      expect(ongoing.attackLedger.enemyCounter).toMatchObject({ actionId: 'normal_attack', powerPercent: 100, damage: 3 });
     });
   });
 });
