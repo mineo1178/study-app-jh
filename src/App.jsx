@@ -20,6 +20,7 @@ import { normalizeRpgProgress } from './rpg/rpgProgress';
 import { buildBattleTurnFeedback } from './rpg/battleUiLogic';
 import { getEquipmentCatalogItem } from './rpg/equipmentCatalog';
 import { normalizeBattle } from './rpg/battleState';
+import { resolveBattleWatchSnapshot } from './rpg/battleLifecycle';
 import { normalizePlayerProfile } from './rpg/playerProfile';
 import { isStudySessionRewardEligible } from './rpg/rewardCalculator';
 import RpgWalletPanel from './components/rpg/RpgWalletPanel';
@@ -66,7 +67,7 @@ const getTasksCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-
 const getTestsCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tests');
 const getStudySessionsCol = () => studySessionsCollection(db, FAMILY_ID);
 const getActiveTimerRef = () => activeTimerRef(db, FAMILY_ID);
-const APP_VERSION = 'v1.83.1';
+const APP_VERSION = 'v1.83.2';
 const TIMER_HEARTBEAT_MS = 30 * 1000;
 const DAILY_TARGET_SECONDS = 2 * 60 * 60;
 const isDocumentHidden = () => typeof document !== 'undefined' && document.hidden;
@@ -854,6 +855,7 @@ export default function App() {
     const [pendingEquipmentAction, setPendingEquipmentAction] = useState(null);
     const [activeBattle, setActiveBattle] = useState(null);
     const [lastBattle, setLastBattle] = useState(null);
+    const [battleWatchId, setBattleWatchId] = useState(null);
     const [battleCandidate, setBattleCandidate] = useState(null);
     const [pendingBattleEnemyId, setPendingBattleEnemyId] = useState(null);
     const [isAttackingBattle, setIsAttackingBattle] = useState(false);
@@ -945,18 +947,16 @@ export default function App() {
     }, [isSampleMode, studySessions, user]);
     useEffect(() => {
         if (isSampleMode || !user) return undefined;
-        return onSnapshot(playerProfileRef(db, FAMILY_ID), (snap) => setPlayerProfile(normalizePlayerProfile(snap.exists() ? snap.data() : emptyPlayerProfile())), (err) => console.error('PlayerProfile realtime sync error:', err));
+        return onSnapshot(playerProfileRef(db, FAMILY_ID), (snap) => { const next = normalizePlayerProfile(snap.exists() ? snap.data() : emptyPlayerProfile()); setPlayerProfile(next); if (next.activeBattleId) setBattleWatchId(next.activeBattleId); }, (err) => console.error('PlayerProfile realtime sync error:', err));
     }, [isSampleMode, user]);
     useEffect(() => {
         if (isSampleMode || !user) return undefined;
         return onSnapshot(rpgProgressRef(db, FAMILY_ID), (snap) => setRpgProgress(normalizeRpgProgress(snap.exists() ? snap.data() : {})), (err) => console.error('RpgProgress realtime sync error:', err));
     }, [isSampleMode, user]);
     useEffect(() => {
-        const battleId = playerProfile.activeBattleId;
-        if (isSampleMode || !user || !battleId) return undefined;
-        const unsubscribe = onSnapshot(rpgBattleRef(db, FAMILY_ID, battleId), (snap) => { const next = snap.exists() ? normalizeBattle(snap.data()) : null; setActiveBattle(next); if (next?.status === 'won' || next?.status === 'lost') setLastBattle(next); }, (err) => console.error('Battle realtime sync error:', err));
-        return () => { unsubscribe(); setActiveBattle(null); };
-    }, [isSampleMode, playerProfile.activeBattleId, user]);
+        if (isSampleMode || !user || !battleWatchId) return undefined;
+        return onSnapshot(rpgBattleRef(db, FAMILY_ID, battleWatchId), (snap) => { const snapshot = resolveBattleWatchSnapshot(snap.exists() ? normalizeBattle(snap.data()) : null, battleWatchId); setActiveBattle(snapshot.activeBattle); setLastBattle(snapshot.lastBattle); setBattleWatchId(snapshot.battleWatchId); }, (err) => console.error('Battle realtime sync error:', err));
+    }, [battleWatchId, isSampleMode, user]);
     useEffect(() => {
         if (!activeTimerIsOwner || activeTimer?.state !== 'running' || isSampleMode || !user) return;
         const sendHeartbeat = () => heartbeatActiveTimer({
@@ -1167,7 +1167,7 @@ export default function App() {
         if (isSampleMode || !user || playerProfile.activeBattleId || pendingBattleEnemyId) return;
         setRpgStatus(null); setBattleCandidate(enemy);
     };
-    const handleBattleResultClose = () => { setActiveBattle(null); setLastBattle(null); setBattleTurnFeedback(null); setRpgStatus(null); };
+    const handleBattleResultClose = () => { setActiveBattle(null); setLastBattle(null); setBattleWatchId(null); setBattleTurnFeedback(null); setRpgStatus(null); };
     const handleBattleStartConfirm = async () => {
         if (!battleCandidate || isSampleMode || !user || pendingBattleEnemyId) return;
         const enemy = battleCandidate; setPendingBattleEnemyId(enemy.id);
