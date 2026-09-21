@@ -14,7 +14,7 @@ vi.mock('firebase/firestore', () => ({
 }));
 
 import { getEquipmentCatalogItem } from '../rpg/equipmentCatalog.js';
-import { prepareEquip, preparePurchase, prepareUnequip, purchaseEquipment } from './rpgShopRepository.js';
+import { equipItem, prepareEquip, preparePurchase, prepareUnequip, purchaseEquipment } from './rpgShopRepository.js';
 
 const now = 123456;
 const baseProfile = (overrides = {}) => ({ gold: 100, materials: { iron: 10, wisdom_scroll: 4, mana_rune: 4 }, ...overrides });
@@ -49,6 +49,16 @@ describe('rpg shop purchase logic', () => {
     expect(second).toEqual({ applied: false, reason: 'ALREADY_APPLIED' });
     expect(firestore.docs.get(profilePath).gold).toBe(20);
     expect(firestore.docs.get(profilePath).materials.iron).toBe(5);
+  });
+  it('blocks purchases during a pending reward correction but still permits equipment changes', async () => {
+    firestore.docs.clear();
+    const profilePath = 'families/family/apps/junior-high/rpg/playerProfile';
+    const integrityPath = 'families/family/apps/junior-high/rewardIntegrity/current';
+    firestore.docs.set(profilePath, { ...baseProfile(), ownedEquipment: { iron_sword: { acquiredAt: 1, sourceActionId: 'seed' } } });
+    firestore.docs.set(integrityPath, { pendingSessionIds: ['session-1'] });
+    await expect(purchaseEquipment({ db: {}, familyId: 'family', itemId: 'scholar_blade', actionId: 'blocked' })).rejects.toThrow('REWARD_CORRECTION_PENDING');
+    await expect(equipItem({ db: {}, familyId: 'family', itemId: 'iron_sword', actionId: 'equip-while-pending' })).resolves.toMatchObject({ applied: true });
+    expect(firestore.docs.get(profilePath).equipped.weapon).toBe('iron_sword');
   });
 });
 

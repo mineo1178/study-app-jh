@@ -2,6 +2,7 @@ import { doc, runTransaction } from 'firebase/firestore';
 import { EQUIPMENT_CATALOG_VERSION, EQUIPMENT_SLOTS, getEquipmentCatalogItem } from '../rpg/equipmentCatalog.js';
 import { normalizePlayerProfile } from '../rpg/playerProfile.js';
 import { playerProfileRef } from './rewardLedgerRepository.js';
+import { assertNoPendingRewardCorrections, rewardIntegrityRef } from './rewardCorrectionRepository.js';
 
 export const RPG_ACTION_LEDGER_SCHEMA_VERSION = 1;
 
@@ -70,12 +71,14 @@ export function prepareUnequip({ profile, slot, actionId, now }) {
   };
 }
 
-async function applyAction({ db, familyId, actionId, makeChange }) {
+async function applyAction({ db, familyId, actionId, makeChange, requiresClearRewardIntegrity = false }) {
   const profile = playerProfileRef(db, familyId);
   const ledger = rpgActionLedgerRef(db, familyId, actionId);
+  const integrity = rewardIntegrityRef(db, familyId);
   return runTransaction(db, async (transaction) => {
-    const [profileSnap, ledgerSnap] = await Promise.all([transaction.get(profile), transaction.get(ledger)]);
+    const [profileSnap, ledgerSnap, integritySnap] = await Promise.all([transaction.get(profile), transaction.get(ledger), transaction.get(integrity)]);
     if (ledgerSnap.exists()) return { applied: false, reason: 'ALREADY_APPLIED' };
+    if (requiresClearRewardIntegrity) assertNoPendingRewardCorrections(integritySnap.exists() ? integritySnap.data() : {});
     const change = makeChange(profileSnap.exists() ? profileSnap.data() : {});
     transaction.set(profile, change.profile);
     transaction.set(ledger, change.ledger);
@@ -87,7 +90,7 @@ export async function purchaseEquipment({ db, familyId, itemId, actionId }) {
   const item = getEquipmentCatalogItem(itemId);
   if (!item) throw failure('ITEM_NOT_FOUND');
   const now = Date.now();
-  return applyAction({ db, familyId, actionId, makeChange: (profile) => preparePurchase({ profile, item, actionId, now }) });
+  return applyAction({ db, familyId, actionId, requiresClearRewardIntegrity: true, makeChange: (profile) => preparePurchase({ profile, item, actionId, now }) });
 }
 
 export async function equipItem({ db, familyId, itemId, actionId }) {

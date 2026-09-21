@@ -11,6 +11,7 @@ import { getBoss, BOSS_CATALOG_VERSION } from '../rpg/bossCatalog.js';
 import { applyBossClearProgress, applyBossClearProgressFromSnapshot, applyNormalVictoryProgress, applyNormalVictoryProgressFromSnapshot, isBossUnlocked, normalizeRpgProgress } from '../rpg/rpgProgress.js';
 import { rpgProgressRef } from './rpgProgressRepository.js';
 import { enemyActionForTurn, snapshotEnemyActionPattern } from '../rpg/enemyActionCatalog.js';
+import { assertNoPendingRewardCorrections, rewardIntegrityRef } from './rewardCorrectionRepository.js';
 
 export const RPG_BATTLE_SCHEMA_VERSION = 2;
 const appPath = (familyId, collectionName, id) => ['families', familyId, 'apps', 'junior-high', collectionName, id];
@@ -87,10 +88,11 @@ export function prepareBattleAttack({ battle: rawBattle, profile, progress, acti
 export async function startBattle({ db, familyId, enemyId, battleId }) {
   const enemy = getEnemyCatalogItem(enemyId);
   if (!enemy) throw failure('ENEMY_NOT_FOUND');
-  const profile = playerProfileRef(db, familyId); const progress = rpgProgressRef(db, familyId); const battle = rpgBattleRef(db, familyId, battleId); const ledger = rpgBattleLedgerRef(db, familyId, `start-${battleId}`); const now = Date.now();
+  const profile = playerProfileRef(db, familyId); const progress = rpgProgressRef(db, familyId); const battle = rpgBattleRef(db, familyId, battleId); const ledger = rpgBattleLedgerRef(db, familyId, `start-${battleId}`); const integrity = rewardIntegrityRef(db, familyId); const now = Date.now();
   return runTransaction(db, async (transaction) => {
-    const [profileSnap, progressSnap, battleSnap, ledgerSnap] = await Promise.all([transaction.get(profile), transaction.get(progress), transaction.get(battle), transaction.get(ledger)]);
+    const [profileSnap, progressSnap, battleSnap, ledgerSnap, integritySnap] = await Promise.all([transaction.get(profile), transaction.get(progress), transaction.get(battle), transaction.get(ledger), transaction.get(integrity)]);
     if (battleSnap.exists() || ledgerSnap.exists()) return { applied: false, reason: 'BATTLE_ALREADY_EXISTS' };
+    assertNoPendingRewardCorrections(integritySnap.exists() ? integritySnap.data() : {});
     const currentProgress = normalizeRpgProgress(progressSnap.exists() ? progressSnap.data() : {}); const chapter = getChapter(currentProgress.currentChapterId);
     if (!chapter.normalEnemyIds.includes(enemyId)) throw failure('ENEMY_NOT_AVAILABLE_IN_CHAPTER');
     const change = prepareBattleStart({ profile: profileSnap.exists() ? profileSnap.data() : {}, enemy, battleId, now, chapter });
@@ -101,11 +103,12 @@ export async function startBattle({ db, familyId, enemyId, battleId }) {
 
 export async function startBossBattle({ db, familyId, bossId, battleId }) {
   const boss = getBoss(bossId); if (!boss) throw failure('BOSS_NOT_FOUND');
-  const profile = playerProfileRef(db, familyId); const progress = rpgProgressRef(db, familyId); const battle = rpgBattleRef(db, familyId, battleId); const ledger = rpgBattleLedgerRef(db, familyId, `start-${battleId}`); const now = Date.now();
+  const profile = playerProfileRef(db, familyId); const progress = rpgProgressRef(db, familyId); const battle = rpgBattleRef(db, familyId, battleId); const ledger = rpgBattleLedgerRef(db, familyId, `start-${battleId}`); const integrity = rewardIntegrityRef(db, familyId); const now = Date.now();
   return runTransaction(db, async (transaction) => {
-    const [profileSnap, progressSnap, battleSnap, ledgerSnap] = await Promise.all([transaction.get(profile), transaction.get(progress), transaction.get(battle), transaction.get(ledger)]);
+    const [profileSnap, progressSnap, battleSnap, ledgerSnap, integritySnap] = await Promise.all([transaction.get(profile), transaction.get(progress), transaction.get(battle), transaction.get(ledger), transaction.get(integrity)]);
     const currentProgress = normalizeRpgProgress(progressSnap.exists() ? progressSnap.data() : {}); const chapter = getChapter(currentProgress.currentChapterId); const chapterClear = rpgBattleLedgerRef(db, familyId, `boss-clear-${chapter.id}`); const chapterClearSnap = await transaction.get(chapterClear);
     if (battleSnap.exists() || ledgerSnap.exists()) return { applied: false, reason: 'BATTLE_ALREADY_EXISTS' };
+    assertNoPendingRewardCorrections(integritySnap.exists() ? integritySnap.data() : {});
     if (chapter.bossId !== bossId) throw failure('BOSS_NOT_AVAILABLE_IN_CHAPTER'); if (chapterClearSnap.exists() || currentProgress.completedChapterIds.includes(chapter.id)) throw failure('BOSS_ALREADY_CLEARED'); if (!isBossUnlocked(currentProgress, chapter)) throw failure('BOSS_LOCKED');
     const change = prepareBattleStart({ profile: profileSnap.exists() ? profileSnap.data() : {}, enemy: boss, battleId, now, battleKind: 'boss', chapter, bossId });
     transaction.set(profile, change.profile); transaction.set(battle, change.battle); transaction.set(ledger, change.ledger); return { applied: true, battle: change.battle };

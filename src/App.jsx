@@ -72,7 +72,7 @@ const getTasksCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-
 const getTestsCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tests');
 const getStudySessionsCol = () => studySessionsCollection(db, FAMILY_ID);
 const getActiveTimerRef = () => activeTimerRef(db, FAMILY_ID);
-const APP_VERSION = 'v1.87.3';
+const APP_VERSION = 'v1.87.4';
 const TIMER_HEARTBEAT_MS = 30 * 1000;
 const DAILY_TARGET_SECONDS = 2 * 60 * 60;
 const isDocumentHidden = () => typeof document !== 'undefined' && document.hidden;
@@ -1122,6 +1122,7 @@ export default function App() {
         ITEM_NOT_OWNED: 'この装備は所有していません',
         ALREADY_EQUIPPED: 'すでに装備中です',
         ALREADY_UNEQUIPPED: 'すでに解除されています',
+        REWARD_CORRECTION_PENDING: '報酬訂正の確認中は新規購入できません',
     }[error?.code || error?.message] || '操作に失敗しました。もう一度お試しください。');
     const handlePurchaseRequest = (item) => {
         if (isSampleMode || !user || pendingPurchaseItemId) return;
@@ -1186,7 +1187,7 @@ export default function App() {
         INSUFFICIENT_BATTLE_ENERGY: 'Battle Energyが足りません',
         ACTIVE_BATTLE_EXISTS: '進行中の戦闘があります',
         BATTLE_NOT_FOUND: '戦闘情報を確認できません',
-        BATTLE_ALREADY_COMPLETED: 'この戦闘は終了しています', HEAL_NOT_NEEDED: 'HPは満タンです', ENEMY_NOT_AVAILABLE_IN_CHAPTER: 'この敵は現在のChapterでは挑戦できません', BOSS_NOT_FOUND: 'Boss情報を確認できません', BOSS_LOCKED: 'Bossはまだ解放されていません', BOSS_NOT_AVAILABLE_IN_CHAPTER: 'このBossには現在挑戦できません', BOSS_ALREADY_CLEARED: 'このBossはすでに撃破済みです', CHAPTER_STATE_MISMATCH: 'Chapter進行の状態が一致しません',
+        BATTLE_ALREADY_COMPLETED: 'この戦闘は終了しています', HEAL_NOT_NEEDED: 'HPは満タンです', ENEMY_NOT_AVAILABLE_IN_CHAPTER: 'この敵は現在のChapterでは挑戦できません', BOSS_NOT_FOUND: 'Boss情報を確認できません', BOSS_LOCKED: 'Bossはまだ解放されていません', BOSS_NOT_AVAILABLE_IN_CHAPTER: 'このBossには現在挑戦できません', BOSS_ALREADY_CLEARED: 'このBossはすでに撃破済みです', CHAPTER_STATE_MISMATCH: 'Chapter進行の状態が一致しません', REWARD_CORRECTION_PENDING: '報酬訂正の確認中は新しい戦闘を開始できません',
     }[error?.code || error?.message] || '戦闘処理に失敗しました。もう一度お試しください。');
     const handleBattleStartRequest = (enemy) => {
         if (isSampleMode || !user || playerProfile.activeBattleId || pendingBattleEnemyId) return;
