@@ -14,7 +14,9 @@ import { activeTimerRef, finishActiveTimer, heartbeatActiveTimer, invalidateStal
 import { studySessionsCollection } from './data/studySessionRepository';
 import { applyStudySessionReward, emptyPlayerProfile, playerProfileRef } from './data/rewardLedgerRepository';
 import { createRpgActionId, equipItem, purchaseEquipment, unequipSlot } from './data/rpgShopRepository';
-import { attackBattle, createBattleActionId, createBattleId, rpgBattleRef, startBattle, useBattleSkill as runBattleSkill } from './data/rpgBattleRepository';
+import { attackBattle, createBattleActionId, createBattleId, rpgBattleRef, startBattle, startBossBattle, useBattleSkill as runBattleSkill } from './data/rpgBattleRepository';
+import { rpgProgressRef } from './data/rpgProgressRepository';
+import { normalizeRpgProgress } from './rpg/rpgProgress';
 import { buildBattleTurnFeedback } from './rpg/battleUiLogic';
 import { getEquipmentCatalogItem } from './rpg/equipmentCatalog';
 import { normalizeBattle } from './rpg/battleState';
@@ -64,7 +66,7 @@ const getTasksCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-
 const getTestsCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tests');
 const getStudySessionsCol = () => studySessionsCollection(db, FAMILY_ID);
 const getActiveTimerRef = () => activeTimerRef(db, FAMILY_ID);
-const APP_VERSION = 'v1.82.1';
+const APP_VERSION = 'v1.83';
 const TIMER_HEARTBEAT_MS = 30 * 1000;
 const DAILY_TARGET_SECONDS = 2 * 60 * 60;
 const isDocumentHidden = () => typeof document !== 'undefined' && document.hidden;
@@ -845,6 +847,7 @@ export default function App() {
     const [tasks, setTasks] = useState([]);
     const [studySessions, setStudySessions] = useState([]);
     const [playerProfile, setPlayerProfile] = useState(emptyPlayerProfile());
+    const [rpgProgress, setRpgProgress] = useState(() => normalizeRpgProgress());
     const [purchaseCandidate, setPurchaseCandidate] = useState(null);
     const [rpgStatus, setRpgStatus] = useState(null);
     const [pendingPurchaseItemId, setPendingPurchaseItemId] = useState(null);
@@ -943,6 +946,10 @@ export default function App() {
     useEffect(() => {
         if (isSampleMode || !user) return undefined;
         return onSnapshot(playerProfileRef(db, FAMILY_ID), (snap) => setPlayerProfile(normalizePlayerProfile(snap.exists() ? snap.data() : emptyPlayerProfile())), (err) => console.error('PlayerProfile realtime sync error:', err));
+    }, [isSampleMode, user]);
+    useEffect(() => {
+        if (isSampleMode || !user) return undefined;
+        return onSnapshot(rpgProgressRef(db, FAMILY_ID), (snap) => setRpgProgress(normalizeRpgProgress(snap.exists() ? snap.data() : {})), (err) => console.error('RpgProgress realtime sync error:', err));
     }, [isSampleMode, user]);
     useEffect(() => {
         const battleId = playerProfile.activeBattleId;
@@ -1164,7 +1171,7 @@ export default function App() {
         const enemy = battleCandidate; setPendingBattleEnemyId(enemy.id);
         try {
             setLastBattle(null);
-            const result = await startBattle({ db, familyId: FAMILY_ID, enemyId: enemy.id, battleId: createBattleId() });
+            const result = enemy.isBoss ? await startBossBattle({ db, familyId: FAMILY_ID, bossId: enemy.id, battleId: createBattleId() }) : await startBattle({ db, familyId: FAMILY_ID, enemyId: enemy.id, battleId: createBattleId() });
             setBattleCandidate(null);
             setRpgStatus(result.applied ? { kind: 'success', message: `${enemy.name}との戦闘を開始しました` } : { kind: 'error', message: battleErrorMessage({ code: result.reason }) });
         } catch (error) { setRpgStatus({ kind: 'error', message: battleErrorMessage(error) }); }
@@ -1984,7 +1991,7 @@ export default function App() {
                 </div>
               </div>)}
             {activeTab === 'rpg' && !isSampleMode && (
-              <RpgHub profile={playerProfile} onPurchaseRequest={handlePurchaseRequest} onEquip={handleEquip} onUnequip={handleUnequip} pendingItemId={pendingPurchaseItemId} pendingAction={pendingEquipmentAction} status={rpgStatus} battle={activeBattle || lastBattle} onStartBattleRequest={handleBattleStartRequest} onAttackBattle={handleAttackBattle} onUseBattleSkill={handleUseBattleSkill} startingEnemyId={pendingBattleEnemyId} attacking={isAttackingBattle} onBattleBack={() => setLastBattle(null)} battleFeedback={battleTurnFeedback}/>
+              <RpgHub profile={playerProfile} progress={rpgProgress} onPurchaseRequest={handlePurchaseRequest} onEquip={handleEquip} onUnequip={handleUnequip} pendingItemId={pendingPurchaseItemId} pendingAction={pendingEquipmentAction} status={rpgStatus} battle={activeBattle || lastBattle} onStartBattleRequest={handleBattleStartRequest} onAttackBattle={handleAttackBattle} onUseBattleSkill={handleUseBattleSkill} startingEnemyId={pendingBattleEnemyId} attacking={isAttackingBattle} onBattleBack={() => setLastBattle(null)} battleFeedback={battleTurnFeedback}/>
             )}
           </main>
         </div>

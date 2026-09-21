@@ -3,6 +3,7 @@ import { ENEMY_CATALOG } from '../rpg/enemyCatalog.js';
 import { prepareBattleAttack, prepareBattleStart } from './rpgBattleRepository.js';
 import { calculateSkillDamage, getElementMultiplier } from '../rpg/battleCalculator.js';
 import { findUndefinedPaths } from '../test/findUndefinedPaths.js';
+import { BOSS_CATALOG } from '../rpg/bossCatalog.js';
 
 const now = 1000;
 const profile = { battleEnergy: 3, totalExp: 90, level: 1, ownedEquipment: { iron_sword: {} }, equipped: { weapon: 'iron_sword' } };
@@ -32,7 +33,7 @@ describe('battle transaction logic', () => {
   });
   it('snapshots starter skills and applies weak skill damage atomically', () => {
     const start = prepareBattleStart({ profile, enemy: ENEMY_CATALOG.slime, battleId: 'battle-skill', now });
-    expect(start.battle).toMatchObject({ schemaVersion: 4, skillUses: { flame_slash: 0, aqua_edge: 0, thunder_strike: 0, healing_light: 0, guard_stance: 0 } });
+    expect(start.battle).toMatchObject({ schemaVersion: 5, skillUses: { flame_slash: 0, aqua_edge: 0, thunder_strike: 0, healing_light: 0, guard_stance: 0 } });
     const skill = start.battle.playerSnapshot.skills.flame_slash;
     const elementResult = getElementMultiplier({ attackElement: skill.element, weaknesses: start.battle.enemySnapshot.weaknesses, resistances: start.battle.enemySnapshot.resistances });
     const damage = calculateSkillDamage({ playerAttack: 10, powerPercent: skill.powerPercent, elementPercent: elementResult.percent });
@@ -43,7 +44,7 @@ describe('battle transaction logic', () => {
   });
   it('snapshots five v4 skills and applies heal and guard through the shared action path', () => {
     const start = prepareBattleStart({ profile, enemy: ENEMY_CATALOG.slime, battleId: 'battle-v4', now });
-    expect(start.battle).toMatchObject({ schemaVersion: 4, skillUses: { flame_slash: 0, aqua_edge: 0, thunder_strike: 0, healing_light: 0, guard_stance: 0 } });
+    expect(start.battle).toMatchObject({ schemaVersion: 5, skillUses: { flame_slash: 0, aqua_edge: 0, thunder_strike: 0, healing_light: 0, guard_stance: 0 } });
     const heal = prepareBattleAttack({ battle: { ...start.battle, playerHp: 20 }, profile: start.profile, actionId: 'heal-1', now, action: { kind: 'skill', healing: { playerHpBefore: 20, calculatedHeal: 14, actualHeal: 14, playerHpAfterHeal: 34 }, skill: { ...start.battle.playerSnapshot.skills.healing_light, useNumber: 1 } } });
     expect(heal.battle).toMatchObject({ enemyHp: 20, playerHp: 31, skillUses: { healing_light: 1 }, attackCount: 1 });
     expect(heal.attackLedger).toMatchObject({ healing: { actualHeal: 14 }, playerAttack: null, enemyCounter: { damage: 3, playerHpBefore: 34, playerHpAfter: 31 } });
@@ -66,5 +67,14 @@ describe('battle transaction logic', () => {
     const victory = prepareBattleAttack({ battle: { ...start.battle, enemyHp: 1 }, profile: start.profile, actionId: 'victory', now });
     const defeat = prepareBattleAttack({ battle: { ...start.battle, playerHp: 1 }, profile: start.profile, actionId: 'defeat', now });
     [start.battle, start.ledger, start.profile, attack.attackLedger, flame.attackLedger, heal.attackLedger, guard.attackLedger, victory.attackLedger, victory.victoryLedger, victory.profile, defeat.attackLedger, defeat.defeatLedger, defeat.profile].forEach((payload) => expect(findUndefinedPaths(payload)).toEqual([]));
+  });
+  it('applies a boss final hit once with reward and chapter progress in the returned atomic change', () => {
+    const start = prepareBattleStart({ profile: { ...profile, battleEnergy: 3 }, enemy: BOSS_CATALOG.orc_chief, battleId: 'boss-a', now, battleKind: 'boss', bossId: 'orc_chief', chapter: { id: 'chapter_1', number: 1, name: '草原', normalWinsRequired: 3, bossId: 'orc_chief' } });
+    const final = prepareBattleAttack({ battle: { ...start.battle, enemyHp: 1 }, profile: start.profile, progress: { currentChapterId: 'chapter_1', normalWins: 3 }, actionId: 'boss-final', now });
+    expect(final.battle).toMatchObject({ status: 'won', victory: { bossClear: { chapterAfter: 'chapter_2', reward: { gold: 150, materials: { iron: 5, wisdom_scroll: 2 } } } } });
+    expect(final.profile).toMatchObject({ gold: 150, materials: { iron: 5, wisdom_scroll: 2 }, activeBattleId: null });
+    expect(final.progress).toMatchObject({ currentChapterId: 'chapter_2', normalWins: 0, completedChapterIds: ['chapter_1'] });
+    expect(final.bossClearLedger).toMatchObject({ type: 'boss_clear', chapterId: 'chapter_1', bossId: 'orc_chief' });
+    [final.battle, final.profile, final.progress, final.victoryLedger, final.bossClearLedger].forEach((payload) => expect(findUndefinedPaths(payload)).toEqual([]));
   });
 });
