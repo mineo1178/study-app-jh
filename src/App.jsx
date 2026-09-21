@@ -26,6 +26,7 @@ import { normalizePlayerProfile } from './rpg/playerProfile';
 import { getQuest } from './rpg/questCatalog';
 import { normalizeQuestState } from './rpg/questState';
 import { isStudySessionRewardEligible } from './rpg/rewardCalculator';
+import { shouldUseLegacyRpgUi } from './rpg/legacyRpgUi';
 import RpgWalletPanel from './components/rpg/RpgWalletPanel';
 import RewardResultModal from './components/rpg/RewardResultModal';
 import RpgHub from './components/rpg/RpgHub';
@@ -71,7 +72,7 @@ const getTasksCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-
 const getTestsCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tests');
 const getStudySessionsCol = () => studySessionsCollection(db, FAMILY_ID);
 const getActiveTimerRef = () => activeTimerRef(db, FAMILY_ID);
-const APP_VERSION = 'v1.87';
+const APP_VERSION = 'v1.87.1';
 const TIMER_HEARTBEAT_MS = 30 * 1000;
 const DAILY_TARGET_SECONDS = 2 * 60 * 60;
 const isDocumentHidden = () => typeof document !== 'undefined' && document.hidden;
@@ -799,7 +800,7 @@ const ActiveTimerSummary = ({ task, onHeartbeat, canHeartbeat = false }) => {
       </div>
     </div>);
 };
-const AdventureStatus = ({ adventure }) => {
+const LegacyAdventureStatus = ({ adventure }) => {
     const { levelInfo, boss, daily, weekly, weeklyMissions, items, skills, chests, reviewRecords, balance } = adventure;
     const weaknessNames = (boss.boss?.weaknesses || []).map((id) => {
         const category = id.startsWith('j_') ? 'juku' : id.startsWith('s_') ? 'school' : 'etc';
@@ -902,7 +903,7 @@ export default function App() {
     const isAnyTaskRunning = useMemo(() => hasAnyRunningTimer({ isSampleMode, activeTimer, tasks }), [isSampleMode, activeTimer, tasks]);
     const runningTask = useMemo(() => getRunningTimerTask({ isSampleMode, activeTimerTask, tasks }), [isSampleMode, activeTimerTask, tasks]);
     const activeStaleTimer = useMemo(() => isStaleActiveTimer(activeTimer, staleCheckNow) ? activeTimer : null, [activeTimer, staleCheckNow]);
-    const adventure = useMemo(() => gameProgress(tasks, getTodayStr(), unifiedSessions), [tasks, unifiedSessions]);
+    const legacyAdventure = useMemo(() => shouldUseLegacyRpgUi(isSampleMode) ? gameProgress(tasks, getTodayStr(), unifiedSessions) : null, [isSampleMode, tasks, unifiedSessions]);
     const todayTaskSummaries = useMemo(() => {
         const todayStr = getTodayStr();
         return tasks.flatMap(task => {
@@ -1232,7 +1233,7 @@ export default function App() {
             const memo = prompt("学習内容：") || "";
             const now = Date.now();
             const today = getTodayStr();
-            const beforeAdventure = gameProgress(tasks, today);
+            const beforeAdventure = isSampleMode ? gameProgress(tasks, today) : null;
             const startedAt = task.sessionStartTime || (now - (totalSeconds * 1000));
             const endedAt = now;
             const historyItem = {
@@ -1246,18 +1247,18 @@ export default function App() {
             const updatedHistory = [...(task.history || []), historyItem];
             const updates = { history: updatedHistory, currentDuration: 0, isRunning: false, sessionStartTime: null, lastUpdatedAt: now };
             const projectedTasks = tasks.map((item) => item.id === task.id ? { ...item, ...updates } : item);
-            const afterAdventure = gameProgress(projectedTasks, today);
-            const savedRecord = afterAdventure.records.find((record) => record.id === historyItem.id);
-            const credited = getCreditedStudySeconds({ ...historyItem, subjectId: task.subjectId }, beforeAdventure.records.map((record) => record.startedAt && record.creditedDuration > 0 ? { start: Number(record.startedAt), end: Number(record.startedAt) + record.creditedDuration * 1000 } : null).filter(Boolean));
-            const resultRecord = savedRecord || { ...historyItem, subjectId: task.subjectId, creditedDuration: credited.creditedDuration, integrity: credited.integrity };
-            const newItems = afterAdventure.items.filter((item) => !beforeAdventure.items.some((previous) => previous.id === item.id));
-            const newSkills = afterAdventure.skills.filter((skill) => !beforeAdventure.skills.some((previous) => previous.id === skill.id));
+            const afterAdventure = isSampleMode ? gameProgress(projectedTasks, today) : null;
+            const savedRecord = afterAdventure?.records.find((record) => record.id === historyItem.id);
+            const credited = isSampleMode ? getCreditedStudySeconds({ ...historyItem, subjectId: task.subjectId }, beforeAdventure.records.map((record) => record.startedAt && record.creditedDuration > 0 ? { start: Number(record.startedAt), end: Number(record.startedAt) + record.creditedDuration * 1000 } : null).filter(Boolean)) : null;
+            const resultRecord = savedRecord || (credited ? { ...historyItem, subjectId: task.subjectId, creditedDuration: credited.creditedDuration, integrity: credited.integrity } : null);
+            const newItems = afterAdventure ? afterAdventure.items.filter((item) => !beforeAdventure.items.some((previous) => previous.id === item.id)) : [];
+            const newSkills = afterAdventure ? afterAdventure.skills.filter((skill) => !beforeAdventure.skills.some((previous) => previous.id === skill.id)) : [];
 
             if (!isSampleMode && user) {
                 await updateDoc(doc(getTasksCol(), task.id), updates);
             }
             handleUpdateLocalTask(task.id, updates);
-            setQuestResult({
+            if (isSampleMode) setQuestResult({
                 exp: Math.max(0, afterAdventure.levelInfo.totalExp - beforeAdventure.levelInfo.totalExp),
                 recordedDuration: historyItem.duration,
                 creditedDuration: resultRecord.creditedDuration,
@@ -1707,7 +1708,7 @@ export default function App() {
             </div>
 
             {!isSampleMode && <RpgWalletPanel profile={playerProfile}/>}
-            <AdventureStatus adventure={adventure}/>
+            {shouldUseLegacyRpgUi(isSampleMode) && legacyAdventure && <LegacyAdventureStatus adventure={legacyAdventure}/>}
 
             <div className={`grid gap-3 sm:gap-4 text-center ${isMobileView ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-4'}`}>
               <div className={`${isMobileView ? '' : 'md:col-span-1'} bg-gradient-to-br from-blue-600 to-indigo-700 p-3 sm:p-6 rounded-[1.5rem] sm:rounded-[2rem] text-white shadow-xl relative overflow-hidden text-center flex flex-col justify-center min-h-[70px] sm:min-h-[120px]`}>
@@ -2023,7 +2024,7 @@ export default function App() {
         </div>
 
         <QuestTreasureResult result={questClaimResult} onClose={() => setQuestClaimResult(null)}/>
-        {questResult && (<div className={modalOverlayClass} role="dialog" aria-modal="true" aria-label="学習結果">
+        {shouldUseLegacyRpgUi(isSampleMode) && questResult && (<div className={modalOverlayClass} role="dialog" aria-modal="true" aria-label="学習結果">
           <div className="w-full max-w-md rounded-[2rem] bg-white p-7 text-center shadow-2xl">
             <div className="text-xs font-black tracking-[0.24em] text-indigo-500">QUEST CLEAR!</div>
             <h3 className="mt-2 text-2xl font-black text-slate-800">学習を記録しました</h3>
