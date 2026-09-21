@@ -37,4 +37,11 @@ describe('study session selectors', () => {
     expect(session.validation.status).toBe('pending_review');
     expect(session.validation.reasonCodes).toContain('legacy_reading_continuity_unknown');
   });
+  it('legacyの5時間読書でも既存invalidをpending_reviewへ格下げしない', () => {
+    const readingTask = { id: 'news', categoryId: 'etc', subjectId: 'e_news', history: [] };
+    const session = normalizeLegacyHistory(readingTask, { id: 'broken', date: '2026-09-19', duration: 5 * 60 * 60, startedAt: 18_001_000, endedAt: 1_000 });
+    expect(session.validation.status).toBe('invalid');
+    expect(session.validation.reasonCodes).toContain('starts_after_end');
+    expect(new Set(session.validation.reasonCodes).size).toBe(session.validation.reasonCodes.length);
+  });
 });

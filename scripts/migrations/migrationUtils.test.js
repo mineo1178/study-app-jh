@@ -15,6 +15,15 @@ describe('migration dry-run report', () => {
     expect(report.invalidCandidateCount).toBe(0);
     expect(report.pendingReviewCandidateCount).toBe(1);
   });
+  it('legacy 5時間読書でも時刻逆転のinvalidをpending_reviewへ格下げしない', () => {
+    const { candidates } = buildLegacyMigrationCandidates({
+      tasks: [{ id: 'news', subjectId: 'e_news', history: [{ id: 'broken', duration: 5 * 60 * 60, startedAt: 18_001_000, endedAt: 1_000 }] }],
+      studySessions: [],
+    });
+    expect(candidates[0].validation.status).toBe('invalid');
+    expect(candidates[0].validation.reasonCodes).toContain('starts_after_end');
+    expect(new Set(candidates[0].validation.reasonCodes).size).toBe(candidates[0].validation.reasonCodes.length);
+  });
   it('migration済みlegacyをlegacySourceで除外する', () => {
     const report = buildMigrationReport({
       tasks: [{ id: 'math', subjectId: 's_math', history: [{ id: 'h1', duration: 600 }] }],

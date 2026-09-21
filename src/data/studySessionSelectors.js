@@ -21,7 +21,7 @@ export function normalizeLegacyHistory(task, history) {
   });
   // Legacy history has no pause boundaries; duration alone cannot prove a five-hour continuous reading.
   const validation = activityType === 'reading' && durationSeconds >= 5 * 60 * 60
-    ? { ...baseValidation, status: 'pending_review', reasonCodes: [...baseValidation.reasonCodes.filter((code) => code !== 'reading_continuous_5h'), 'legacy_reading_continuity_unknown'] }
+    ? { ...baseValidation, status: baseValidation.status === 'invalid' ? 'invalid' : 'pending_review', reasonCodes: [...new Set([...baseValidation.reasonCodes.filter((code) => code !== 'reading_continuous_5h'), 'legacy_reading_continuity_unknown'])] }
     : baseValidation;
   return {
     id: `legacy-${task.id}-${history?.id || `${startedAt}-${durationSeconds}`}`,

@@ -33,7 +33,7 @@ export function normalizeMigrationInput(data = {}) {
 function evaluateLegacyCandidate(session) {
   const validation = validateStudySession(session);
   if (session.legacySource && session.taskSnapshot?.activityType === 'reading' && session.recordedSeconds >= 5 * 60 * 60) {
-    return { ...session, validation: { ...validation, status: 'pending_review', reasonCodes: [...validation.reasonCodes.filter((code) => code !== 'reading_continuous_5h'), 'legacy_reading_continuity_unknown'] } };
+    return { ...session, validation: { ...validation, status: validation.status === 'invalid' ? 'invalid' : 'pending_review', reasonCodes: [...new Set([...validation.reasonCodes.filter((code) => code !== 'reading_continuous_5h'), 'legacy_reading_continuity_unknown'])] } };
   }
   return { ...session, validation };
 }

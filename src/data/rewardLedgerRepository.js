@@ -6,6 +6,7 @@ import { calculateStudyReward, isStudySessionRewardEligible } from '../rpg/rewar
 const appPath = (familyId, collectionName, id) => ['families', familyId, 'apps', 'junior-high', collectionName, id];
 export const rewardLedgerRef = (db, familyId, sessionId) => doc(db, ...appPath(familyId, 'rewardLedger', sessionId));
 export const playerProfileRef = (db, familyId) => doc(db, ...appPath(familyId, 'rpg', 'playerProfile'));
+const studySessionRef = (db, familyId, sessionId) => doc(db, ...appPath(familyId, 'studySessions', sessionId));
 export const emptyPlayerProfile = createEmptyPlayerProfile;
 
 export function applyRewardToPlayerProfile(profile, rewards, updatedAt) {
@@ -23,19 +24,38 @@ export function applyRewardToPlayerProfile(profile, rewards, updatedAt) {
   };
 }
 
+export function prepareCanonicalStudySessionReward(session) {
+  if (!isStudySessionRewardEligible(session)) return { eligible: false, reason: 'INELIGIBLE' };
+  const rewards = calculateStudyReward(session);
+  return {
+    eligible: true,
+    rewards,
+    basis: {
+      recordedSeconds: session.recordedSeconds,
+      subjectId: session.taskSnapshot?.subjectId || session.subjectId || null,
+      categoryId: session.taskSnapshot?.categoryId || null,
+      activityType: session.taskSnapshot?.activityType || null,
+    },
+  };
+}
+
 export async function applyStudySessionReward({ db, familyId, session }) {
-  if (!isStudySessionRewardEligible(session)) return { applied: false, reason: 'INELIGIBLE' };
+  if (!session?.id) return { applied: false, reason: 'SESSION_NOT_FOUND' };
   const ledger = rewardLedgerRef(db, familyId, session.id);
   const profile = playerProfileRef(db, familyId);
+  const sessionReference = studySessionRef(db, familyId, session.id);
+  const now = Date.now();
   return runTransaction(db, async (transaction) => {
-    const [ledgerSnap, profileSnap] = await Promise.all([transaction.get(ledger), transaction.get(profile)]);
+    const [ledgerSnap, profileSnap, sessionSnap] = await Promise.all([transaction.get(ledger), transaction.get(profile), transaction.get(sessionReference)]);
+    if (!sessionSnap.exists()) return { applied: false, reason: 'SESSION_NOT_FOUND' };
     if (ledgerSnap.exists()) return { applied: false, reason: 'ALREADY_APPLIED' };
-    if (!isStudySessionRewardEligible(session)) return { applied: false, reason: 'INELIGIBLE' };
-    const rewards = calculateStudyReward(session);
-    const nextProfile = applyRewardToPlayerProfile(profileSnap.exists() ? profileSnap.data() : emptyPlayerProfile(), rewards, Date.now());
+    const canonicalSession = { id: sessionSnap.id, ...sessionSnap.data() };
+    const prepared = prepareCanonicalStudySessionReward(canonicalSession);
+    if (!prepared.eligible) return { applied: false, reason: prepared.reason };
+    const nextProfile = applyRewardToPlayerProfile(profileSnap.exists() ? profileSnap.data() : emptyPlayerProfile(), prepared.rewards, now);
     transaction.set(profile, nextProfile);
-    transaction.set(ledger, { schemaVersion: REWARD_SCHEMA_VERSION, studySessionId: session.id, timerId: session.timerId || null, rewardPolicyVersion: REWARD_POLICY_VERSION, basis: { recordedSeconds: session.recordedSeconds, subjectId: session.taskSnapshot?.subjectId || session.subjectId || null, categoryId: session.taskSnapshot?.categoryId || null, activityType: session.taskSnapshot?.activityType || null }, rewards, status: 'applied', appliedAt: Date.now(), reversal: null });
-    return { applied: true, rewards };
+    transaction.set(ledger, { schemaVersion: REWARD_SCHEMA_VERSION, studySessionId: canonicalSession.id, timerId: canonicalSession.timerId || null, rewardPolicyVersion: REWARD_POLICY_VERSION, basis: prepared.basis, rewards: prepared.rewards, status: 'applied', appliedAt: now, reversal: null });
+    return { applied: true, rewards: prepared.rewards };
   });
 }
 
