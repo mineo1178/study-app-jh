@@ -2,6 +2,7 @@ import { doc, runTransaction } from 'firebase/firestore';
 import { calculateStudyReward, materialForSubject } from '../rpg/rewardCalculator.js';
 import { normalizePlayerProfile } from '../rpg/playerProfile.js';
 import { playerProfileRef, rewardLedgerRef } from './rewardLedgerRepository.js';
+import { assertAuthorizedRewardReviewer, assertReviewerUid, reviewerMemberRef } from './reviewerAuthorization.js';
 
 const appPath = (familyId, collectionName, id) => ['families', familyId, 'apps', 'junior-high', collectionName, id];
 const correctionFailure = (code) => Object.assign(new Error(code), { code });
@@ -56,7 +57,8 @@ const deductFromProfile = (profile, deduction, now) => {
 const correctionIdFor = (sessionId, correction = {}) => correction.correctionId || `correction-${sessionId}-${correction.recordedSeconds ?? 'same'}-${correction.validation?.status || 'same'}`;
 const updatedValidation = (current, requested) => ({ ...current, ...requested, status: requested.status });
 
-export function prepareRewardCorrection({ session, ledger = null, profile = {}, integrity = {}, correction = {}, now = Date.now() }) {
+export function prepareRewardCorrection({ session, ledger = null, profile = {}, integrity = {}, correction = {}, reviewerUid, now = Date.now() }) {
+  const reviewerId = assertReviewerUid(reviewerUid);
   if (!session) throw correctionFailure('SESSION_NOT_FOUND');
   const correctionId = correctionIdFor(session.id, correction);
   if (ledger?.lastCorrectionId === correctionId) return { alreadyApplied: true, revision: number(ledger.revision) };
@@ -82,6 +84,7 @@ export function prepareRewardCorrection({ session, ledger = null, profile = {}, 
       correctionId,
       reason: correction.reason || 'manual',
       requestedAt: now,
+      requestedBy: reviewerId,
       before: { recordedSeconds: currentSeconds, validationStatus: sourceStatus },
       after: { recordedSeconds: targetSeconds, validationStatus: targetStatus },
     },
@@ -124,7 +127,9 @@ export function prepareRewardCorrection({ session, ledger = null, profile = {}, 
     status,
     reason: correction.reason || 'manual',
     requestedAt: now,
+    requestedBy: reviewerId,
     appliedAt: sufficient ? now : null,
+    appliedBy: sufficient ? reviewerId : null,
   };
   const nextLedger = {
     ...ledger,
@@ -132,7 +137,7 @@ export function prepareRewardCorrection({ session, ledger = null, profile = {}, 
     effectiveRewards: sufficient ? targetRewards : effectiveRewards,
     correctionStatus: sufficient ? 'applied' : 'reversal_pending',
     lastCorrectionId: correctionId,
-    pendingCorrection: sufficient ? null : { adjustmentId, targetRewards, deduction, reason: correction.reason || 'manual', requestedAt: now },
+    pendingCorrection: sufficient ? null : { adjustmentId, targetRewards, deduction, reason: correction.reason || 'manual', requestedAt: now, requestedBy: reviewerId },
   };
   return {
     sessionPatch,
@@ -144,18 +149,21 @@ export function prepareRewardCorrection({ session, ledger = null, profile = {}, 
   };
 }
 
-export async function correctStudySessionReward({ db, familyId, sessionId, correction }) {
+export async function correctStudySessionReward({ db, familyId, sessionId, correction, reviewerUid }) {
+  const reviewerId = assertReviewerUid(reviewerUid);
   const sessionReference = studySessionRef(db, familyId, sessionId);
   const ledgerReference = rewardLedgerRef(db, familyId, sessionId);
   const profileReference = playerProfileRef(db, familyId);
   const integrityReference = rewardIntegrityRef(db, familyId);
+  const reviewerReference = reviewerMemberRef(db, familyId, reviewerId);
   const now = Date.now();
   return runTransaction(db, async (transaction) => {
-    const [sessionSnap, ledgerSnap, profileSnap, integritySnap] = await Promise.all([transaction.get(sessionReference), transaction.get(ledgerReference), transaction.get(profileReference), transaction.get(integrityReference)]);
+    const [sessionSnap, ledgerSnap, profileSnap, integritySnap, reviewerSnap] = await Promise.all([transaction.get(sessionReference), transaction.get(ledgerReference), transaction.get(profileReference), transaction.get(integrityReference), transaction.get(reviewerReference)]);
+    assertAuthorizedRewardReviewer(reviewerSnap.exists() ? reviewerSnap.data() : null);
     if (!sessionSnap.exists()) return { applied: false, reason: 'SESSION_NOT_FOUND' };
     const session = { id: sessionSnap.id, ...sessionSnap.data() };
     const ledger = ledgerSnap.exists() ? ledgerSnap.data() : null;
-    const change = prepareRewardCorrection({ session, ledger, profile: profileSnap.exists() ? profileSnap.data() : {}, integrity: integritySnap.exists() ? integritySnap.data() : {}, correction, now });
+    const change = prepareRewardCorrection({ session, ledger, profile: profileSnap.exists() ? profileSnap.data() : {}, integrity: integritySnap.exists() ? integritySnap.data() : {}, correction, reviewerUid: reviewerId, now });
     if (change.alreadyApplied) return { applied: false, reason: 'ALREADY_APPLIED', revision: change.revision };
     const adjustmentReference = change.adjustment ? rewardAdjustmentLedgerRef(db, familyId, change.adjustment.adjustmentId) : null;
     const adjustmentSnap = adjustmentReference ? await transaction.get(adjustmentReference) : null;
@@ -169,7 +177,8 @@ export async function correctStudySessionReward({ db, familyId, sessionId, corre
   });
 }
 
-export function preparePendingRewardCorrectionRetry({ sessionId, ledger, adjustment, profile = {}, integrity = {}, now = Date.now() }) {
+export function preparePendingRewardCorrectionRetry({ sessionId, ledger, adjustment, profile = {}, integrity = {}, reviewerUid, now = Date.now() }) {
+  const reviewerId = assertReviewerUid(reviewerUid);
   if (ledger?.correctionStatus !== 'reversal_pending' || !ledger.pendingCorrection?.adjustmentId) throw correctionFailure('NO_PENDING_CORRECTION');
   if (!adjustment || adjustment.status !== 'pending' || adjustment.adjustmentId !== ledger.pendingCorrection.adjustmentId) throw correctionFailure('PENDING_CORRECTION_INVALID');
   const pending = ledger.pendingCorrection;
@@ -181,20 +190,23 @@ export function preparePendingRewardCorrectionRetry({ sessionId, ledger, adjustm
   return {
     applied: true,
     profile: deductFromProfile(current, pending.deduction, now),
-    ledger: { ...ledger, effectiveRewards: pending.targetRewards, correctionStatus: 'applied', pendingCorrection: null },
-    adjustment: { ...adjustment, status: 'applied', appliedAt: now },
+    ledger: { ...ledger, effectiveRewards: pending.targetRewards, correctionStatus: 'applied', pendingCorrection: null, lastResolvedBy: reviewerId, lastResolvedAt: now },
+    adjustment: { ...adjustment, status: 'applied', appliedAt: now, appliedBy: reviewerId, resolvedAt: now, resolvedBy: reviewerId },
     integrity: nextIntegrity,
   };
 }
 
-export async function retryPendingRewardCorrection({ db, familyId, sessionId }) {
+export async function retryPendingRewardCorrection({ db, familyId, sessionId, reviewerUid }) {
+  const reviewerId = assertReviewerUid(reviewerUid);
   const sessionReference = studySessionRef(db, familyId, sessionId);
   const ledgerReference = rewardLedgerRef(db, familyId, sessionId);
   const profileReference = playerProfileRef(db, familyId);
   const integrityReference = rewardIntegrityRef(db, familyId);
+  const reviewerReference = reviewerMemberRef(db, familyId, reviewerId);
   const now = Date.now();
   return runTransaction(db, async (transaction) => {
-    const [sessionSnap, ledgerSnap, profileSnap, integritySnap] = await Promise.all([transaction.get(sessionReference), transaction.get(ledgerReference), transaction.get(profileReference), transaction.get(integrityReference)]);
+    const [sessionSnap, ledgerSnap, profileSnap, integritySnap, reviewerSnap] = await Promise.all([transaction.get(sessionReference), transaction.get(ledgerReference), transaction.get(profileReference), transaction.get(integrityReference), transaction.get(reviewerReference)]);
+    assertAuthorizedRewardReviewer(reviewerSnap.exists() ? reviewerSnap.data() : null);
     if (!sessionSnap.exists()) return { applied: false, reason: 'SESSION_NOT_FOUND' };
     if (!ledgerSnap.exists() || ledgerSnap.data().correctionStatus !== 'reversal_pending') return { applied: false, reason: 'NO_PENDING_CORRECTION' };
     const ledger = ledgerSnap.data();
@@ -203,7 +215,7 @@ export async function retryPendingRewardCorrection({ db, familyId, sessionId }) 
     const adjustmentReference = rewardAdjustmentLedgerRef(db, familyId, pending.adjustmentId);
     const adjustmentSnap = await transaction.get(adjustmentReference);
     if (!adjustmentSnap.exists() || adjustmentSnap.data().status !== 'pending') throw correctionFailure('PENDING_CORRECTION_INVALID');
-    const change = preparePendingRewardCorrectionRetry({ sessionId, ledger, adjustment: adjustmentSnap.data(), profile: profileSnap.exists() ? profileSnap.data() : {}, integrity: integritySnap.exists() ? integritySnap.data() : {}, now });
+    const change = preparePendingRewardCorrectionRetry({ sessionId, ledger, adjustment: adjustmentSnap.data(), profile: profileSnap.exists() ? profileSnap.data() : {}, integrity: integritySnap.exists() ? integritySnap.data() : {}, reviewerUid: reviewerId, now });
     if (!change.applied) return change;
     transaction.set(profileReference, change.profile);
     transaction.set(ledgerReference, change.ledger);
