@@ -6,6 +6,10 @@ describe('study session selectors', () => {
   it('legacy historyのみをsessionとして読める', () => {
     expect(getEffectiveStudySeconds(getUnifiedStudySessions([task], []))).toBe(600);
   });
+  it('keeps a reviewer-approved validation canonical instead of recalculating it', () => {
+    const sessions = getUnifiedStudySessions([], [{ id: 'approved', recordedSeconds: 5 * 60 * 60, taskSnapshot: { activityType: 'reading' }, legacySource: { taskId: 'news', historyId: 'h1' }, validation: { status: 'valid', reasonCodes: [] }, manualReview: { reviewed: true, decision: 'valid' } }]);
+    expect(sessions[0].validation.status).toBe('valid');
+  });
   it('migration済みlegacy重複を二重集計しない', () => {
     const sessions = getUnifiedStudySessions([task], [{ id: 's1', recordedSeconds: 600, legacySource: { taskId: 'math', historyId: 'h1' }, validation: { status: 'valid' } }]);
     expect(sessions).toHaveLength(1);

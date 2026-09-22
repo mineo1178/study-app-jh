@@ -56,6 +56,11 @@ const deductFromProfile = (profile, deduction, now) => {
 };
 const correctionIdFor = (sessionId, correction = {}) => correction.correctionId || `correction-${sessionId}-${correction.recordedSeconds ?? 'same'}-${correction.validation?.status || 'same'}`;
 const updatedValidation = (current, requested) => ({ ...current, ...requested, status: requested.status });
+const manualReviewValidation = (sourceStatus, targetStatus, requested = {}) => {
+  if (targetStatus === 'valid') return { ...requested, status: 'valid', reasonCodes: [] };
+  if (targetStatus === 'invalid') return { ...requested, status: 'invalid', reasonCodes: [...new Set([...(requested.reasonCodes || []), 'manual_review_invalid'])] };
+  return requested;
+};
 
 export function prepareRewardCorrection({ session, ledger = null, profile = {}, integrity = {}, correction = {}, reviewerUid, now = Date.now() }) {
   const reviewerId = assertReviewerUid(reviewerUid);
@@ -67,7 +72,7 @@ export function prepareRewardCorrection({ session, ledger = null, profile = {}, 
   const currentSeconds = number(session.recordedSeconds);
   const targetSeconds = correction.recordedSeconds === undefined ? currentSeconds : number(correction.recordedSeconds);
   if (!['valid', 'pending_review'].includes(sourceStatus)) throw correctionFailure('CORRECTION_SOURCE_STATUS_NOT_SUPPORTED');
-  if (sourceStatus === 'pending_review' && targetStatus !== 'invalid') throw correctionFailure('CORRECTION_TRANSITION_NOT_SUPPORTED');
+  if (sourceStatus === 'pending_review' && !['valid', 'invalid'].includes(targetStatus)) throw correctionFailure('CORRECTION_TRANSITION_NOT_SUPPORTED');
   if (sourceStatus === 'valid' && !['valid', 'invalid'].includes(targetStatus)) throw correctionFailure('CORRECTION_TRANSITION_NOT_SUPPORTED');
   if (targetSeconds > currentSeconds) throw correctionFailure('CORRECTION_REWARD_INCREASE_NOT_ALLOWED');
   if (sourceStatus === 'valid' && targetStatus === 'valid' && targetSeconds >= currentSeconds) throw correctionFailure('CORRECTION_REWARD_INCREASE_NOT_ALLOWED');
@@ -75,7 +80,8 @@ export function prepareRewardCorrection({ session, ledger = null, profile = {}, 
   if (ledger?.status === 'reversed') throw correctionFailure('REWARD_ALREADY_REVERSED');
 
   const revision = number(ledger?.revision) + 1;
-  const validation = updatedValidation(session.validation || {}, correction.validation);
+  const requestedValidation = manualReviewValidation(sourceStatus, targetStatus, correction.validation || {});
+  const validation = updatedValidation(session.validation || {}, requestedValidation);
   const sessionPatch = {
     recordedSeconds: targetSeconds,
     validation,
@@ -90,6 +96,18 @@ export function prepareRewardCorrection({ session, ledger = null, profile = {}, 
     },
     updatedAt: now,
   };
+  if (sourceStatus === 'pending_review') {
+    sessionPatch.manualReview = {
+      schemaVersion: 1,
+      reviewed: true,
+      decision: targetStatus,
+      reviewedBy: reviewerId,
+      reviewedAt: now,
+      reason: correction.reason || (targetStatus === 'valid' ? 'manual_review_approved' : 'manual_review_invalid'),
+      previousValidation: { status: sourceStatus, reasonCodes: [...(session.validation?.reasonCodes || [])] },
+      resultingValidation: { status: validation.status, reasonCodes: [...(validation.reasonCodes || [])] },
+    };
+  }
   // Legacy migration sessions are deliberately outside the study-reward economy.
   // Their validation may still be corrected, but no reward adjustment is created.
   if (session.legacySource) {

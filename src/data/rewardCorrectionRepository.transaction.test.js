@@ -71,6 +71,14 @@ describe('reward correction reviewer transaction authorization', () => {
     await expect(correctStudySessionReward({ db: {}, familyId, sessionId: 'session-1', correction, reviewerUid: 'admin-1' })).resolves.toMatchObject({ applied: true });
   });
 
+  it('allows an authorized reviewer to approve a pending non-legacy session without creating a reward ledger', async () => {
+    seed({ session: { validation: { status: 'pending_review', reasonCodes: ['legacy_reading_continuity_unknown'] } }, ledger: null });
+    authorize('parent-1');
+    await expect(correctStudySessionReward({ db: {}, familyId, sessionId: 'session-1', correction: { correctionId: 'approve-1', validation: { status: 'valid' }, reason: 'manual_review_approved' }, reviewerUid: 'parent-1' })).resolves.toMatchObject({ status: 'no_reward_ledger' });
+    expect(firestore.docs.get(sessionPath())).toMatchObject({ validation: { status: 'valid', reasonCodes: [] }, manualReview: { reviewed: true, decision: 'valid', reviewedBy: 'parent-1', previousValidation: { reasonCodes: ['legacy_reading_continuity_unknown'] } } });
+    expect(firestore.docs.has(ledgerPath())).toBe(false);
+  });
+
   it.each([
     ['student', 'student', true],
     ['inactive parent', 'parent', false],

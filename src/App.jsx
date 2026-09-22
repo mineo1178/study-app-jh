@@ -3,7 +3,7 @@ import { Play, Pause, Trash2, X, Zap, History, TrendingUp, Calendar as CalendarI
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from 'firebase/auth';
-import { getFirestore, collection, doc, getDocs, updateDoc, deleteDoc, enableIndexedDbPersistence, addDoc, setDoc, onSnapshot } from 'firebase/firestore';
+import { getFirestore, collection, doc, getDoc, getDocs, updateDoc, deleteDoc, enableIndexedDbPersistence, addDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import { HIGH_RISK_SESSION_MINUTES, LONG_SESSION_MINUTES, REVIEW_SESSION_MINUTES, damageForRecord, elapsedSeconds, gameProgress, getCreditedStudySeconds, getLastHeartbeatTime, getStaleSessionRecoveryDuration, isStaleRunningTask, recordIntegrity, timerStateAfterPause, timerStateAfterStart, totalSecondsForFinish } from './gameLogic';
 import { ACTIVITY_TYPES, inferLegacyActivityType, normalizeActivityType } from './integrity/activityTypes';
 import { validateStudySession } from './integrity/studyValidation';
@@ -12,7 +12,9 @@ import { breakRemainingSeconds, isActiveTimer, isBreakFinished, isStaleActiveTim
 import { getRunningTimerTask, getTaskLiveSession, getTimerViewTask, hasAnyRunningTimer } from './timer/timerRuntimeState';
 import { activeTimerRef, finishActiveTimer, heartbeatActiveTimer, invalidateStaleActiveTimer, pauseActiveTimer, resumeActiveTimer, startBreakActiveTimer, startOrSwitchActiveTimer } from './data/activeTimerRepository';
 import { studySessionsCollection } from './data/studySessionRepository';
-import { applyStudySessionReward, emptyPlayerProfile, playerProfileRef } from './data/rewardLedgerRepository';
+import { applyStudySessionReward, emptyPlayerProfile, playerProfileRef, rewardLedgerRef } from './data/rewardLedgerRepository';
+import { correctStudySessionReward, retryPendingRewardCorrection, rewardIntegrityRef } from './data/rewardCorrectionRepository';
+import { isAuthorizedRewardReviewer, reviewerMemberRef } from './data/reviewerAuthorization';
 import { createRpgActionId, equipItem, purchaseEquipment, unequipSlot } from './data/rpgShopRepository';
 import { attackBattle, createBattleActionId, createBattleId, rpgBattleRef, startBattle, startBossBattle, useBattleSkill as runBattleSkill } from './data/rpgBattleRepository';
 import { rpgProgressRef } from './data/rpgProgressRepository';
@@ -38,6 +40,9 @@ import LiveStudyStatus from './components/study/LiveStudyStatus';
 import MigrationExportButton from './components/dev/MigrationExportButton';
 import LegacyStudySessionMigrationPanel from './components/dev/LegacyStudySessionMigrationPanel';
 import { DESKTOP_SIDEBAR_NAV_CLASS, DESKTOP_SIDEBAR_SCROLL_CLASS } from './layout/sidebarLayout';
+import ManualReviewPanel from './components/review/ManualReviewPanel';
+import HistoryCorrectionModal from './components/review/HistoryCorrectionModal';
+import { buildReviewQueue, isCanonicalHistoryCorrectionTarget, reviewErrorMessage } from './review/manualReviewUi';
 // ==========================================
 // Firebase Initialization (Vite/Vercel Dedicated)
 // ==========================================
@@ -72,7 +77,7 @@ const getTasksCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-
 const getTestsCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tests');
 const getStudySessionsCol = () => studySessionsCollection(db, FAMILY_ID);
 const getActiveTimerRef = () => activeTimerRef(db, FAMILY_ID);
-const APP_VERSION = 'v1.87.5';
+const APP_VERSION = 'v1.87.6';
 const TIMER_HEARTBEAT_MS = 30 * 1000;
 const DAILY_TARGET_SECONDS = 2 * 60 * 60;
 const isDocumentHidden = () => typeof document !== 'undefined' && document.hidden;
@@ -891,12 +896,21 @@ export default function App() {
     const [liveNow, setLiveNow] = useState(() => Date.now());
     const [isSavingRecord, setIsSavingRecord] = useState(false);
     const [staleTimerNotice, setStaleTimerNotice] = useState(null);
+    const [reviewerMember, setReviewerMember] = useState(null);
+    const [rewardIntegrity, setRewardIntegrity] = useState({ pendingSessionIds: [] });
+    const [pendingCorrectionLedgers, setPendingCorrectionLedgers] = useState({});
+    const [historyCorrectionSession, setHistoryCorrectionSession] = useState(null);
+    const [historyCorrectionDecision, setHistoryCorrectionDecision] = useState('valid');
+    const [reviewBusySessionIds, setReviewBusySessionIds] = useState({});
+    const [reviewError, setReviewError] = useState(null);
     const savingRecordRef = useRef(false);
     const staleInvalidatingRef = useRef(false);
     const autoFinishHandlerRef = useRef(null);
     const rewardProcessingRef = useRef(new Set());
     const currentClientId = useMemo(() => getCurrentClientId(), []);
     const unifiedSessions = useMemo(() => getUnifiedStudySessions(tasks, studySessions), [tasks, studySessions]);
+    const canReview = useMemo(() => Boolean(user) && !isSampleMode && isAuthorizedRewardReviewer(reviewerMember), [isSampleMode, reviewerMember, user]);
+    const reviewQueue = useMemo(() => buildReviewQueue({ studySessions, integrity: rewardIntegrity }), [studySessions, rewardIntegrity]);
     const activeTimerTask = useMemo(() => isActiveTimer(activeTimer) ? tasks.find((task) => task.id === activeTimer.taskId) || null : null, [activeTimer, tasks]);
     const liveSession = useMemo(() => getLiveStudySession(activeTimer, activeTimerTask, liveNow), [activeTimer, activeTimerTask, liveNow]);
     const activeTimerIsOwner = useMemo(() => isTimerOwner(activeTimer, currentClientId), [activeTimer, currentClientId]);
@@ -959,6 +973,24 @@ export default function App() {
     }, [isSampleMode, user]);
     useEffect(() => {
         if (isSampleMode || !user) return undefined;
+        return onSnapshot(reviewerMemberRef(db, FAMILY_ID, user.uid), (snap) => setReviewerMember(snap.exists() ? snap.data() : null), (err) => { console.error('Reviewer membership realtime sync error:', err); setReviewerMember(null); });
+    }, [isSampleMode, user]);
+    useEffect(() => {
+        if (isSampleMode || !user) return undefined;
+        return onSnapshot(rewardIntegrityRef(db, FAMILY_ID), (snap) => setRewardIntegrity(snap.exists() ? snap.data() : { pendingSessionIds: [] }), (err) => console.error('Reward integrity realtime sync error:', err));
+    }, [isSampleMode, user]);
+    useEffect(() => {
+        if (isSampleMode || !user || !canReview) return undefined;
+        let disposed = false;
+        const ids = reviewQueue.pendingCorrectionSessionIds;
+        Promise.all(ids.map(async (sessionId) => {
+            const snap = await getDoc(rewardLedgerRef(db, FAMILY_ID, sessionId));
+            return [sessionId, snap.exists() ? snap.data() : null];
+        })).then((entries) => { if (!disposed) setPendingCorrectionLedgers(Object.fromEntries(entries)); }).catch((err) => console.error('Pending correction ledger read failed:', err));
+        return () => { disposed = true; };
+    }, [canReview, isSampleMode, reviewQueue.pendingCorrectionSessionIds, user]);
+    useEffect(() => {
+        if (isSampleMode || !user) return undefined;
         return onSnapshot(rpgProgressRef(db, FAMILY_ID), (snap) => setRpgProgress(normalizeRpgProgress(snap.exists() ? snap.data() : {})), (err) => console.error('RpgProgress realtime sync error:', err));
     }, [isSampleMode, user]);
     useEffect(() => {
@@ -997,6 +1029,39 @@ export default function App() {
                 setStaleCheckNow(Date.now());
             });
     }, [activeStaleTimer, isSampleMode, tasks, user]);
+    const openHistoryCorrection = (session, decision = 'valid') => {
+        if (!canReview || !isCanonicalHistoryCorrectionTarget(session)) return;
+        setReviewError(null);
+        setHistoryCorrectionDecision(decision);
+        setHistoryCorrectionSession(session);
+    };
+    const handleHistoryCorrection = async ({ session, targetSeconds, targetStatus, reason }) => {
+        if (!user || !canReview || reviewBusySessionIds[session.id]) return;
+        setReviewBusySessionIds((current) => ({ ...current, [session.id]: true }));
+        setReviewError(null);
+        try {
+            const result = await correctStudySessionReward({ db, familyId: FAMILY_ID, sessionId: session.id, reviewerUid: user.uid, correction: { correctionId: `review-${session.id}-${targetSeconds}-${targetStatus}`, recordedSeconds: targetSeconds, validation: { status: targetStatus }, reason } });
+            if (result.status === 'pending') setReviewError('学習履歴は訂正されました。報酬の回収に必要な資産が不足しているため、報酬訂正は確認待ちです。');
+            else setHistoryCorrectionSession(null);
+        } catch (err) {
+            setReviewError(reviewErrorMessage(err?.code || err?.message));
+        } finally {
+            setReviewBusySessionIds((current) => ({ ...current, [session.id]: false }));
+        }
+    };
+    const handlePendingCorrectionRetry = async (sessionId) => {
+        if (!user || !canReview || reviewBusySessionIds[sessionId]) return;
+        setReviewBusySessionIds((current) => ({ ...current, [sessionId]: true }));
+        setReviewError(null);
+        try {
+            const result = await retryPendingRewardCorrection({ db, familyId: FAMILY_ID, sessionId, reviewerUid: user.uid });
+            if (!result.applied && result.reason === 'REWARD_PROFILE_INSUFFICIENT') setReviewError('まだ回収に必要な資産が不足しています。');
+        } catch (err) {
+            setReviewError(reviewErrorMessage(err?.code || err?.message));
+        } finally {
+            setReviewBusySessionIds((current) => ({ ...current, [sessionId]: false }));
+        }
+    };
     const handleCategoryChange = (categoryId) => {
         setActiveCategory(categoryId);
         setSelectedSubjectId(SUBJECT_DEFS[categoryId]?.[0]?.id || '');
@@ -1613,8 +1678,8 @@ export default function App() {
             </div>
           </div>
           <nav className={DESKTOP_SIDEBAR_NAV_CLASS}>
-            {[{ id: 'daily', label: '学習記録', icon: Zap }, { id: 'stats', label: '実績分析', icon: BarChart2 }, { id: 'tests', label: '成績推移', icon: TrendingUp }, ...(!isSampleMode ? [{ id: 'rpg', label: 'RPG', icon: Trophy }] : [])].map(item => (<button type="button" key={item.id} onClick={() => setActiveTab(item.id)} className={`w-full flex items-center gap-4 px-6 py-4 rounded-3xl font-black transition-all leading-none ${activeTab === item.id ? 'bg-blue-600 text-white shadow-2xl' : 'text-slate-400 hover:bg-slate-50'}`}>
-                <item.icon size={20}/> {item.label}
+            {[{ id: 'daily', label: '学習記録', icon: Zap }, { id: 'stats', label: '実績分析', icon: BarChart2 }, { id: 'tests', label: '成績推移', icon: TrendingUp }, ...(!isSampleMode ? [{ id: 'rpg', label: 'RPG', icon: Trophy }] : []), ...(canReview ? [{ id: 'review', label: '確認', icon: CheckSquare }] : [])].map(item => (<button type="button" key={item.id} onClick={() => setActiveTab(item.id)} className={`w-full flex items-center gap-4 px-6 py-4 rounded-3xl font-black transition-all leading-none ${activeTab === item.id ? 'bg-blue-600 text-white shadow-2xl' : 'text-slate-400 hover:bg-slate-50'}`}>
+                <item.icon size={20}/> {item.label}{item.id === 'review' && reviewQueue.badgeCount > 0 && <span className="ml-auto rounded-full bg-rose-500 px-2 py-1 text-[10px] text-white">{reviewQueue.badgeCount}</span>}
               </button>))}
           </nav>
           <button type="button" aria-label="サンプルモードを切り替える" title="サンプルモード" onClick={toggleSampleMode} className={`mt-8 w-full flex items-center justify-between p-4 rounded-2xl border-2 transition-all leading-none ${isSampleMode ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-slate-50 border-slate-100 text-slate-400'}`}>
@@ -2021,6 +2086,7 @@ export default function App() {
             {activeTab === 'rpg' && !isSampleMode && (
               <RpgHub profile={playerProfile} progress={rpgProgress} questState={questState} onClaimQuest={handleClaimQuest} pendingQuestId={pendingQuestId} onPurchaseRequest={handlePurchaseRequest} onEquip={handleEquip} onUnequip={handleUnequip} pendingItemId={pendingPurchaseItemId} pendingAction={pendingEquipmentAction} status={rpgStatus} battle={activeBattle || lastBattle} onStartBattleRequest={handleBattleStartRequest} onAttackBattle={handleAttackBattle} onUseBattleSkill={handleUseBattleSkill} startingEnemyId={pendingBattleEnemyId} attacking={isAttackingBattle} onBattleBack={handleBattleResultClose} battleFeedback={battleTurnFeedback}/>
             )}
+            {activeTab === 'review' && canReview && !isSampleMode && <ManualReviewPanel queue={reviewQueue} profile={playerProfile} studySessions={studySessions} ledgersBySessionId={pendingCorrectionLedgers} busySessionIds={reviewBusySessionIds} message={reviewError} onOpenCorrection={openHistoryCorrection} onRetry={handlePendingCorrectionRetry}/>}
           </main>
         </div>
 
@@ -2046,6 +2112,7 @@ export default function App() {
         <RewardResultModal result={rewardResult} profile={playerProfile} onClose={() => setRewardResult(null)} />
         <PurchaseConfirmModal item={purchaseCandidate} profile={playerProfile} purchasing={Boolean(pendingPurchaseItemId)} onCancel={() => !pendingPurchaseItemId && setPurchaseCandidate(null)} onConfirm={handlePurchaseConfirm}/>
         <BattleStartConfirmModal enemy={battleCandidate} starting={Boolean(pendingBattleEnemyId)} onCancel={() => !pendingBattleEnemyId && setBattleCandidate(null)} onConfirm={handleBattleStartConfirm}/>
+        <HistoryCorrectionModal key={`${historyCorrectionSession?.id || 'none'}-${historyCorrectionDecision}`} session={historyCorrectionSession} initialDecision={historyCorrectionDecision} busy={Boolean(historyCorrectionSession && reviewBusySessionIds[historyCorrectionSession.id])} error={reviewError} onClose={() => { if (!historyCorrectionSession || !reviewBusySessionIds[historyCorrectionSession.id]) { setHistoryCorrectionSession(null); setReviewError(null); } }} onSubmit={handleHistoryCorrection}/>
 
         {/* --- Modals --- */}
         {isAddingTask && (<div className={modalOverlayClass}>
@@ -2124,6 +2191,7 @@ export default function App() {
                                        <span className="text-[10px] font-black bg-slate-50 text-slate-500 px-3 py-1 rounded-full mb-2 inline-block text-left">{h.date}</span>
                                        {h.validation?.status !== 'valid' && <span className={`ml-2 text-[10px] font-black px-2 py-1 rounded-full ${h.validation?.status === 'invalid' ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-600'}`}>{h.validation?.status === 'invalid' ? '無効' : '要確認'}</span>}
                                        <p className="font-bold text-slate-500 text-xs leading-snug break-words text-left">{h.memo || "詳細なし"}</p>
+                                       {canReview && isCanonicalHistoryCorrectionTarget(studySessions.find((session) => session.id === h.id)) && <button type="button" onClick={() => openHistoryCorrection(studySessions.find((session) => session.id === h.id), h.validation?.status === 'pending_review' ? 'valid' : 'valid')} className="mt-3 rounded-lg bg-slate-100 px-3 py-2 text-[10px] font-black text-slate-600 hover:bg-blue-50 hover:text-blue-700">履歴を訂正</button>}
                                     </div>
                                     <div className="text-blue-600 font-mono font-black text-xl tracking-tighter shrink-0 self-end sm:self-auto text-left">{formatDuration(h.recordedSeconds ?? h.duration)}</div>
                                 </div>))}
@@ -2197,7 +2265,7 @@ export default function App() {
         <nav className={isMobileView
             ? "absolute bottom-0 left-0 right-0 bg-white/90 backdrop-blur-3xl border-t border-slate-100 flex justify-around p-3 pb-8 z-50 rounded-t-[1.75rem] shadow-2xl leading-none text-center"
             : "lg:hidden fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-3xl border-t border-slate-100 flex justify-around p-3 pb-8 z-50 rounded-t-[1.75rem] shadow-2xl leading-none text-center"}>
-          {[{ id: 'daily', label: '学習記録', icon: Zap }, { id: 'stats', label: '実績分析', icon: BarChart2 }, { id: 'tests', label: '成績推移', icon: TrendingUp }, ...(!isSampleMode ? [{ id: 'rpg', label: 'RPG', icon: Trophy }] : [])].map(item => (<button type="button" key={item.id} aria-label={item.label} title={item.label} onClick={() => setActiveTab(item.id)} className={`min-w-0 flex-1 p-2.5 sm:p-4 rounded-2xl transition-all duration-300 leading-none text-center ${activeTab === item.id ? 'bg-blue-600 text-white shadow-xl -translate-y-2 text-center' : 'text-slate-300 text-center'}`}><item.icon size={20}/><span className="mt-1 block text-[8px] font-black sm:hidden">{item.id === 'daily' ? '学習' : item.id === 'stats' ? '実績' : item.id === 'tests' ? '成績' : 'RPG'}</span></button>))}
+          {[{ id: 'daily', label: '学習記録', icon: Zap }, { id: 'stats', label: '実績分析', icon: BarChart2 }, { id: 'tests', label: '成績推移', icon: TrendingUp }, ...(!isSampleMode ? [{ id: 'rpg', label: 'RPG', icon: Trophy }] : []), ...(canReview ? [{ id: 'review', label: '確認', icon: CheckSquare }] : [])].map(item => (<button type="button" key={item.id} aria-label={item.label} title={item.label} onClick={() => setActiveTab(item.id)} className={`relative min-w-0 flex-1 p-2.5 sm:p-4 rounded-2xl transition-all duration-300 leading-none text-center ${activeTab === item.id ? 'bg-blue-600 text-white shadow-xl -translate-y-2 text-center' : 'text-slate-300 text-center'}`}><item.icon size={20}/>{item.id === 'review' && reviewQueue.badgeCount > 0 && <span className="absolute right-1 top-1 rounded-full bg-rose-500 px-1.5 py-0.5 text-[8px] text-white">{reviewQueue.badgeCount}</span>}<span className="mt-1 block text-[8px] font-black sm:hidden">{item.id === 'daily' ? '学習' : item.id === 'stats' ? '実績' : item.id === 'tests' ? '成績' : item.id === 'review' ? '確認' : 'RPG'}</span></button>))}
         </nav>
       </div>
     </div>);

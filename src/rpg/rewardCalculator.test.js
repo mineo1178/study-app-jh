@@ -15,6 +15,7 @@ describe('study rewards', () => {
     expect(isStudySessionRewardEligible(valid(0))).toBe(true);
     expect(isStudySessionRewardEligible({ ...valid(60), validation: { status: 'invalid' } })).toBe(false);
     expect(isStudySessionRewardEligible({ ...valid(60), validation: { status: 'pending_review' } })).toBe(false);
+    expect(isStudySessionRewardEligible({ ...valid(60), validation: { status: 'valid' }, manualReview: { reviewed: true, decision: 'valid' } })).toBe(true);
     expect(isStudySessionRewardEligible({ ...valid(60), legacySource: { taskId: 'old' } })).toBe(false);
     expect(isStudySessionRewardEligible({ ...valid(60), rewardPolicyVersion: undefined })).toBe(false);
   });

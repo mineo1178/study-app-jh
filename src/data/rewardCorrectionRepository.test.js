@@ -62,6 +62,19 @@ describe('reward correction preparation', () => {
     const change = prepareRewardCorrection({ session: session({ validation: { status: 'pending_review', reasonCodes: ['clock_mismatch'] } }), correction: { correctionId: 'pending-invalid', validation: { status: 'invalid', reasonCodes: ['manual_invalid'] } }, reviewerUid: 'parent-1', now });
     expect(change).toMatchObject({ sessionPatch: { validation: { status: 'invalid' } }, result: { status: 'no_reward_ledger' } });
   });
+  it('allows a reviewer to approve a pending session without increasing time and preserves its review evidence', () => {
+    const change = prepareRewardCorrection({ session: session({ validation: { status: 'pending_review', reasonCodes: ['legacy_reading_continuity_unknown'] } }), correction: { correctionId: 'pending-valid', validation: { status: 'valid' }, reason: 'manual_review_approved' }, reviewerUid: 'parent-1', now });
+    expect(change).toMatchObject({ sessionPatch: { validation: { status: 'valid', reasonCodes: [] }, manualReview: { reviewed: true, decision: 'valid', reviewedBy: 'parent-1', previousValidation: { reasonCodes: ['legacy_reading_continuity_unknown'] } } }, result: { status: 'no_reward_ledger' } });
+    expect(() => prepareRewardCorrection({ session: session({ validation: { status: 'pending_review' } }), correction: { correctionId: 'too-long', recordedSeconds: 3_601, validation: { status: 'valid' } }, reviewerUid: 'parent-1', now })).toThrow('CORRECTION_REWARD_INCREASE_NOT_ALLOWED');
+  });
+  it('allows a legacy pending reading session to be approved while remaining outside rewards', () => {
+    const legacy = prepareRewardCorrection({ session: session({ recordedSeconds: 5 * 60 * 60, legacySource: { taskId: 'news', historyId: 'h1' }, validation: { status: 'pending_review', reasonCodes: ['legacy_reading_continuity_unknown'] } }), correction: { correctionId: 'legacy-valid', validation: { status: 'valid' }, reason: 'manual_review_approved' }, reviewerUid: 'parent-1', now });
+    expect(legacy).toMatchObject({ sessionPatch: { validation: { status: 'valid' }, manualReview: { decision: 'valid' } }, result: { status: 'legacy_no_reward' } });
+  });
+  it('records manual invalid reason codes while preserving the previous pending evidence', () => {
+    const change = prepareRewardCorrection({ session: session({ validation: { status: 'pending_review', reasonCodes: ['clock_mismatch'] } }), correction: { correctionId: 'pending-invalid-review', validation: { status: 'invalid' }, reason: 'manual_review_invalid' }, reviewerUid: 'parent-1', now });
+    expect(change.sessionPatch).toMatchObject({ validation: { status: 'invalid', reasonCodes: ['manual_review_invalid'] }, manualReview: { decision: 'invalid', previousValidation: { reasonCodes: ['clock_mismatch'] } } });
+  });
   it('blocks new asset spending while pending but does not impose a lock when clear', () => {
     expect(() => assertNoPendingRewardCorrections({ pendingSessionIds: ['session-1'] })).toThrow('REWARD_CORRECTION_PENDING');
     expect(() => assertNoPendingRewardCorrections({ pendingSessionIds: [] })).not.toThrow();
@@ -70,6 +83,7 @@ describe('reward correction preparation', () => {
     const applied = prepareRewardCorrection({ session: session(), ledger: ledger(), profile: profile(), correction: shorten, reviewerUid: 'parent-1', now });
     const pending = prepareRewardCorrection({ session: session(), ledger: ledger(), profile: profile({ materials: { iron: 1 } }), correction: shorten, reviewerUid: 'parent-1', now });
     const resolved = preparePendingRewardCorrectionRetry({ sessionId: 'session-1', ledger: pending.ledger, adjustment: pending.adjustment, profile: profile(), integrity: pending.integrity, reviewerUid: 'parent-1', now });
-    [applied.sessionPatch, applied.ledger, applied.adjustment, applied.profile, applied.integrity, pending.sessionPatch, pending.ledger, pending.adjustment, pending.integrity, resolved.profile, resolved.ledger, resolved.adjustment, resolved.integrity].forEach((payload) => expect(findUndefinedPaths(payload)).toEqual([]));
+    const reviewed = prepareRewardCorrection({ session: session({ validation: { status: 'pending_review', reasonCodes: ['clock_mismatch'] } }), correction: { correctionId: 'reviewed-valid', validation: { status: 'valid' }, reason: 'manual_review_approved' }, reviewerUid: 'parent-1', now });
+    [applied.sessionPatch, applied.ledger, applied.adjustment, applied.profile, applied.integrity, pending.sessionPatch, pending.ledger, pending.adjustment, pending.integrity, resolved.profile, resolved.ledger, resolved.adjustment, resolved.integrity, reviewed.sessionPatch].forEach((payload) => expect(findUndefinedPaths(payload)).toEqual([]));
   });
 });
