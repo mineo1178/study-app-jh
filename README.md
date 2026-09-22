@@ -1,5 +1,11 @@
 # React + Vite
 
+## Firestore security
+
+`firestore.rules` protects authentication, family membership, reviewer authorization, and document mutation boundaries. Run `npm run test:rules` to validate those rules against the local Firestore Emulator.
+
+RPG economy writes are still performed by the client. An authenticated member could attempt forged economy writes within the fields currently permitted by the rules. Strict anti-cheat requires moving economy mutations to a trusted backend.
+
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
 Currently, two official plugins are available:
