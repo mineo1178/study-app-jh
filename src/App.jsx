@@ -16,6 +16,7 @@ import { applyStudySessionReward, emptyPlayerProfile, playerProfileRef, rewardLe
 import { correctStudySessionReward, retryPendingRewardCorrection, rewardIntegrityRef } from './data/rewardCorrectionRepository';
 import { isAuthorizedRewardReviewer, reviewerMemberRef } from './data/reviewerAuthorization';
 import { createRpgActionId, equipItem, purchaseEquipment, unequipSlot } from './data/rpgShopRepository';
+import { createMaterialExchangeActionId, exchangeMaterial } from './data/rpgMaterialExchangeRepository';
 import { attackBattle, createBattleActionId, createBattleId, rpgBattleRef, startBattle, startBossBattle, useBattleSkill as runBattleSkill } from './data/rpgBattleRepository';
 import { rpgProgressRef } from './data/rpgProgressRepository';
 import { claimQuestReward, rpgQuestStateRef } from './data/rpgQuestRepository';
@@ -28,11 +29,13 @@ import { normalizePlayerProfile } from './rpg/playerProfile';
 import { getQuest } from './rpg/questCatalog';
 import { normalizeQuestState } from './rpg/questState';
 import { isStudySessionRewardEligible } from './rpg/rewardCalculator';
+import { MATERIAL_DEFS } from './rpg/rewardConfig';
 import { shouldUseLegacyRpgUi } from './rpg/legacyRpgUi';
 import RpgWalletPanel from './components/rpg/RpgWalletPanel';
 import RewardResultModal from './components/rpg/RewardResultModal';
 import RpgHub from './components/rpg/RpgHub';
 import PurchaseConfirmModal from './components/rpg/PurchaseConfirmModal';
+import MaterialExchangeConfirmModal from './components/rpg/MaterialExchangeConfirmModal';
 import BattleStartConfirmModal from './components/rpg/BattleStartConfirmModal';
 import QuestTreasureResult from './components/rpg/QuestTreasureResult';
 import { formatHms, getEffectiveStudySeconds, getLiveStudySession, getSessionsForDate, getSessionsForTask, getUnifiedStudySessions } from './data/studySessionSelectors';
@@ -77,7 +80,7 @@ const getTasksCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-
 const getTestsCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tests');
 const getStudySessionsCol = () => studySessionsCollection(db, FAMILY_ID);
 const getActiveTimerRef = () => activeTimerRef(db, FAMILY_ID);
-const APP_VERSION = 'v1.87.7';
+const APP_VERSION = 'v1.88.0';
 const TIMER_HEARTBEAT_MS = 30 * 1000;
 const DAILY_TARGET_SECONDS = 2 * 60 * 60;
 const isDocumentHidden = () => typeof document !== 'undefined' && document.hidden;
@@ -863,8 +866,10 @@ export default function App() {
     const [pendingQuestId, setPendingQuestId] = useState(null);
     const [questClaimResult, setQuestClaimResult] = useState(null);
     const [purchaseCandidate, setPurchaseCandidate] = useState(null);
+    const [exchangeCandidate, setExchangeCandidate] = useState(null);
     const [rpgStatus, setRpgStatus] = useState(null);
     const [pendingPurchaseItemId, setPendingPurchaseItemId] = useState(null);
+    const [pendingMaterialExchange, setPendingMaterialExchange] = useState(false);
     const [pendingEquipmentAction, setPendingEquipmentAction] = useState(null);
     const [activeBattle, setActiveBattle] = useState(null);
     const [lastBattle, setLastBattle] = useState(null);
@@ -1188,11 +1193,32 @@ export default function App() {
         ALREADY_EQUIPPED: 'すでに装備中です',
         ALREADY_UNEQUIPPED: 'すでに解除されています',
         REWARD_CORRECTION_PENDING: '報酬訂正の確認中は新規購入できません',
+        INSUFFICIENT_EXCHANGE_MATERIAL: '素材が足りません',
+        SAME_EXCHANGE_MATERIAL: '同じ素材どうしは交換できません',
+        UNKNOWN_MATERIAL: '選べない素材です',
     }[error?.code || error?.message] || '操作に失敗しました。もう一度お試しください。');
     const handlePurchaseRequest = (item) => {
         if (isSampleMode || !user || pendingPurchaseItemId) return;
         setRpgStatus(null);
         setPurchaseCandidate(item);
+    };
+    const handleMaterialExchangeRequest = ({ sourceMaterialKey, targetMaterialKey }) => {
+        if (isSampleMode || !user || pendingMaterialExchange) return;
+        setRpgStatus(null);
+        setExchangeCandidate({ sourceMaterialKey, targetMaterialKey });
+    };
+    const handleMaterialExchangeConfirm = async () => {
+        if (!exchangeCandidate || isSampleMode || !user || pendingMaterialExchange) return;
+        setPendingMaterialExchange(true);
+        try {
+            const result = await exchangeMaterial({ db, familyId: FAMILY_ID, ...exchangeCandidate, actionId: createMaterialExchangeActionId() });
+            setExchangeCandidate(null);
+            setRpgStatus(result.applied ? { kind: 'success', message: `${MATERIAL_DEFS[exchangeCandidate.targetMaterialKey]?.label || '素材'}を1個手に入れました！` } : { kind: 'error', message: rpgErrorMessage({ code: result.reason }) });
+        } catch (error) {
+            setRpgStatus({ kind: 'error', message: rpgErrorMessage(error) });
+        } finally {
+            setPendingMaterialExchange(false);
+        }
     };
     const handlePurchaseConfirm = async () => {
         if (!purchaseCandidate || isSampleMode || !user || pendingPurchaseItemId) return;
@@ -2084,7 +2110,7 @@ export default function App() {
                 </div>
               </div>)}
             {activeTab === 'rpg' && !isSampleMode && (
-              <RpgHub profile={playerProfile} progress={rpgProgress} questState={questState} onClaimQuest={handleClaimQuest} pendingQuestId={pendingQuestId} onPurchaseRequest={handlePurchaseRequest} onEquip={handleEquip} onUnequip={handleUnequip} pendingItemId={pendingPurchaseItemId} pendingAction={pendingEquipmentAction} status={rpgStatus} battle={activeBattle || lastBattle} onStartBattleRequest={handleBattleStartRequest} onAttackBattle={handleAttackBattle} onUseBattleSkill={handleUseBattleSkill} startingEnemyId={pendingBattleEnemyId} attacking={isAttackingBattle} onBattleBack={handleBattleResultClose} battleFeedback={battleTurnFeedback}/>
+              <RpgHub profile={playerProfile} progress={rpgProgress} questState={questState} onClaimQuest={handleClaimQuest} pendingQuestId={pendingQuestId} onPurchaseRequest={handlePurchaseRequest} onMaterialExchangeRequest={handleMaterialExchangeRequest} pendingMaterialExchange={pendingMaterialExchange} onEquip={handleEquip} onUnequip={handleUnequip} pendingItemId={pendingPurchaseItemId} pendingAction={pendingEquipmentAction} status={rpgStatus} battle={activeBattle || lastBattle} onStartBattleRequest={handleBattleStartRequest} onAttackBattle={handleAttackBattle} onUseBattleSkill={handleUseBattleSkill} startingEnemyId={pendingBattleEnemyId} attacking={isAttackingBattle} onBattleBack={handleBattleResultClose} battleFeedback={battleTurnFeedback}/>
             )}
             {activeTab === 'review' && canReview && !isSampleMode && <ManualReviewPanel queue={reviewQueue} profile={playerProfile} studySessions={studySessions} ledgersBySessionId={pendingCorrectionLedgers} busySessionIds={reviewBusySessionIds} message={reviewError} onOpenCorrection={openHistoryCorrection} onRetry={handlePendingCorrectionRetry}/>}
           </main>
@@ -2111,6 +2137,7 @@ export default function App() {
         </div>)}
         <RewardResultModal result={rewardResult} profile={playerProfile} onClose={() => setRewardResult(null)} />
         <PurchaseConfirmModal item={purchaseCandidate} profile={playerProfile} purchasing={Boolean(pendingPurchaseItemId)} onCancel={() => !pendingPurchaseItemId && setPurchaseCandidate(null)} onConfirm={handlePurchaseConfirm}/>
+        <MaterialExchangeConfirmModal exchange={exchangeCandidate} profile={playerProfile} exchanging={pendingMaterialExchange} onCancel={() => !pendingMaterialExchange && setExchangeCandidate(null)} onConfirm={handleMaterialExchangeConfirm}/>
         <BattleStartConfirmModal enemy={battleCandidate} starting={Boolean(pendingBattleEnemyId)} onCancel={() => !pendingBattleEnemyId && setBattleCandidate(null)} onConfirm={handleBattleStartConfirm}/>
         <HistoryCorrectionModal key={`${historyCorrectionSession?.id || 'none'}-${historyCorrectionDecision}`} session={historyCorrectionSession} initialDecision={historyCorrectionDecision} busy={Boolean(historyCorrectionSession && reviewBusySessionIds[historyCorrectionSession.id])} error={reviewError} onClose={() => { if (!historyCorrectionSession || !reviewBusySessionIds[historyCorrectionSession.id]) { setHistoryCorrectionSession(null); setReviewError(null); } }} onSubmit={handleHistoryCorrection}/>
 

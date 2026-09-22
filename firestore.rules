@@ -86,6 +86,11 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    match /families/{familyId}/apps/junior-high/rpgExchangeLedger/{actionId} {
+      allow read, create: if isActiveMember(familyId);
+      allow update, delete: if false;
+    }
+
     match /families/{familyId}/apps/junior-high/rpgBattles/{battleId} {
       allow read, create, update: if isActiveMember(familyId);
       allow delete: if false;

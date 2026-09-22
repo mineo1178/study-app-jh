@@ -13,6 +13,9 @@ describe('equipment catalog', () => {
       expect(item.stats.attack).toBeGreaterThanOrEqual(0);
     }
   });
+  it('gives every equipment item a child-friendly description', () => {
+    Object.values(EQUIPMENT_CATALOG).forEach((item) => expect(item.description.trim().length).toBeGreaterThan(0));
+  });
 
   it('looks up catalog items safely', () => {
     expect(getEquipmentCatalogItem('iron_sword')?.slot).toBe('weapon');

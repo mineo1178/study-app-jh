@@ -114,6 +114,20 @@ describe('Firestore Security Rules', () => {
     }
   });
 
+  it('allows only active family members to create immutable material exchange ledgers', async () => {
+    await seed('family-a', 'student-a');
+    await seed('family-b', 'student-b');
+    const ownLedger = ref(userDb('student-a'), appPath('family-a', 'rpgExchangeLedger', 'exchange-1'));
+    const foreignLedger = ref(userDb('student-b'), appPath('family-a', 'rpgExchangeLedger', 'exchange-1'));
+    const nonMemberLedger = ref(userDb('missing'), appPath('family-a', 'rpgExchangeLedger', 'exchange-2'));
+    await assertSucceeds(setDoc(ownLedger, { value: 1 }));
+    await assertSucceeds(getDoc(ownLedger));
+    await assertFails(setDoc(foreignLedger, { value: 1 }));
+    await assertFails(setDoc(nonMemberLedger, { value: 1 }));
+    await assertFails(updateDoc(ownLedger, { value: 2 }));
+    await assertFails(deleteDoc(ownLedger));
+  });
+
   it('allows active members the current profile, progress, quest, and battle mutation paths only', async () => {
     await seed('family-a', 'student-a');
     const db = userDb('student-a');
