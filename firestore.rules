@@ -1,103 +1,83 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    function memberDoc(familyId) {
-      return get(/databases/$(database)/documents/families/$(familyId)/members/$(request.auth.uid));
-    }
-
-    function isActiveMember(familyId) {
-      return isSignedIn() && memberDoc(familyId).data.active == true;
-    }
-
-    function isReviewer(familyId) {
-      return isActiveMember(familyId)
-        && (memberDoc(familyId).data.role == 'parent' || memberDoc(familyId).data.role == 'admin');
-    }
-
-    match /families/{familyId}/members/{uid} {
-      // Bootstrap and role administration are trusted Console/backend operations only.
-      allow get: if isSignedIn() && request.auth.uid == uid;
-      allow list, create, update, delete: if false;
+    // Authenticated single-family application. Client access is intentionally
+    // limited to the fixed family; members documents and roles are not used.
+    function isAppUser(familyId) {
+      return request.auth != null && familyId == 'oomine-study-2026';
     }
 
     match /families/{familyId}/apps/junior-high/tasks/{taskId} {
-      allow read, create, update, delete: if isActiveMember(familyId);
+      allow read, create, update, delete: if isAppUser(familyId);
     }
 
     match /families/{familyId}/apps/junior-high/tests/{testId} {
-      allow read, create, update, delete: if isActiveMember(familyId);
+      allow read, create, update, delete: if isAppUser(familyId);
     }
 
     match /families/{familyId}/apps/junior-high/activeTimers/current {
-      allow read, create, update, delete: if isActiveMember(familyId);
+      allow read, create, update, delete: if isAppUser(familyId);
     }
 
     match /families/{familyId}/apps/junior-high/studySessions/{sessionId} {
-      allow read, create: if isActiveMember(familyId);
-      allow update: if isReviewer(familyId);
+      allow read, create, update: if isAppUser(familyId);
       allow delete: if false;
     }
 
     match /families/{familyId}/apps/junior-high/rewardLedger/{sessionId} {
-      allow read, create: if isActiveMember(familyId);
-      allow update: if isReviewer(familyId);
+      allow read, create, update: if isAppUser(familyId);
       allow delete: if false;
     }
 
     match /families/{familyId}/apps/junior-high/rewardAdjustmentLedger/{adjustmentId} {
-      allow read, create, update: if isReviewer(familyId);
+      allow read, create, update: if isAppUser(familyId);
       allow delete: if false;
     }
 
     match /families/{familyId}/apps/junior-high/rewardIntegrity/current {
-      allow read: if isActiveMember(familyId);
-      allow create, update: if isReviewer(familyId);
+      allow read, create, update: if isAppUser(familyId);
       allow delete: if false;
     }
 
     match /families/{familyId}/apps/junior-high/rpg/playerProfile {
-      // Client-side economy writes remain intentionally allowed for active members.
+      // Client-side economy writes remain intentionally allowed for app users.
       // Moving these mutations to a trusted backend is required for strict anti-cheat.
-      allow read, create, update: if isActiveMember(familyId);
+      allow read, create, update: if isAppUser(familyId);
       allow delete: if false;
     }
 
     match /families/{familyId}/apps/junior-high/rpgProgress/current {
-      allow read, create, update: if isActiveMember(familyId);
+      allow read, create, update: if isAppUser(familyId);
       allow delete: if false;
     }
 
     match /families/{familyId}/apps/junior-high/rpgQuestState/current {
-      allow read, create, update: if isActiveMember(familyId);
+      allow read, create, update: if isAppUser(familyId);
       allow delete: if false;
     }
 
     match /families/{familyId}/apps/junior-high/rpgQuestLedger/{ledgerId} {
-      allow read, create: if isActiveMember(familyId);
+      allow read, create: if isAppUser(familyId);
       allow update, delete: if false;
     }
 
     match /families/{familyId}/apps/junior-high/rpgActionLedger/{actionId} {
-      allow read, create: if isActiveMember(familyId);
+      allow read, create: if isAppUser(familyId);
       allow update, delete: if false;
     }
 
     match /families/{familyId}/apps/junior-high/rpgExchangeLedger/{actionId} {
-      allow read, create: if isActiveMember(familyId);
+      allow read, create: if isAppUser(familyId);
       allow update, delete: if false;
     }
 
     match /families/{familyId}/apps/junior-high/rpgBattles/{battleId} {
-      allow read, create, update: if isActiveMember(familyId);
+      allow read, create, update: if isAppUser(familyId);
       allow delete: if false;
     }
 
     match /families/{familyId}/apps/junior-high/rpgBattleLedger/{ledgerId} {
-      allow read, create: if isActiveMember(familyId);
+      allow read, create: if isAppUser(familyId);
       allow update, delete: if false;
     }
 

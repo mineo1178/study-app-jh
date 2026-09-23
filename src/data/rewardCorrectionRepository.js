@@ -2,10 +2,13 @@ import { doc, runTransaction } from 'firebase/firestore';
 import { calculateStudyReward, materialForSubject } from '../rpg/rewardCalculator.js';
 import { normalizePlayerProfile } from '../rpg/playerProfile.js';
 import { playerProfileRef, rewardLedgerRef } from './rewardLedgerRepository.js';
-import { assertAuthorizedRewardReviewer, assertReviewerUid, reviewerMemberRef } from './reviewerAuthorization.js';
 
 const appPath = (familyId, collectionName, id) => ['families', familyId, 'apps', 'junior-high', collectionName, id];
 const correctionFailure = (code) => Object.assign(new Error(code), { code });
+const assertReviewerUid = (reviewerUid) => {
+  if (typeof reviewerUid !== 'string' || !reviewerUid.trim()) throw correctionFailure('REVIEWER_NOT_AUTHORIZED');
+  return reviewerUid;
+};
 const number = (value) => Math.max(0, Number(value) || 0);
 
 export const REWARD_ADJUSTMENT_SCHEMA_VERSION = 1;
@@ -173,11 +176,9 @@ export async function correctStudySessionReward({ db, familyId, sessionId, corre
   const ledgerReference = rewardLedgerRef(db, familyId, sessionId);
   const profileReference = playerProfileRef(db, familyId);
   const integrityReference = rewardIntegrityRef(db, familyId);
-  const reviewerReference = reviewerMemberRef(db, familyId, reviewerId);
   const now = Date.now();
   return runTransaction(db, async (transaction) => {
-    const [sessionSnap, ledgerSnap, profileSnap, integritySnap, reviewerSnap] = await Promise.all([transaction.get(sessionReference), transaction.get(ledgerReference), transaction.get(profileReference), transaction.get(integrityReference), transaction.get(reviewerReference)]);
-    assertAuthorizedRewardReviewer(reviewerSnap.exists() ? reviewerSnap.data() : null);
+    const [sessionSnap, ledgerSnap, profileSnap, integritySnap] = await Promise.all([transaction.get(sessionReference), transaction.get(ledgerReference), transaction.get(profileReference), transaction.get(integrityReference)]);
     if (!sessionSnap.exists()) return { applied: false, reason: 'SESSION_NOT_FOUND' };
     const session = { id: sessionSnap.id, ...sessionSnap.data() };
     const ledger = ledgerSnap.exists() ? ledgerSnap.data() : null;
@@ -220,11 +221,9 @@ export async function retryPendingRewardCorrection({ db, familyId, sessionId, re
   const ledgerReference = rewardLedgerRef(db, familyId, sessionId);
   const profileReference = playerProfileRef(db, familyId);
   const integrityReference = rewardIntegrityRef(db, familyId);
-  const reviewerReference = reviewerMemberRef(db, familyId, reviewerId);
   const now = Date.now();
   return runTransaction(db, async (transaction) => {
-    const [sessionSnap, ledgerSnap, profileSnap, integritySnap, reviewerSnap] = await Promise.all([transaction.get(sessionReference), transaction.get(ledgerReference), transaction.get(profileReference), transaction.get(integrityReference), transaction.get(reviewerReference)]);
-    assertAuthorizedRewardReviewer(reviewerSnap.exists() ? reviewerSnap.data() : null);
+    const [sessionSnap, ledgerSnap, profileSnap, integritySnap] = await Promise.all([transaction.get(sessionReference), transaction.get(ledgerReference), transaction.get(profileReference), transaction.get(integrityReference)]);
     if (!sessionSnap.exists()) return { applied: false, reason: 'SESSION_NOT_FOUND' };
     if (!ledgerSnap.exists() || ledgerSnap.data().correctionStatus !== 'reversal_pending') return { applied: false, reason: 'NO_PENDING_CORRECTION' };
     const ledger = ledgerSnap.data();

@@ -14,7 +14,6 @@ import { activeTimerRef, finishActiveTimer, heartbeatActiveTimer, invalidateStal
 import { studySessionsCollection } from './data/studySessionRepository';
 import { applyStudySessionReward, emptyPlayerProfile, playerProfileRef, rewardLedgerRef } from './data/rewardLedgerRepository';
 import { correctStudySessionReward, retryPendingRewardCorrection, rewardIntegrityRef } from './data/rewardCorrectionRepository';
-import { isAuthorizedRewardReviewer, reviewerMemberRef } from './data/reviewerAuthorization';
 import { createRpgActionId, equipItem, purchaseEquipment, unequipSlot } from './data/rpgShopRepository';
 import { createMaterialExchangeActionId, exchangeMaterial } from './data/rpgMaterialExchangeRepository';
 import { attackBattle, createBattleActionId, createBattleId, rpgBattleRef, startBattle, startBossBattle, useBattleSkill as runBattleSkill } from './data/rpgBattleRepository';
@@ -80,7 +79,7 @@ const getTasksCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-
 const getTestsCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tests');
 const getStudySessionsCol = () => studySessionsCollection(db, FAMILY_ID);
 const getActiveTimerRef = () => activeTimerRef(db, FAMILY_ID);
-const APP_VERSION = 'v1.88.0';
+const APP_VERSION = 'v1.88.1';
 const TIMER_HEARTBEAT_MS = 30 * 1000;
 const DAILY_TARGET_SECONDS = 2 * 60 * 60;
 const isDocumentHidden = () => typeof document !== 'undefined' && document.hidden;
@@ -901,7 +900,6 @@ export default function App() {
     const [liveNow, setLiveNow] = useState(() => Date.now());
     const [isSavingRecord, setIsSavingRecord] = useState(false);
     const [staleTimerNotice, setStaleTimerNotice] = useState(null);
-    const [reviewerMember, setReviewerMember] = useState(null);
     const [rewardIntegrity, setRewardIntegrity] = useState({ pendingSessionIds: [] });
     const [pendingCorrectionLedgers, setPendingCorrectionLedgers] = useState({});
     const [historyCorrectionSession, setHistoryCorrectionSession] = useState(null);
@@ -914,7 +912,7 @@ export default function App() {
     const rewardProcessingRef = useRef(new Set());
     const currentClientId = useMemo(() => getCurrentClientId(), []);
     const unifiedSessions = useMemo(() => getUnifiedStudySessions(tasks, studySessions), [tasks, studySessions]);
-    const canReview = useMemo(() => Boolean(user) && !isSampleMode && isAuthorizedRewardReviewer(reviewerMember), [isSampleMode, reviewerMember, user]);
+    const canReview = useMemo(() => Boolean(user) && !isSampleMode, [isSampleMode, user]);
     const reviewQueue = useMemo(() => buildReviewQueue({ studySessions, integrity: rewardIntegrity }), [studySessions, rewardIntegrity]);
     const activeTimerTask = useMemo(() => isActiveTimer(activeTimer) ? tasks.find((task) => task.id === activeTimer.taskId) || null : null, [activeTimer, tasks]);
     const liveSession = useMemo(() => getLiveStudySession(activeTimer, activeTimerTask, liveNow), [activeTimer, activeTimerTask, liveNow]);
@@ -975,10 +973,6 @@ export default function App() {
     useEffect(() => {
         if (isSampleMode || !user) return undefined;
         return onSnapshot(playerProfileRef(db, FAMILY_ID), (snap) => { const next = normalizePlayerProfile(snap.exists() ? snap.data() : emptyPlayerProfile()); setPlayerProfile(next); if (next.activeBattleId) setBattleWatchId(next.activeBattleId); }, (err) => console.error('PlayerProfile realtime sync error:', err));
-    }, [isSampleMode, user]);
-    useEffect(() => {
-        if (isSampleMode || !user) return undefined;
-        return onSnapshot(reviewerMemberRef(db, FAMILY_ID, user.uid), (snap) => setReviewerMember(snap.exists() ? snap.data() : null), (err) => { console.error('Reviewer membership realtime sync error:', err); setReviewerMember(null); });
     }, [isSampleMode, user]);
     useEffect(() => {
         if (isSampleMode || !user) return undefined;
