@@ -46,7 +46,7 @@ describe('Firestore Security Rules', () => {
 
   it('allows mutable RPG documents only within the fixed family and denies unknown collections', async () => {
     const db = userDb();
-    for (const [collection, id] of [['rpg', 'playerProfile'], ['rpgProgress', 'current'], ['rpgQuestState', 'current'], ['rpgBattles', 'battle-1']]) {
+    for (const [collection, id] of [['rpg', 'playerProfile'], ['rpgProgress', 'current'], ['rpgTowerProgress', 'current'], ['rpgQuestState', 'current'], ['rpgBattles', 'battle-1']]) {
       const target = ref(db, appPath(appFamilyId, collection, id));
       await assertSucceeds(setDoc(target, { value: 1 })); await assertSucceeds(updateDoc(target, { value: 2 })); await assertFails(deleteDoc(target));
     }
@@ -59,5 +59,12 @@ describe('Firestore Security Rules', () => {
     await assertFails(getDoc(ref(anonymous, appPath(appFamilyId, 'rpgExchangeLedger', 'ledger-1'))));
     await seedDoc(['families', appFamilyId, 'members', 'app-user']);
     await assertFails(getDoc(ref(userDb(), ['families', appFamilyId, 'members', 'app-user'])));
+  });
+
+  it('applies fixed-family authentication and delete protection directly to Tower Progress', async () => {
+    const towerPath = appPath(appFamilyId, 'rpgTowerProgress', 'current'); const fixed = ref(userDb(), towerPath);
+    await assertSucceeds(setDoc(fixed, { value: 1 })); await assertSucceeds(getDoc(fixed)); await assertSucceeds(updateDoc(fixed, { value: 2 })); await assertFails(deleteDoc(fixed));
+    const anonymous = ref(anonymousDb(), towerPath); await assertFails(getDoc(anonymous)); await assertFails(setDoc(anonymous, { value: 1 })); await assertFails(updateDoc(anonymous, { value: 2 }));
+    const other = ref(userDb('other-user'), appPath('other-family', 'rpgTowerProgress', 'current')); await assertFails(getDoc(other)); await assertFails(setDoc(other, { value: 1 })); await assertFails(updateDoc(other, { value: 2 }));
   });
 });

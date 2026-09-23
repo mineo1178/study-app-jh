@@ -13,7 +13,7 @@ vi.mock('firebase/firestore', () => ({
   }),
 }));
 
-import { startBattle, startBossBattle } from './rpgBattleRepository.js';
+import { attackBattle, startBattle, startBossBattle, startTowerBattle } from './rpgBattleRepository.js';
 
 const profilePath = 'families/family/apps/junior-high/rpg/playerProfile';
 const progressPath = 'families/family/apps/junior-high/rpgProgress/current';
@@ -27,6 +27,20 @@ describe('battle reward-integrity lock', () => {
     firestore.docs.set(integrityPath, { pendingSessionIds: ['session-1'] });
     await expect(startBattle({ db: {}, familyId: 'family', enemyId: 'slime', battleId: 'blocked-normal' })).rejects.toThrow('REWARD_CORRECTION_PENDING');
     await expect(startBossBattle({ db: {}, familyId: 'family', bossId: 'orc_chief', battleId: 'blocked-boss' })).rejects.toThrow('REWARD_CORRECTION_PENDING');
+    await expect(startTowerBattle({ db: {}, familyId: 'family', battleId: 'blocked-tower' })).rejects.toThrow('REWARD_CORRECTION_PENDING');
     expect(firestore.docs.get(profilePath)).toEqual({ battleEnergy: 10 });
+  });
+  it('locks Tower behind Campaign clear and applies each start and victory transaction once', async () => {
+    firestore.docs.clear(); firestore.docs.set(profilePath, { battleEnergy: 10, totalExp: 0, level: 1, equipped: {} }); firestore.docs.set(progressPath, { campaignCompleted: false });
+    await expect(startTowerBattle({ db: {}, familyId: 'family', battleId: 'tower-locked' })).rejects.toThrow('TOWER_LOCKED');
+    expect(firestore.docs.get(profilePath)).toMatchObject({ battleEnergy: 10 }); expect(firestore.docs.has('families/family/apps/junior-high/rpgBattles/tower-locked')).toBe(false);
+    firestore.docs.set(progressPath, { campaignCompleted: true }); const started = await startTowerBattle({ db: {}, familyId: 'family', battleId: 'tower-win' });
+    expect(started.applied).toBe(true); expect(firestore.docs.get(profilePath)).toMatchObject({ battleEnergy: 9, activeBattleId: 'tower-win' });
+    const battlePath = 'families/family/apps/junior-high/rpgBattles/tower-win'; firestore.docs.set(battlePath, { ...firestore.docs.get(battlePath), enemyHp: 1 });
+    const first = await attackBattle({ db: {}, familyId: 'family', battleId: 'tower-win', actionId: 'tower-action' }); expect(first.victory).toBe(true);
+    const afterFirst = structuredClone(firestore.docs.get(profilePath)); const towerPath = 'families/family/apps/junior-high/rpgTowerProgress/current'; const towerAfterFirst = structuredClone(firestore.docs.get(towerPath));
+    await expect(attackBattle({ db: {}, familyId: 'family', battleId: 'tower-win', actionId: 'tower-action' })).resolves.toMatchObject({ applied: false, reason: 'ALREADY_APPLIED' });
+    await expect(attackBattle({ db: {}, familyId: 'family', battleId: 'tower-win', actionId: 'tower-action-2' })).rejects.toThrow('BATTLE_ALREADY_COMPLETED');
+    expect(firestore.docs.get(profilePath)).toEqual(afterFirst); expect(firestore.docs.get(towerPath)).toEqual(towerAfterFirst);
   });
 });

@@ -60,6 +60,11 @@ describe('battle transaction logic', () => {
     expect(final.victoryLedger).toMatchObject({ type: 'victory', expGranted: 20, totalExpBefore: 90, totalExpAfter: 110, levelAfter: 2 });
     expect(() => prepareBattleAttack({ battle: final.battle, profile: final.profile, actionId: 'later', now })).toThrow('BATTLE_ALREADY_COMPLETED');
   });
+  it('keeps a Campaign victory on the Campaign path without changing Tower progress', () => {
+    const start = prepareBattleStart({ profile, enemy: ENEMY_CATALOG.slime, battleId: 'campaign-regression', now, chapter: getChapter('chapter_1') });
+    const final = prepareBattleAttack({ battle: { ...start.battle, enemyHp: 1 }, profile: start.profile, progress: { currentChapterId: 'chapter_1', normalWins: 0 }, towerProgress: { currentFloor: 7, highestFloor: 6, totalWins: 6 }, actionId: 'campaign-regression-win', now });
+    expect(final.battle.battleMode).toBe('campaign'); expect(final.progress).toMatchObject({ currentChapterId: 'chapter_1', normalWins: 1 }); expect(final.towerProgress).toBeNull();
+  });
   it('snapshots starter skills and applies weak skill damage atomically', () => {
     const start = prepareBattleStart({ profile, enemy: ENEMY_CATALOG.slime, battleId: 'battle-skill', now });
     expect(start.battle).toMatchObject({ schemaVersion: 7, skillUses: { flame_slash: 0, aqua_edge: 0, thunder_strike: 0, healing_light: 0, guard_stance: 0 } });

@@ -51,6 +51,11 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    match /families/{familyId}/apps/junior-high/rpgTowerProgress/current {
+      allow read, create, update: if isAppUser(familyId);
+      allow delete: if false;
+    }
+
     match /families/{familyId}/apps/junior-high/rpgQuestState/current {
       allow read, create, update: if isAppUser(familyId);
       allow delete: if false;

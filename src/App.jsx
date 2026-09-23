@@ -16,10 +16,12 @@ import { applyStudySessionReward, emptyPlayerProfile, playerProfileRef, rewardLe
 import { correctStudySessionReward, retryPendingRewardCorrection, rewardIntegrityRef } from './data/rewardCorrectionRepository';
 import { createRpgActionId, equipItem, purchaseEquipment, unequipSlot } from './data/rpgShopRepository';
 import { createMaterialExchangeActionId, exchangeMaterial } from './data/rpgMaterialExchangeRepository';
-import { attackBattle, createBattleActionId, createBattleId, rpgBattleRef, startBattle, startBossBattle, useBattleSkill as runBattleSkill } from './data/rpgBattleRepository';
+import { attackBattle, createBattleActionId, createBattleId, rpgBattleRef, startBattle, startBossBattle, startTowerBattle, useBattleSkill as runBattleSkill } from './data/rpgBattleRepository';
 import { rpgProgressRef } from './data/rpgProgressRepository';
+import { rpgTowerProgressRef } from './data/rpgTowerProgressRepository';
 import { claimQuestReward, rpgQuestStateRef } from './data/rpgQuestRepository';
 import { normalizeRpgProgress } from './rpg/rpgProgress';
+import { normalizeTowerProgress } from './rpg/towerProgress';
 import { buildBattleTurnFeedback } from './rpg/battleUiLogic';
 import { getEquipmentCatalogItem } from './rpg/equipmentCatalog';
 import { normalizeBattle } from './rpg/battleState';
@@ -79,7 +81,7 @@ const getTasksCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-
 const getTestsCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tests');
 const getStudySessionsCol = () => studySessionsCollection(db, FAMILY_ID);
 const getActiveTimerRef = () => activeTimerRef(db, FAMILY_ID);
-const APP_VERSION = 'v1.88.1';
+const APP_VERSION = 'v1.89.0';
 const TIMER_HEARTBEAT_MS = 30 * 1000;
 const DAILY_TARGET_SECONDS = 2 * 60 * 60;
 const isDocumentHidden = () => typeof document !== 'undefined' && document.hidden;
@@ -861,6 +863,7 @@ export default function App() {
     const [studySessions, setStudySessions] = useState([]);
     const [playerProfile, setPlayerProfile] = useState(emptyPlayerProfile());
     const [rpgProgress, setRpgProgress] = useState(() => normalizeRpgProgress());
+    const [towerProgress, setTowerProgress] = useState(() => normalizeTowerProgress());
     const [questState, setQuestState] = useState(() => normalizeQuestState());
     const [pendingQuestId, setPendingQuestId] = useState(null);
     const [questClaimResult, setQuestClaimResult] = useState(null);
@@ -991,6 +994,10 @@ export default function App() {
     useEffect(() => {
         if (isSampleMode || !user) return undefined;
         return onSnapshot(rpgProgressRef(db, FAMILY_ID), (snap) => setRpgProgress(normalizeRpgProgress(snap.exists() ? snap.data() : {})), (err) => console.error('RpgProgress realtime sync error:', err));
+    }, [isSampleMode, user]);
+    useEffect(() => {
+        if (isSampleMode || !user) return undefined;
+        return onSnapshot(rpgTowerProgressRef(db, FAMILY_ID), (snap) => setTowerProgress(normalizeTowerProgress(snap.exists() ? snap.data() : {})), (err) => console.error('Tower progress realtime sync error:', err));
     }, [isSampleMode, user]);
     useEffect(() => {
         if (isSampleMode || !user) return undefined;
@@ -1272,7 +1279,7 @@ export default function App() {
         INSUFFICIENT_BATTLE_ENERGY: 'Battle Energyが足りません',
         ACTIVE_BATTLE_EXISTS: '進行中の戦闘があります',
         BATTLE_NOT_FOUND: '戦闘情報を確認できません',
-        BATTLE_ALREADY_COMPLETED: 'この戦闘は終了しています', HEAL_NOT_NEEDED: 'HPは満タンです', ENEMY_NOT_AVAILABLE_IN_CHAPTER: 'この敵は現在のChapterでは挑戦できません', BOSS_NOT_FOUND: 'Boss情報を確認できません', BOSS_LOCKED: 'Bossはまだ解放されていません', BOSS_NOT_AVAILABLE_IN_CHAPTER: 'このBossには現在挑戦できません', BOSS_ALREADY_CLEARED: 'このBossはすでに撃破済みです', CHAPTER_STATE_MISMATCH: 'Chapter進行の状態が一致しません', REWARD_CORRECTION_PENDING: '報酬訂正の確認中は新しい戦闘を開始できません',
+        BATTLE_ALREADY_COMPLETED: 'この戦闘は終了しています', HEAL_NOT_NEEDED: 'HPは満タンです', ENEMY_NOT_AVAILABLE_IN_CHAPTER: 'この敵は現在のChapterでは挑戦できません', BOSS_NOT_FOUND: 'Boss情報を確認できません', BOSS_LOCKED: 'Bossはまだ解放されていません', BOSS_NOT_AVAILABLE_IN_CHAPTER: 'このBossには現在挑戦できません', BOSS_ALREADY_CLEARED: 'このBossはすでに撃破済みです', TOWER_LOCKED: '無限の塔は本編クリア後に解放されます', CHAPTER_STATE_MISMATCH: 'Chapter進行の状態が一致しません', REWARD_CORRECTION_PENDING: '報酬訂正の確認中は新しい戦闘を開始できません',
     }[error?.code || error?.message] || '戦闘処理に失敗しました。もう一度お試しください。');
     const handleBattleStartRequest = (enemy) => {
         if (isSampleMode || !user || playerProfile.activeBattleId || pendingBattleEnemyId) return;
@@ -1284,7 +1291,7 @@ export default function App() {
         const enemy = battleCandidate; setPendingBattleEnemyId(enemy.id);
         try {
             setLastBattle(null);
-            const result = enemy.isBoss ? await startBossBattle({ db, familyId: FAMILY_ID, bossId: enemy.id, battleId: createBattleId() }) : await startBattle({ db, familyId: FAMILY_ID, enemyId: enemy.id, battleId: createBattleId() });
+            const result = enemy.isTower ? await startTowerBattle({ db, familyId: FAMILY_ID, battleId: createBattleId() }) : enemy.isBoss ? await startBossBattle({ db, familyId: FAMILY_ID, bossId: enemy.id, battleId: createBattleId() }) : await startBattle({ db, familyId: FAMILY_ID, enemyId: enemy.id, battleId: createBattleId() });
             setBattleCandidate(null);
             setRpgStatus(result.applied ? { kind: 'success', message: `${enemy.name}との戦闘を開始しました` } : { kind: 'error', message: battleErrorMessage({ code: result.reason }) });
         } catch (error) { setRpgStatus({ kind: 'error', message: battleErrorMessage(error) }); }
@@ -2104,7 +2111,7 @@ export default function App() {
                 </div>
               </div>)}
             {activeTab === 'rpg' && !isSampleMode && (
-              <RpgHub profile={playerProfile} progress={rpgProgress} questState={questState} onClaimQuest={handleClaimQuest} pendingQuestId={pendingQuestId} onPurchaseRequest={handlePurchaseRequest} onMaterialExchangeRequest={handleMaterialExchangeRequest} pendingMaterialExchange={pendingMaterialExchange} onEquip={handleEquip} onUnequip={handleUnequip} pendingItemId={pendingPurchaseItemId} pendingAction={pendingEquipmentAction} status={rpgStatus} battle={activeBattle || lastBattle} onStartBattleRequest={handleBattleStartRequest} onAttackBattle={handleAttackBattle} onUseBattleSkill={handleUseBattleSkill} startingEnemyId={pendingBattleEnemyId} attacking={isAttackingBattle} onBattleBack={handleBattleResultClose} battleFeedback={battleTurnFeedback}/>
+              <RpgHub profile={playerProfile} progress={rpgProgress} towerProgress={towerProgress} questState={questState} onClaimQuest={handleClaimQuest} pendingQuestId={pendingQuestId} onPurchaseRequest={handlePurchaseRequest} onMaterialExchangeRequest={handleMaterialExchangeRequest} pendingMaterialExchange={pendingMaterialExchange} onEquip={handleEquip} onUnequip={handleUnequip} pendingItemId={pendingPurchaseItemId} pendingAction={pendingEquipmentAction} status={rpgStatus} battle={activeBattle || lastBattle} onStartBattleRequest={handleBattleStartRequest} onAttackBattle={handleAttackBattle} onUseBattleSkill={handleUseBattleSkill} startingEnemyId={pendingBattleEnemyId} attacking={isAttackingBattle} onBattleBack={handleBattleResultClose} battleFeedback={battleTurnFeedback}/>
             )}
             {activeTab === 'review' && canReview && !isSampleMode && <ManualReviewPanel queue={reviewQueue} profile={playerProfile} studySessions={studySessions} ledgersBySessionId={pendingCorrectionLedgers} busySessionIds={reviewBusySessionIds} message={reviewError} onOpenCorrection={openHistoryCorrection} onRetry={handlePendingCorrectionRetry}/>}
           </main>
