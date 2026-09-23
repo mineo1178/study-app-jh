@@ -1,7 +1,8 @@
 import { MATERIAL_KEYS } from './rewardConfig.js';
 import { levelForTotalExp } from './levelSystem.js';
 
-export const PLAYER_PROFILE_SCHEMA_VERSION = 3;
+export const PLAYER_PROFILE_SCHEMA_VERSION = 4;
+export const DEFAULT_PARTY_MEMBER_IDS = Object.freeze(['hero', 'guardian', 'mage']);
 
 export const EMPTY_EQUIPMENT = Object.freeze({ weapon: null, armor: null, accessory: null });
 
@@ -15,6 +16,7 @@ export const createEmptyPlayerProfile = () => ({
   totalExp: 0,
   level: 1,
   activeBattleId: null,
+  partyMemberIds: [...DEFAULT_PARTY_MEMBER_IDS],
 });
 
 export const normalizePlayerProfile = (profile = {}) => {
@@ -34,5 +36,6 @@ export const normalizePlayerProfile = (profile = {}) => {
     totalExp,
     level: levelForTotalExp(totalExp),
     activeBattleId: typeof profile.activeBattleId === 'string' ? profile.activeBattleId : null,
+    partyMemberIds: Array.isArray(profile.partyMemberIds) ? [...profile.partyMemberIds] : [...DEFAULT_PARTY_MEMBER_IDS],
   };
 };

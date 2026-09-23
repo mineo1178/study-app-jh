@@ -32,3 +32,18 @@ export function buildTowerEnemy({ floor, baseEnemy }) {
     tower: { rulesVersion: TOWER_RULES_VERSION, floor: safeFloor, tier, boss },
   };
 }
+
+export function buildTowerEncounter({ floor }) {
+  const safeFloor = Math.max(1, Math.floor(Number(floor) || 1));
+  const boss = isTowerBossFloor(safeFloor);
+  const withinDecade = (safeFloor - 1) % 10 + 1;
+  const count = boss ? Math.min(3, safeFloor >= 20 ? 3 : 2) : withinDecade <= 3 ? 1 : withinDecade <= 6 ? 2 : 3;
+  const primary = buildTowerEnemy({ floor: safeFloor });
+  const choices = [ENEMY_CATALOG.slime, ENEMY_CATALOG.goblin, ENEMY_CATALOG.stone_golem];
+  const enemies = Array.from({ length: count }, (_, index) => {
+    const base = index === 0 ? (boss ? (safeFloor / 10 % 2 === 1 ? BOSS_CATALOG.orc_chief : BOSS_CATALOG.ancient_golem) : choices[(safeFloor - 1) % choices.length]) : choices[(safeFloor + index - 1) % choices.length];
+    const enemy = index === 0 ? primary : buildTowerEnemy({ floor: safeFloor, baseEnemy: base });
+    return { ...enemy, enemyId: base.id, enemyInstanceId: `tower-${safeFloor}-e${index + 1}-${base.id}` };
+  });
+  return { floor: safeFloor, rulesVersion: TOWER_RULES_VERSION, energyCost: boss ? 3 : 1, expReward: enemies.reduce((sum, enemy) => sum + enemy.expReward, 0), enemies, boss };
+}

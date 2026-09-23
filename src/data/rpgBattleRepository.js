@@ -12,9 +12,12 @@ import { applyBossClearProgress, applyBossClearProgressFromSnapshot, applyNormal
 import { rpgProgressRef } from './rpgProgressRepository.js';
 import { enemyActionForTurn, snapshotEnemyActionPattern } from '../rpg/enemyActionCatalog.js';
 import { assertNoPendingRewardCorrections, rewardIntegrityRef } from './rewardCorrectionRepository.js';
-import { buildTowerEnemy, isTowerBossFloor, TOWER_RULES_VERSION } from '../rpg/towerCatalog.js';
+import { TOWER_RULES_VERSION } from '../rpg/towerCatalog.js';
 import { applyTowerVictory, normalizeTowerProgress } from '../rpg/towerProgress.js';
 import { rpgTowerProgressRef } from './rpgTowerProgressRepository.js';
+import { buildTowerEncounter } from '../rpg/towerCatalog.js';
+import { buildTowerPartySnapshot } from '../rpg/partyMemberCatalog.js';
+import { createPartyBattle, preparePartyBattleAction } from '../rpg/partyBattleEngine.js';
 
 export const RPG_BATTLE_SCHEMA_VERSION = 2;
 const appPath = (familyId, collectionName, id) => ['families', familyId, 'apps', 'junior-high', collectionName, id];
@@ -36,6 +39,25 @@ export const buildBattleSkillSnapshot = (skill) => {
   return base;
 };
 const optional = (key, value) => value === undefined ? {} : { [key]: value };
+
+export function preparePartyTowerStart({ profile, encounter, battleId, now }) {
+  const current = normalizePlayerProfile(profile);
+  if (current.activeBattleId) throw failure('ACTIVE_BATTLE_EXISTS');
+  if (number(current.battleEnergy) < encounter.energyCost) throw failure('INSUFFICIENT_BATTLE_ENERGY');
+  const battle = createPartyBattle({ battleId, floor: encounter.floor, encounter, members: buildTowerPartySnapshot(current), now, battleKind: encounter.boss ? 'boss' : 'normal' });
+  return { profile: { ...current, battleEnergy: number(current.battleEnergy) - encounter.energyCost, activeBattleId: battleId, updatedAt: now }, battle, ledger: { schemaVersion: RPG_BATTLE_SCHEMA_VERSION, type: 'battle_start', battleId, battleKind: battle.battleKind, battleMode: 'tower', floor: encounter.floor, energySpent: encounter.energyCost, encounterSnapshot: battle.encounterSnapshot, partySnapshot: battle.partySnapshot, status: 'applied', appliedAt: now } };
+}
+
+export function preparePartyBattleResult({ battle: rawBattle, profile, towerProgress, action, actionId, now }) {
+  const change = preparePartyBattleAction({ battle: rawBattle, action: { ...action, actionId }, now });
+  const current = normalizePlayerProfile(profile); const base = { battle: change.battle, attackLedger: { schemaVersion: 1, type: 'attack', actionId, battleId: change.battle.battleId, action: change.event, enemyEvents: change.enemyEvents, outcome: change.battle.status, status: 'applied', appliedAt: now }, result: change };
+  if (change.battle.status === 'lost') return { ...base, profile: { ...current, activeBattleId: null, updatedAt: now }, defeatLedger: { schemaVersion: 1, type: 'defeat', battleId: change.battle.battleId, expGranted: 0, status: 'applied', appliedAt: now } };
+  if (change.battle.status !== 'won') return base;
+  const expGranted = number(change.battle.encounterSnapshot.expReward); const totalExpAfter = current.totalExp + expGranted; const levelAfter = levelForTotalExp(totalExpAfter);
+  const profileAfter = { ...current, totalExp: totalExpAfter, level: levelAfter, activeBattleId: null, updatedAt: now };
+  const wonBattle = { ...change.battle, victory: { ...change.battle.victory, expGranted, totalExpBefore: current.totalExp, totalExpAfter, levelBefore: current.level, levelAfter } };
+  return { ...base, battle: wonBattle, profile: profileAfter, towerProgress: applyTowerVictory(towerProgress, { floor: Number(wonBattle.towerFloor), boss: wonBattle.battleKind === 'boss', now }), victoryLedger: { schemaVersion: RPG_BATTLE_SCHEMA_VERSION, type: 'victory', battleId: wonBattle.battleId, expGranted, totalExpBefore: current.totalExp, totalExpAfter, levelBefore: current.level, levelAfter, triggeringActionId: actionId, status: 'applied', appliedAt: now } };
+}
 
 export function prepareBattleStart({ profile, enemy, battleId, now, battleKind = 'normal', chapter = null, bossId = null, battleMode = 'campaign', towerFloor = null }) {
   const current = normalizePlayerProfile(profile);
@@ -126,13 +148,13 @@ export async function startTowerBattle({ db, familyId, battleId }) {
     if (battleSnap.exists() || ledgerSnap.exists()) return { applied: false, reason: 'BATTLE_ALREADY_EXISTS' };
     assertNoPendingRewardCorrections(integritySnap.exists() ? integritySnap.data() : {});
     if (!normalizeRpgProgress(progressSnap.exists() ? progressSnap.data() : {}).campaignCompleted) throw failure('TOWER_LOCKED');
-    const currentTower = normalizeTowerProgress(towerSnap.exists() ? towerSnap.data() : {}); const floor = currentTower.currentFloor; const boss = isTowerBossFloor(floor); const enemy = buildTowerEnemy({ floor });
-    const change = prepareBattleStart({ profile: profileSnap.exists() ? profileSnap.data() : {}, enemy, battleId, now, battleKind: boss ? 'boss' : 'normal', battleMode: 'tower', towerFloor: floor });
+    const currentTower = normalizeTowerProgress(towerSnap.exists() ? towerSnap.data() : {}); const encounter = buildTowerEncounter({ floor: currentTower.currentFloor });
+    const change = preparePartyTowerStart({ profile: profileSnap.exists() ? profileSnap.data() : {}, encounter, battleId, now });
     transaction.set(profile, change.profile); transaction.set(battle, change.battle); transaction.set(ledger, change.ledger); return { applied: true, battle: change.battle };
   });
 }
 
-export async function attackBattle({ db, familyId, battleId, actionId }) {
+export async function attackBattle({ db, familyId, battleId, actionId, targetEnemyInstanceId = null }) {
   const profile = playerProfileRef(db, familyId); const progressRef = rpgProgressRef(db, familyId); const towerProgressRef = rpgTowerProgressRef(db, familyId); const battleRef = rpgBattleRef(db, familyId, battleId); const attackLedgerRef = rpgBattleLedgerRef(db, familyId, actionId); const victoryLedgerRef = rpgBattleLedgerRef(db, familyId, `victory-${battleId}`); const defeatLedgerRef = rpgBattleLedgerRef(db, familyId, `defeat-${battleId}`); const now = Date.now();
   return runTransaction(db, async (transaction) => {
     const [battleSnap, attackLedgerSnap, victoryLedgerSnap, defeatLedgerSnap, profileSnap, progressSnap, towerSnap] = await Promise.all([transaction.get(battleRef), transaction.get(attackLedgerRef), transaction.get(victoryLedgerRef), transaction.get(defeatLedgerRef), transaction.get(profile), transaction.get(progressRef), transaction.get(towerProgressRef)]);
@@ -140,6 +162,7 @@ export async function attackBattle({ db, familyId, battleId, actionId }) {
     if (!battleSnap.exists()) throw failure('BATTLE_NOT_FOUND');
     const battle = normalizeBattle(battleSnap.data());
     if (battle.status !== 'active' || victoryLedgerSnap.exists() || defeatLedgerSnap.exists()) throw failure('BATTLE_ALREADY_COMPLETED');
+    if (Number(battle.schemaVersion) >= 8 && battle.battleMode === 'tower') { const change = preparePartyBattleResult({ battle, profile: profileSnap.exists() ? profileSnap.data() : {}, towerProgress: towerSnap.exists() ? towerSnap.data() : {}, action: { targetEnemyInstanceId }, actionId, now }); transaction.set(battleRef, change.battle); transaction.set(attackLedgerRef, change.attackLedger); if (change.profile) transaction.set(profile, change.profile); if (change.towerProgress) transaction.set(towerProgressRef, change.towerProgress); if (change.victoryLedger) transaction.set(victoryLedgerRef, change.victoryLedger); if (change.defeatLedger) transaction.set(defeatLedgerRef, change.defeatLedger); return { applied: true, battle: change.battle, result: change.result, victory: Boolean(change.victoryLedger), defeat: Boolean(change.defeatLedger) }; }
     const clearRef = battle.battleKind === 'boss' && battle.chapterSnapshot?.id ? rpgBattleLedgerRef(db, familyId, `boss-clear-${battle.chapterSnapshot.id}`) : null; const clearSnap = clearRef ? await transaction.get(clearRef) : null; if (clearSnap?.exists()) throw failure('BOSS_ALREADY_CLEARED');
     const change = prepareBattleAttack({ battle, profile: profileSnap.exists() ? profileSnap.data() : {}, progress: progressSnap.exists() ? progressSnap.data() : {}, towerProgress: towerSnap.exists() ? towerSnap.data() : {}, actionId, now });
     transaction.set(battleRef, change.battle); transaction.set(attackLedgerRef, change.attackLedger);
@@ -151,7 +174,7 @@ export async function attackBattle({ db, familyId, battleId, actionId }) {
   });
 }
 
-export async function useBattleSkill({ db, familyId, battleId, skillId, actionId }) {
+export async function useBattleSkill({ db, familyId, battleId, skillId, actionId, targetEnemyInstanceId = null, targetMemberId = null }) {
   const profile = playerProfileRef(db, familyId); const progressRef = rpgProgressRef(db, familyId); const towerProgressRef = rpgTowerProgressRef(db, familyId); const battleRef = rpgBattleRef(db, familyId, battleId); const actionLedgerRef = rpgBattleLedgerRef(db, familyId, actionId); const victoryLedgerRef = rpgBattleLedgerRef(db, familyId, `victory-${battleId}`); const defeatLedgerRef = rpgBattleLedgerRef(db, familyId, `defeat-${battleId}`); const now = Date.now();
   return runTransaction(db, async (transaction) => {
     const [battleSnap, actionSnap, victorySnap, defeatSnap, profileSnap, progressSnap, towerSnap] = await Promise.all([transaction.get(battleRef), transaction.get(actionLedgerRef), transaction.get(victoryLedgerRef), transaction.get(defeatLedgerRef), transaction.get(profile), transaction.get(progressRef), transaction.get(towerProgressRef)]);
@@ -159,6 +182,7 @@ export async function useBattleSkill({ db, familyId, battleId, skillId, actionId
     if (!battleSnap.exists()) throw failure('BATTLE_NOT_FOUND');
     const battle = normalizeBattle(battleSnap.data());
     if (battle.status !== 'active' || victorySnap.exists() || defeatSnap.exists()) throw failure('BATTLE_ALREADY_COMPLETED');
+    if (Number(battle.schemaVersion) >= 8 && battle.battleMode === 'tower') { const change = preparePartyBattleResult({ battle, profile: profileSnap.exists() ? profileSnap.data() : {}, towerProgress: towerSnap.exists() ? towerSnap.data() : {}, action: { skillId, targetEnemyInstanceId, targetMemberId }, actionId, now }); transaction.set(battleRef, change.battle); transaction.set(actionLedgerRef, change.attackLedger); if (change.profile) transaction.set(profile, change.profile); if (change.towerProgress) transaction.set(towerProgressRef, change.towerProgress); if (change.victoryLedger) transaction.set(victoryLedgerRef, change.victoryLedger); if (change.defeatLedger) transaction.set(defeatLedgerRef, change.defeatLedger); return { applied: true, battle: change.battle, result: change.result, victory: Boolean(change.victoryLedger), defeat: Boolean(change.defeatLedger) }; }
     const skill = battle.playerSnapshot.skills?.[skillId];
     if (!skill) throw failure('SKILL_NOT_AVAILABLE');
     const used = Number(battle.skillUses?.[skillId] || 0);

@@ -17,6 +17,7 @@ import { correctStudySessionReward, retryPendingRewardCorrection, rewardIntegrit
 import { createRpgActionId, equipItem, purchaseEquipment, unequipSlot } from './data/rpgShopRepository';
 import { createMaterialExchangeActionId, exchangeMaterial } from './data/rpgMaterialExchangeRepository';
 import { attackBattle, createBattleActionId, createBattleId, rpgBattleRef, startBattle, startBossBattle, startTowerBattle, useBattleSkill as runBattleSkill } from './data/rpgBattleRepository';
+import { saveParty } from './data/rpgPartyRepository';
 import { rpgProgressRef } from './data/rpgProgressRepository';
 import { rpgTowerProgressRef } from './data/rpgTowerProgressRepository';
 import { claimQuestReward, rpgQuestStateRef } from './data/rpgQuestRepository';
@@ -81,7 +82,7 @@ const getTasksCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-
 const getTestsCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tests');
 const getStudySessionsCol = () => studySessionsCollection(db, FAMILY_ID);
 const getActiveTimerRef = () => activeTimerRef(db, FAMILY_ID);
-const APP_VERSION = 'v1.89.0';
+const APP_VERSION = 'v1.90.0';
 const TIMER_HEARTBEAT_MS = 30 * 1000;
 const DAILY_TARGET_SECONDS = 2 * 60 * 60;
 const isDocumentHidden = () => typeof document !== 'undefined' && document.hidden;
@@ -880,6 +881,7 @@ export default function App() {
     const [pendingBattleEnemyId, setPendingBattleEnemyId] = useState(null);
     const [isAttackingBattle, setIsAttackingBattle] = useState(false);
     const [battleTurnFeedback, setBattleTurnFeedback] = useState(null);
+    const [savingParty, setSavingParty] = useState(false);
     const [activeTimer, setActiveTimer] = useState(null);
     const [tests, setTests] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -1279,7 +1281,7 @@ export default function App() {
         INSUFFICIENT_BATTLE_ENERGY: 'Battle Energyが足りません',
         ACTIVE_BATTLE_EXISTS: '進行中の戦闘があります',
         BATTLE_NOT_FOUND: '戦闘情報を確認できません',
-        BATTLE_ALREADY_COMPLETED: 'この戦闘は終了しています', HEAL_NOT_NEEDED: 'HPは満タンです', ENEMY_NOT_AVAILABLE_IN_CHAPTER: 'この敵は現在のChapterでは挑戦できません', BOSS_NOT_FOUND: 'Boss情報を確認できません', BOSS_LOCKED: 'Bossはまだ解放されていません', BOSS_NOT_AVAILABLE_IN_CHAPTER: 'このBossには現在挑戦できません', BOSS_ALREADY_CLEARED: 'このBossはすでに撃破済みです', TOWER_LOCKED: '無限の塔は本編クリア後に解放されます', CHAPTER_STATE_MISMATCH: 'Chapter進行の状態が一致しません', REWARD_CORRECTION_PENDING: '報酬訂正の確認中は新しい戦闘を開始できません',
+        BATTLE_ALREADY_COMPLETED: 'この戦闘は終了しています', HEAL_NOT_NEEDED: 'HPは満タンです', ENEMY_NOT_AVAILABLE_IN_CHAPTER: 'この敵は現在のChapterでは挑戦できません', BOSS_NOT_FOUND: 'Boss情報を確認できません', BOSS_LOCKED: 'Bossはまだ解放されていません', BOSS_NOT_AVAILABLE_IN_CHAPTER: 'このBossには現在挑戦できません', BOSS_ALREADY_CLEARED: 'このBossはすでに撃破済みです', TOWER_LOCKED: '無限の塔は本編クリア後に解放されます', CHAPTER_STATE_MISMATCH: 'Chapter進行の状態が一致しません', REWARD_CORRECTION_PENDING: '報酬訂正の確認中は新しい戦闘を開始できません', PARTY_CHANGE_DURING_BATTLE: '戦闘中はパーティーを変更できません', HERO_REQUIRED: '主人公は必須です', INVALID_PARTY_SIZE: 'パーティーは1〜3人です', DUPLICATE_PARTY_MEMBER: '同じ仲間は重複できません', UNKNOWN_PARTY_MEMBER: '不明な仲間です', INVALID_BATTLE_TARGET: '対象を選択してください',
     }[error?.code || error?.message] || '戦闘処理に失敗しました。もう一度お試しください。');
     const handleBattleStartRequest = (enemy) => {
         if (isSampleMode || !user || playerProfile.activeBattleId || pendingBattleEnemyId) return;
@@ -1297,25 +1299,32 @@ export default function App() {
         } catch (error) { setRpgStatus({ kind: 'error', message: battleErrorMessage(error) }); }
         finally { setPendingBattleEnemyId(null); }
     };
-    const handleAttackBattle = async () => {
+    const handleAttackBattle = async (targetEnemyInstanceId = null) => {
         if (!activeBattle?.battleId || isSampleMode || !user || isAttackingBattle) return;
         setIsAttackingBattle(true);
         try {
-            const result = await attackBattle({ db, familyId: FAMILY_ID, battleId: activeBattle.battleId, actionId: createBattleActionId() });
+            const result = await attackBattle({ db, familyId: FAMILY_ID, battleId: activeBattle.battleId, actionId: createBattleActionId(), targetEnemyInstanceId });
             setBattleTurnFeedback(buildBattleTurnFeedback({ ...result, skill: null }, activeBattle.enemySnapshot?.name));
             if (result.victory) setRpgStatus({ kind: 'success', message: `${activeBattle.enemySnapshot?.name || '敵'}に勝利しました` });
         } catch (error) { setRpgStatus({ kind: 'error', message: battleErrorMessage(error) }); }
         finally { setIsAttackingBattle(false); }
     };
-    const handleUseBattleSkill = async (skillId) => {
+    const handleUseBattleSkill = async (skillId, targetEnemyInstanceId = null, targetMemberId = null) => {
         if (!activeBattle?.battleId || isSampleMode || !user || isAttackingBattle) return;
         setIsAttackingBattle(true);
         try {
-            const result = await runBattleSkill({ db, familyId: FAMILY_ID, battleId: activeBattle.battleId, skillId, actionId: `skill-${createBattleActionId()}` });
+            const result = await runBattleSkill({ db, familyId: FAMILY_ID, battleId: activeBattle.battleId, skillId, actionId: `skill-${createBattleActionId()}`, targetEnemyInstanceId, targetMemberId });
             setBattleTurnFeedback(buildBattleTurnFeedback(result, activeBattle.enemySnapshot?.name));
             if (result.victory) setRpgStatus({ kind: 'success', message: `${activeBattle.enemySnapshot?.name || '敵'}に勝利しました` });
         } catch (error) { setRpgStatus({ kind: 'error', message: error.code === 'SKILL_NOT_AVAILABLE' ? 'このスキルは現在の戦闘では使用できません' : error.code === 'SKILL_NO_USES' ? 'このスキルの使用回数を使い切りました' : battleErrorMessage(error) }); }
         finally { setIsAttackingBattle(false); }
+    };
+    const handleSaveParty = async (partyMemberIds) => {
+        if (isSampleMode || !user || savingParty) return;
+        setSavingParty(true); setRpgStatus(null);
+        try { const result = await saveParty({ db, familyId: FAMILY_ID, partyMemberIds }); setRpgStatus({ kind: 'success', message: result.applied ? 'パーティーを保存しました' : '編成は変更されていません' }); }
+        catch (error) { setRpgStatus({ kind: 'error', message: battleErrorMessage(error) }); }
+        finally { setSavingParty(false); }
     };
     const handleSaveLegacyRecord = async (task, totalSeconds) => {
         if (savingRecordRef.current)
@@ -2111,7 +2120,7 @@ export default function App() {
                 </div>
               </div>)}
             {activeTab === 'rpg' && !isSampleMode && (
-              <RpgHub profile={playerProfile} progress={rpgProgress} towerProgress={towerProgress} questState={questState} onClaimQuest={handleClaimQuest} pendingQuestId={pendingQuestId} onPurchaseRequest={handlePurchaseRequest} onMaterialExchangeRequest={handleMaterialExchangeRequest} pendingMaterialExchange={pendingMaterialExchange} onEquip={handleEquip} onUnequip={handleUnequip} pendingItemId={pendingPurchaseItemId} pendingAction={pendingEquipmentAction} status={rpgStatus} battle={activeBattle || lastBattle} onStartBattleRequest={handleBattleStartRequest} onAttackBattle={handleAttackBattle} onUseBattleSkill={handleUseBattleSkill} startingEnemyId={pendingBattleEnemyId} attacking={isAttackingBattle} onBattleBack={handleBattleResultClose} battleFeedback={battleTurnFeedback}/>
+              <RpgHub profile={playerProfile} progress={rpgProgress} towerProgress={towerProgress} questState={questState} onClaimQuest={handleClaimQuest} pendingQuestId={pendingQuestId} onPurchaseRequest={handlePurchaseRequest} onMaterialExchangeRequest={handleMaterialExchangeRequest} pendingMaterialExchange={pendingMaterialExchange} onEquip={handleEquip} onUnequip={handleUnequip} pendingItemId={pendingPurchaseItemId} pendingAction={pendingEquipmentAction} status={rpgStatus} battle={activeBattle || lastBattle} onStartBattleRequest={handleBattleStartRequest} onAttackBattle={handleAttackBattle} onUseBattleSkill={handleUseBattleSkill} startingEnemyId={pendingBattleEnemyId} attacking={isAttackingBattle} onBattleBack={handleBattleResultClose} battleFeedback={battleTurnFeedback} onSaveParty={handleSaveParty} savingParty={savingParty}/>
             )}
             {activeTab === 'review' && canReview && !isSampleMode && <ManualReviewPanel queue={reviewQueue} profile={playerProfile} studySessions={studySessions} ledgersBySessionId={pendingCorrectionLedgers} busySessionIds={reviewBusySessionIds} message={reviewError} onOpenCorrection={openHistoryCorrection} onRetry={handlePendingCorrectionRetry}/>}
           </main>

@@ -1,0 +1,7 @@
+import { PARTY_MEMBER_CATALOG } from '../../rpg/partyMemberCatalog.js';
+
+export default function PartyPanel({ profile, onSave, pending }) {
+  const ids = profile?.partyMemberIds || ['hero', 'guardian', 'mage'];
+  const toggle = (id) => { if (id === 'hero') return; const selected = ids.includes(id); const next = selected ? ids.filter((value) => value !== id) : ids.length < 3 ? [...ids, id] : ids; if (next !== ids) onSave?.(next); };
+  return <section className="space-y-4"><p className="text-sm font-bold text-slate-600">主人公を含む最大3人を編成できます。戦闘中は変更できません。</p><div className="grid gap-3 sm:grid-cols-2">{Object.values(PARTY_MEMBER_CATALOG).map((member) => { const selected = ids.includes(member.id); return <article key={member.id} className={`rounded-2xl border-2 p-4 ${selected ? 'border-violet-500 bg-violet-50' : 'border-slate-100 bg-white'}`}><div className="flex items-start justify-between gap-3"><div><h2 className="font-black text-slate-800">{member.name}</h2><p className="text-xs font-bold text-violet-700">{member.role}</p><p className="mt-2 text-xs text-slate-600">HP/攻撃/防御：{member.tendency}<br/>Signature Skill：{member.skillIds[0]}</p></div><button type="button" disabled={member.id === 'hero' || pending || (!selected && ids.length >= 3)} onClick={() => toggle(member.id)} className="rounded-lg bg-violet-600 px-3 py-2 text-xs font-black text-white disabled:bg-slate-300">{member.id === 'hero' ? '固定' : selected ? '編成中' : '選択'}</button></div></article>; })}</div></section>;
+}
