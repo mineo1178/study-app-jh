@@ -20,6 +20,7 @@ export function prepareTicketPurchase({ profile, ticketType, actionId, now }) {
 export function prepareDraw({ profile, ticketType, actionId, now, rolls = { rarityRoll: randomPercent(), categoryRoll: randomPercent(), poolRoll: randomPercent() } }) {
   if (!validTicket(ticketType)) throw failure('INVALID_TICKET_TYPE');
   const current = normalizePlayerProfile(profile); if (!integer(current.gacha.ticketBalances[ticketType])) throw failure('INSUFFICIENT_TICKETS');
+  const pityApplied = integer(current.gacha.drawsSinceSsr) >= 19 ? 'ssr' : integer(current.gacha.drawsSinceSrPlus) >= 9 ? 'sr' : 'none';
   const rarity = calculateRarity({ ticketType, drawsSinceSrPlus: integer(current.gacha.drawsSinceSrPlus), drawsSinceSsr: integer(current.gacha.drawsSinceSsr), rarityRoll: rolls.rarityRoll });
   const isMember = rarity !== 'N' && rolls.categoryRoll < MEMBER_RATES[rarity]; const pool = isMember ? membersForRarity(rarity) : itemsForRarity(rarity); const result = pool[Math.min(pool.length - 1, Math.floor((rolls.poolRoll / 100) * pool.length))];
   const duplicate = isMember && current.unlockedPartyMemberIds.includes(result.id); const fragments = duplicate ? FRAGMENTS_BY_RARITY[rarity] : 0;
@@ -28,7 +29,7 @@ export function prepareDraw({ profile, ticketType, actionId, now, rolls = { rari
   const recent = [{ rarity, resultType: isMember ? 'member' : 'item', resultId: result.id, duplicate, starFragmentsGained: fragments, drawnAt: now }, ...current.gacha.recentDraws].slice(0, 20);
   gacha.recentDraws = recent;
   const profileNext = { ...current, gacha, unlockedPartyMemberIds: isMember && !duplicate ? [...current.unlockedPartyMemberIds, result.id] : current.unlockedPartyMemberIds, updatedAt: now };
-  return { profile: profileNext, ledger: action(actionId, 'gacha_draw', now, { ticketType, rolls, rarity, resultType: isMember ? 'member' : 'item', memberId: isMember ? result.id : null, itemId: isMember ? null : result.id, duplicate, starFragmentsGained: fragments, pityApplied: current.gacha.drawsSinceSsr >= 19 || current.gacha.drawsSinceSrPlus >= 9, drawnAt: now }) };
+  return { profile: profileNext, ledger: action(actionId, 'gacha_draw', now, { ticketType, rolls, rarity, resultType: isMember ? 'member' : 'item', memberId: isMember ? result.id : null, itemId: isMember ? null : result.id, duplicate, starFragmentsGained: fragments, pityApplied, drawnAt: now }) };
 }
 export function prepareFragmentExchange({ profile, kind, targetId, actionId, now }) {
   const current = normalizePlayerProfile(profile); const ticketCosts = { silver: 80, gold: 150, premium: 350 }; const itemCost = kind === 'item' && ALCHEMY_ITEMS[targetId] ? (ALCHEMY_ITEMS[targetId].rarity === 'R' ? 25 : ALCHEMY_ITEMS[targetId].rarity === 'SR' ? 60 : null) : null; const cost = kind === 'ticket' ? ticketCosts[targetId] : itemCost;

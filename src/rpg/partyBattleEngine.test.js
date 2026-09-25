@@ -24,6 +24,14 @@ describe('party battle engine', () => {
     const ids = buildTowerEncounter({ floor: 7 }).enemies.map((enemy) => enemy.enemyInstanceId);
     expect(new Set(ids).size).toBe(ids.length);
   });
+  it('gives each role its intended Tower stats and applies gacha rarity multipliers', () => {
+    const members = buildTowerPartySnapshot({ partyMemberIds: ['hero', 'akane', 'raika'], unlockedPartyMemberIds: ['hero', 'akane', 'raika'], level: 4, equipped: {}, ownedEquipment: {} });
+    const all = buildTowerPartySnapshot({ partyMemberIds: ['hero', 'guardian', 'mage'], unlockedPartyMemberIds: ['hero', 'guardian', 'mage', 'healer', 'akane', 'kaede', 'homura', 'raika'], level: 4, equipped: {}, ownedEquipment: {} });
+    const hero = members.find((member) => member.memberId === 'hero'); const attacker = members.find((member) => member.memberId === 'akane'); const mage = members.find((member) => member.memberId === 'raika'); const guardian = all.find((member) => member.memberId === 'guardian');
+    const healer = buildTowerPartySnapshot({ partyMemberIds: ['hero', 'healer'], unlockedPartyMemberIds: ['hero', 'healer'], level: 4, equipped: {}, ownedEquipment: {} }).find((member) => member.memberId === 'healer');
+    const rarities = ['akane', 'kaede', 'homura'].map((memberId) => buildTowerPartySnapshot({ partyMemberIds: ['hero', memberId], unlockedPartyMemberIds: ['hero', memberId], level: 4, equipped: {}, ownedEquipment: {} })[1]);
+    expect(attacker.attack).toBeGreaterThan(hero.attack); expect(mage.attack).toBeGreaterThan(healer.attack); expect(guardian.defense).toBeGreaterThan(attacker.defense); expect(healer.maxHp).toBeGreaterThan(mage.maxHp); expect(rarities[0].attack).toBeLessThan(rarities[1].attack); expect(rarities[1].attack).toBeLessThan(rarities[2].attack);
+  });
   it('moves party turns in order, rejects invalid targets, and runs an enemy phase after all actors', () => {
     let battle = battleAt(4);
     const enemy = battle.enemyStates[0].enemyInstanceId;

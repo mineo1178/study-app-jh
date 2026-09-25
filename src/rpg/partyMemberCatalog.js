@@ -26,6 +26,7 @@ export function validatePartyMemberIds(ids, unlockedIds = null) {
   return [...ids];
 }
 const integer = (value) => Math.max(0, Math.floor(Number(value) || 0));
+const roleForMember = (memberId, member) => ({ guardian: 'Guardian', mage: 'Mage', healer: 'Healer' }[memberId] || member.role);
 export function buildTowerPartySnapshot(profile) {
   const ids = validatePartyMemberIds(profile.partyMemberIds, profile.unlockedPartyMemberIds);
   const level = Math.max(1, integer(profile.level) || 1);
@@ -36,11 +37,14 @@ export function buildTowerPartySnapshot(profile) {
   };
   return ids.map((memberId) => {
     const member = PARTY_MEMBER_CATALOG[memberId];
-    const stats = memberId === 'hero' ? hero : member.role === 'Guardian' || memberId === 'guardian'
-      ? { maxHp: Math.round(hero.maxHp * 1.30), attack: Math.round(hero.attack * .80), defense: hero.defense + 3 }
-      : member.role === 'Mage' || memberId === 'mage'
-        ? { maxHp: Math.round(hero.maxHp * .85), attack: Math.round(hero.attack * 1.15), defense: Math.max(0, hero.defense - 1) }
-        : { maxHp: Math.round(hero.maxHp * .95), attack: Math.round(hero.attack * .85), defense: hero.defense + 1 };
+    const role = roleForMember(memberId, member);
+    const stats = memberId === 'hero' ? hero : role === 'Guardian'
+      ? { maxHp: hero.maxHp * 1.30, attack: hero.attack * .80, defense: hero.defense + 3 }
+      : role === 'Mage'
+        ? { maxHp: hero.maxHp * .85, attack: hero.attack * 1.15, defense: Math.max(0, hero.defense - 1) }
+        : role === 'Attacker'
+          ? { maxHp: hero.maxHp * .95, attack: hero.attack * 1.20, defense: Math.max(0, hero.defense - 1) }
+          : { maxHp: hero.maxHp * .95, attack: hero.attack * .85, defense: hero.defense + 1 };
     const multiplier = member.multiplier || 1;
     return { memberId, name: member.name, role: member.role, maxHp: Math.round(stats.maxHp * multiplier), attack: Math.round(stats.attack * multiplier), defense: Math.round(stats.defense * multiplier), skills: member.skillIds.map((id) => ({ ...partySkill(id), targetType: partySkill(id).targetType || (id === 'healing_light' ? 'single_ally' : id === 'guard_stance' ? 'self' : 'single_enemy') })) };
   });

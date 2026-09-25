@@ -17,4 +17,5 @@ export const GACHA_MEMBERS = Object.freeze({
 export const itemsForRarity = (rarity) => Object.values(ALCHEMY_ITEMS).filter((item) => item.rarity === rarity);
 export const membersForRarity = (rarity) => Object.values(GACHA_MEMBERS).filter((member) => member.rarity === rarity);
 export const rollByPercentages = (rates, roll) => { let total = 0; for (const [key, rate] of Object.entries(rates)) { total += rate; if (roll < total) return key; } return Object.keys(rates).at(-1); };
-export const calculateRarity = ({ ticketType, drawsSinceSrPlus, drawsSinceSsr, rarityRoll }) => drawsSinceSsr >= 19 ? 'SSR' : drawsSinceSrPlus >= 9 ? (rollByPercentages({ SR: GACHA_RATES[ticketType].SR, SSR: GACHA_RATES[ticketType].SSR }, rarityRoll) === 'SSR' ? 'SSR' : 'SR') : rollByPercentages(GACHA_RATES[ticketType], rarityRoll);
+export const calculateRarity = ({ ticketType, drawsSinceSrPlus, drawsSinceSsr, rarityRoll }) => drawsSinceSsr >= 19 ? 'SSR' : drawsSinceSrPlus >= 9 ? (rarityRoll < 50 ? 'SR' : 'SSR') : rollByPercentages(GACHA_RATES[ticketType], rarityRoll);
+export const getGachaResultName = ({ resultType, resultId }) => (resultType === 'member' ? GACHA_MEMBERS[resultId] : ALCHEMY_ITEMS[resultId])?.name || '不明な結果';
