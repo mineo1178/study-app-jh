@@ -18,6 +18,8 @@ import { createRpgActionId, equipItem, purchaseEquipment, unequipSlot } from './
 import { createMaterialExchangeActionId, exchangeMaterial } from './data/rpgMaterialExchangeRepository';
 import { attackBattle, createBattleActionId, createBattleId, rpgBattleRef, startBattle, startBossBattle, startTowerBattle, useBattleSkill as runBattleSkill } from './data/rpgBattleRepository';
 import { saveParty } from './data/rpgPartyRepository';
+import { createGachaActionId, drawGacha, exchangeGachaFragments, purchaseGachaTicket } from './data/rpgGachaRepository';
+import { craftAlchemy, createAlchemyActionId } from './data/rpgAlchemyRepository';
 import { rpgProgressRef } from './data/rpgProgressRepository';
 import { rpgTowerProgressRef } from './data/rpgTowerProgressRepository';
 import { claimQuestReward, rpgQuestStateRef } from './data/rpgQuestRepository';
@@ -82,7 +84,7 @@ const getTasksCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-
 const getTestsCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tests');
 const getStudySessionsCol = () => studySessionsCollection(db, FAMILY_ID);
 const getActiveTimerRef = () => activeTimerRef(db, FAMILY_ID);
-const APP_VERSION = 'v1.90.0';
+const APP_VERSION = 'v1.91.0';
 const TIMER_HEARTBEAT_MS = 30 * 1000;
 const DAILY_TARGET_SECONDS = 2 * 60 * 60;
 const isDocumentHidden = () => typeof document !== 'undefined' && document.hidden;
@@ -882,6 +884,8 @@ export default function App() {
     const [isAttackingBattle, setIsAttackingBattle] = useState(false);
     const [battleTurnFeedback, setBattleTurnFeedback] = useState(null);
     const [savingParty, setSavingParty] = useState(false);
+    const [gachaPending, setGachaPending] = useState(false);
+    const [alchemyPending, setAlchemyPending] = useState(false);
     const [activeTimer, setActiveTimer] = useState(null);
     const [tests, setTests] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -1199,6 +1203,10 @@ export default function App() {
         INSUFFICIENT_EXCHANGE_MATERIAL: '素材が足りません',
         SAME_EXCHANGE_MATERIAL: '同じ素材どうしは交換できません',
         UNKNOWN_MATERIAL: '選べない素材です',
+        INSUFFICIENT_TICKETS: 'チケットが足りません',
+        INSUFFICIENT_FRAGMENTS: 'スターのかけらが足りません',
+        INSUFFICIENT_ALCHEMY_MATERIALS: '錬金素材が足りません',
+        EQUIPMENT_ALREADY_OWNED: 'この装備はすでに所持しています',
     }[error?.code || error?.message] || '操作に失敗しました。もう一度お試しください。');
     const handlePurchaseRequest = (item) => {
         if (isSampleMode || !user || pendingPurchaseItemId) return;
@@ -1262,6 +1270,24 @@ export default function App() {
         } finally {
             setPendingEquipmentAction(null);
         }
+    };
+    const handleGacha = async (operation, ...args) => {
+        if (isSampleMode || !user || gachaPending) return;
+        setGachaPending(true); setRpgStatus(null);
+        try {
+            const actionId = createGachaActionId(operation === 'buy' ? 'gacha-ticket-purchase' : operation === 'draw' ? 'gacha-draw' : 'gacha-fragment-exchange');
+            const result = operation === 'buy' ? await purchaseGachaTicket({ db, familyId: FAMILY_ID, ticketType: args[0], actionId }) : operation === 'draw' ? await drawGacha({ db, familyId: FAMILY_ID, ticketType: args[0], actionId }) : await exchangeGachaFragments({ db, familyId: FAMILY_ID, kind: args[0], targetId: args[1], actionId });
+            const draw = result.ledger;
+            setRpgStatus(result.applied ? { kind: 'success', message: operation === 'draw' ? `${draw.rarity} ${draw.resultType === 'member' ? draw.memberId : draw.itemId}${draw.duplicate ? ` / かけら +${draw.starFragmentsGained}` : ''}` : 'ガチャの取引が完了しました' } : { kind: 'error', message: rpgErrorMessage({ code: result.reason }) });
+        } catch (error) { setRpgStatus({ kind: 'error', message: rpgErrorMessage(error) }); }
+        finally { setGachaPending(false); }
+    };
+    const handleAlchemyCraft = async (recipeId) => {
+        if (isSampleMode || !user || alchemyPending) return;
+        setAlchemyPending(true); setRpgStatus(null);
+        try { const result = await craftAlchemy({ db, familyId: FAMILY_ID, recipeId, actionId: createAlchemyActionId() }); setRpgStatus(result.applied ? { kind: 'success', message: '錬金が完了しました' } : { kind: 'error', message: rpgErrorMessage({ code: result.reason }) }); }
+        catch (error) { setRpgStatus({ kind: 'error', message: rpgErrorMessage(error) }); }
+        finally { setAlchemyPending(false); }
     };
     const handleClaimQuest = async (questId) => {
         if (isSampleMode || !user || pendingQuestId) return;
@@ -2120,7 +2146,7 @@ export default function App() {
                 </div>
               </div>)}
             {activeTab === 'rpg' && !isSampleMode && (
-              <RpgHub profile={playerProfile} progress={rpgProgress} towerProgress={towerProgress} questState={questState} onClaimQuest={handleClaimQuest} pendingQuestId={pendingQuestId} onPurchaseRequest={handlePurchaseRequest} onMaterialExchangeRequest={handleMaterialExchangeRequest} pendingMaterialExchange={pendingMaterialExchange} onEquip={handleEquip} onUnequip={handleUnequip} pendingItemId={pendingPurchaseItemId} pendingAction={pendingEquipmentAction} status={rpgStatus} battle={activeBattle || lastBattle} onStartBattleRequest={handleBattleStartRequest} onAttackBattle={handleAttackBattle} onUseBattleSkill={handleUseBattleSkill} startingEnemyId={pendingBattleEnemyId} attacking={isAttackingBattle} onBattleBack={handleBattleResultClose} battleFeedback={battleTurnFeedback} onSaveParty={handleSaveParty} savingParty={savingParty}/>
+              <RpgHub profile={playerProfile} progress={rpgProgress} towerProgress={towerProgress} questState={questState} onClaimQuest={handleClaimQuest} pendingQuestId={pendingQuestId} onPurchaseRequest={handlePurchaseRequest} onMaterialExchangeRequest={handleMaterialExchangeRequest} pendingMaterialExchange={pendingMaterialExchange} onEquip={handleEquip} onUnequip={handleUnequip} pendingItemId={pendingPurchaseItemId} pendingAction={pendingEquipmentAction} status={rpgStatus} battle={activeBattle || lastBattle} onStartBattleRequest={handleBattleStartRequest} onAttackBattle={handleAttackBattle} onUseBattleSkill={handleUseBattleSkill} startingEnemyId={pendingBattleEnemyId} attacking={isAttackingBattle} onBattleBack={handleBattleResultClose} battleFeedback={battleTurnFeedback} onSaveParty={handleSaveParty} savingParty={savingParty} onGachaBuy={(type) => handleGacha('buy', type)} onGachaDraw={(type) => handleGacha('draw', type)} onGachaExchange={(kind, id) => handleGacha('exchange', kind, id)} onAlchemyCraft={handleAlchemyCraft} gachaPending={gachaPending} alchemyPending={alchemyPending}/>
             )}
             {activeTab === 'review' && canReview && !isSampleMode && <ManualReviewPanel queue={reviewQueue} profile={playerProfile} studySessions={studySessions} ledgersBySessionId={pendingCorrectionLedgers} busySessionIds={reviewBusySessionIds} message={reviewError} onOpenCorrection={openHistoryCorrection} onRetry={handlePendingCorrectionRetry}/>}
           </main>

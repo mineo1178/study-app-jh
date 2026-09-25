@@ -25,7 +25,7 @@ describe('rpg shop purchase logic', () => {
     const result = purchase({ ...baseProfile(), equipped: { weapon: 'history_charm' } });
     expect(result.profile).toMatchObject({ gold: 20, materials: { iron: 5 }, equipped: { weapon: 'history_charm' } });
     expect(result.profile.ownedEquipment.iron_sword).toEqual({ acquiredAt: now, sourceActionId: 'purchase-1' });
-    expect(result.ledger).toMatchObject({ type: 'purchase', itemId: 'iron_sword', catalogVersion: 1, cost: { gold: 80, materials: { iron: 5 } } });
+    expect(result.ledger).toMatchObject({ type: 'purchase', itemId: 'iron_sword', catalogVersion: 2, cost: { gold: 80, materials: { iron: 5 } } });
   });
 
   it('rejects insufficient gold or materials without returning a partial change', async () => {

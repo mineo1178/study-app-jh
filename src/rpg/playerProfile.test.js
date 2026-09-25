@@ -12,4 +12,10 @@ describe('player profile v2', () => {
     first.equipped.weapon = 'iron_sword';
     expect(createEmptyPlayerProfile().equipped.weapon).toBeNull();
   });
+  it('upgrades v4 profiles while preserving RPG state and starter unlocks', () => {
+    const profile = normalizePlayerProfile({ schemaVersion: 4, gold: 55, materials: { iron: 3 }, ownedEquipment: { iron_sword: {} }, totalExp: 30, activeBattleId: 'battle-1', partyMemberIds: ['hero', 'mage'] });
+    expect(profile).toMatchObject({ schemaVersion: 5, gold: 55, materials: { iron: 3 }, ownedEquipment: { iron_sword: {} }, totalExp: 30, activeBattleId: 'battle-1', partyMemberIds: ['hero', 'mage'] });
+    expect(profile.unlockedPartyMemberIds).toEqual(expect.arrayContaining(['hero', 'guardian', 'mage', 'healer']));
+    expect(profile.gacha.ticketBalances).toEqual({ normal: 0, silver: 0, gold: 0, premium: 0 });
+  });
 });

@@ -1,0 +1,9 @@
+import { ALCHEMY_ITEMS } from './gachaCatalog.js';
+import { EQUIPMENT_CATALOG } from './equipmentCatalog.js';
+export const ALCHEMY_RECIPES = Object.freeze([
+  ['silver_iron_blade', { iron: 8 }, { silver_ore: 2, alchemy_dust: 3 }], ['arcane_staff', { wisdom_scroll: 5, mana_rune: 5 }, { magic_crystal: 2, magic_herb: 3 }], ['beast_armor', { mineral: 8, vitality: 4 }, { beast_hide: 2, hard_stone: 3 }], ['spirit_robe', { craft_cloth: 6, resonance: 4 }, { spirit_thread: 2, magic_herb: 3 }],
+  ['mythril_blade', { iron: 12, logic_core: 5 }, { mythril_fragment: 3, magic_crystal: 2 }], ['spirit_staff', { wisdom_scroll: 8, mana_rune: 8 }, { spirit_core: 2, moon_cloth: 1 }], ['dragon_bone_armor', { mineral: 12, vitality: 6 }, { dragon_bone: 2, silver_ore: 3 }], ['moon_robe', { craft_cloth: 10, resonance: 6 }, { moon_cloth: 3, spirit_thread: 2 }],
+  ['dragon_star_blade', { iron: 15, logic_core: 8 }, { mythril_fragment: 5, dragon_scale: 2, ancient_core: 1 }], ['sage_staff', { wisdom_scroll: 12, mana_rune: 12 }, { spirit_core: 4, sage_stone: 2, ancient_core: 1 }], ['dragon_scale_armor', { mineral: 15, vitality: 10 }, { dragon_bone: 4, dragon_scale: 3, ancient_core: 1 }], ['celestial_robe', { craft_cloth: 12, resonance: 10 }, { moon_cloth: 5, celestial_cloth: 3, sage_stone: 1 }],
+].map(([equipmentId, studyMaterials, alchemyItems]) => ({ id: equipmentId, equipmentId, studyMaterials, alchemyItems, ...EQUIPMENT_CATALOG[equipmentId] })));
+export const getAlchemyRecipe = (id) => ALCHEMY_RECIPES.find((recipe) => recipe.id === id) || null;
+export const validateAlchemyCatalog = () => ALCHEMY_RECIPES.every((recipe) => EQUIPMENT_CATALOG[recipe.equipmentId] && Object.entries(recipe.studyMaterials).every(([, value]) => value > 0) && Object.entries(recipe.alchemyItems).every(([id, value]) => ALCHEMY_ITEMS[id] && value > 0));
