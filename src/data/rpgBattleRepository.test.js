@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ENEMY_CATALOG } from '../rpg/enemyCatalog.js';
-import { prepareBattleAttack, prepareBattleStart } from './rpgBattleRepository.js';
+import { prepareBattleAttack, prepareBattleStart, prepareWeeklyBossResult, prepareWeeklyBossStart } from './rpgBattleRepository.js';
 import { calculateSkillDamage, getElementMultiplier } from '../rpg/battleCalculator.js';
 import { findUndefinedPaths } from '../test/findUndefinedPaths.js';
 import { BOSS_CATALOG } from '../rpg/bossCatalog.js';
@@ -165,5 +165,18 @@ describe('battle transaction logic', () => {
     result = prepareBattleAttack({ battle, profile: start.profile, actionId: 'bare-normal-final', now });
     expect(result.battle).toMatchObject({ status: 'won', enemyHp: 0, playerHp: 7 });
     expect(result.attackLedger.enemyCounter).toBeNull();
+  });
+  it('applies every custom weekly snapshot reward quantity exactly once', () => {
+    const weeklyBoss = {
+      id: 'weekly-custom', weekId: '2021-W52', name: '検証ボス', rulesVersion: 1, energyCost: 3, expReward: 777,
+      maxHp: 1, attack: 1, element: 'fire', weaknesses: [], resistances: [], actionPattern: [{ id: 'normal', name: '攻撃', powerPercent: 100 }],
+      reward: { expReward: 777, goldTicket: 2, starFragments: 47, alchemyItemId: 'dragon_scale', alchemyItemQuantity: 3 },
+    };
+    const start = prepareWeeklyBossStart({ profile: { battleEnergy: 3 }, boss: weeklyBoss, battleId: 'weekly-custom', now });
+    const result = prepareWeeklyBossResult({ battle: start.battle, profile: start.profile, action: { targetEnemyInstanceId: 'weekly-2021-W52-weekly-custom' }, actionId: 'weekly-custom-final', now: now + 1 });
+    expect(result.battle.status).toBe('won');
+    expect(result.profile).toMatchObject({ totalExp: 777, activeBattleId: null, gacha: { ticketBalances: { gold: 2 }, starFragments: 47, alchemyItems: { dragon_scale: 3 } }, weeklyBoss: { clearedWeekIds: ['2021-W52'], totalClears: 1 } });
+    expect(result.victoryLedger).toMatchObject({ type: 'weekly_boss_clear', triggeringActionId: 'weekly-custom-final', outcome: 'won', reward: weeklyBoss.reward });
+    [result.battle, result.profile, result.attackLedger, result.victoryLedger].forEach((payload) => expect(findUndefinedPaths(payload)).toEqual([]));
   });
 });
