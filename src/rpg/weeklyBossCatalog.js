@@ -1,0 +1,12 @@
+export const WEEKLY_BOSS_RULES_VERSION = 1;
+export const WEEKLY_BOSSES = Object.freeze([
+  { id: 'weekly_ignis', name: '炎帝イグニス', element: 'fire', weaknesses: ['water'], resistances: ['fire'], maxHp: 220, attack: 11, alchemyItemId: 'dragon_scale' },
+  { id: 'weekly_leviathan', name: '蒼海竜リヴァイア', element: 'water', weaknesses: ['lightning'], resistances: ['water'], maxHp: 235, attack: 10, alchemyItemId: 'sage_stone' },
+  { id: 'weekly_volt', name: '雷王ヴォルト', element: 'lightning', weaknesses: ['fire'], resistances: ['lightning'], maxHp: 210, attack: 12, alchemyItemId: 'ancient_core' },
+  { id: 'weekly_gaia', name: '大地巨神ガイア', element: 'earth', weaknesses: ['water'], resistances: ['lightning'], maxHp: 250, attack: 10, alchemyItemId: 'celestial_cloth' },
+]);
+const jstParts = (timestamp) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date(timestamp)).reduce((all, part) => ({ ...all, [part.type]: part.value }), {});
+export const getWeeklyBossWeekId = (timestamp) => { const p = jstParts(timestamp); const d = new Date(Date.UTC(p.year, Number(p.month) - 1, p.day)); d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7)); const y = d.getUTCFullYear(); const first = new Date(Date.UTC(y, 0, 1)); const week = Math.ceil((((d - first) / 86400000) + 1) / 7); return `${y}-W${String(week).padStart(2, '0')}`; };
+export const getWeeklyBossDefinition = (timestampOrWeekId) => { const weekId = typeof timestampOrWeekId === 'string' ? timestampOrWeekId : getWeeklyBossWeekId(timestampOrWeekId); const [, y, w] = /^(\d+)-W(\d+)$/.exec(weekId) || []; const index = ((Number(y) * 53 + Number(w)) % 4 + 4) % 4; const boss = WEEKLY_BOSSES[index]; return { ...boss, weekId, energyCost: 3, expReward: 180, actionPattern: [{ id: 'normal', name: '攻撃', powerPercent: 100 }, { id: 'power', name: '強撃', powerPercent: 150 }], reward: { goldTicket: 1, starFragments: 30, alchemyItemId: boss.alchemyItemId, alchemyItemQuantity: 1, expReward: 180 }, rulesVersion: WEEKLY_BOSS_RULES_VERSION }; };
+export const getNextWeeklyBossResetAt = (timestamp) => { const p = jstParts(timestamp); const utc = Date.UTC(p.year, Number(p.month) - 1, p.day); const day = new Date(utc).getUTCDay() || 7; return utc + (8 - day) * 86400000 - 9 * 3600000; };
+export const isWeeklyBossCleared = (profile, weekId) => (profile?.weeklyBoss?.clearedWeekIds || []).includes(weekId);

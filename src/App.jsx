@@ -16,7 +16,7 @@ import { applyStudySessionReward, emptyPlayerProfile, playerProfileRef, rewardLe
 import { correctStudySessionReward, retryPendingRewardCorrection, rewardIntegrityRef } from './data/rewardCorrectionRepository';
 import { createRpgActionId, equipItem, purchaseEquipment, unequipSlot } from './data/rpgShopRepository';
 import { createMaterialExchangeActionId, exchangeMaterial } from './data/rpgMaterialExchangeRepository';
-import { attackBattle, createBattleActionId, createBattleId, rpgBattleRef, startBattle, startBossBattle, startTowerBattle, useBattleSkill as runBattleSkill } from './data/rpgBattleRepository';
+import { attackBattle, createBattleActionId, createBattleId, rpgBattleRef, startBattle, startBossBattle, startTowerBattle, startWeeklyBossBattle, useBattleSkill as runBattleSkill } from './data/rpgBattleRepository';
 import { saveParty } from './data/rpgPartyRepository';
 import { createGachaActionId, drawGacha, exchangeGachaFragments, purchaseGachaTicket } from './data/rpgGachaRepository';
 import { craftAlchemy, createAlchemyActionId } from './data/rpgAlchemyRepository';
@@ -84,7 +84,7 @@ const getTasksCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-
 const getTestsCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tests');
 const getStudySessionsCol = () => studySessionsCollection(db, FAMILY_ID);
 const getActiveTimerRef = () => activeTimerRef(db, FAMILY_ID);
-const APP_VERSION = 'v1.91.1';
+const APP_VERSION = 'v1.92.0';
 const TIMER_HEARTBEAT_MS = 30 * 1000;
 const DAILY_TARGET_SECONDS = 2 * 60 * 60;
 const isDocumentHidden = () => typeof document !== 'undefined' && document.hidden;
@@ -1319,7 +1319,7 @@ export default function App() {
         const enemy = battleCandidate; setPendingBattleEnemyId(enemy.id);
         try {
             setLastBattle(null);
-            const result = enemy.isTower ? await startTowerBattle({ db, familyId: FAMILY_ID, battleId: createBattleId() }) : enemy.isBoss ? await startBossBattle({ db, familyId: FAMILY_ID, bossId: enemy.id, battleId: createBattleId() }) : await startBattle({ db, familyId: FAMILY_ID, enemyId: enemy.id, battleId: createBattleId() });
+            const result = enemy.isWeekly ? await startWeeklyBossBattle({ db, familyId: FAMILY_ID, battleId: createBattleId() }) : enemy.isTower ? await startTowerBattle({ db, familyId: FAMILY_ID, battleId: createBattleId() }) : enemy.isBoss ? await startBossBattle({ db, familyId: FAMILY_ID, bossId: enemy.id, battleId: createBattleId() }) : await startBattle({ db, familyId: FAMILY_ID, enemyId: enemy.id, battleId: createBattleId() });
             setBattleCandidate(null);
             setRpgStatus(result.applied ? { kind: 'success', message: `${enemy.name}との戦闘を開始しました` } : { kind: 'error', message: battleErrorMessage({ code: result.reason }) });
         } catch (error) { setRpgStatus({ kind: 'error', message: battleErrorMessage(error) }); }

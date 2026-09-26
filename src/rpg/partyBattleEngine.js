@@ -7,10 +7,10 @@ const alive = (state) => state.status === 'active';
 const status = (hp) => hp > 0 ? 'active' : 'defeated';
 export const partySkillKey = (memberId, skillId) => `${memberId}:${skillId}`;
 
-export function createPartyBattle({ battleId, floor, encounter, members, now, battleKind }) {
+export function createPartyBattle({ battleId, floor = null, encounter, members, now, battleKind, battleMode = 'tower', schemaVersion = 8, weeklyBossSnapshot = null }) {
   const enemySnapshots = encounter.enemies.map((enemy) => ({ ...enemy }));
   return {
-    schemaVersion: 8, battleId, battleKind, battleMode: 'tower', towerFloor: floor, towerRulesVersion: encounter.rulesVersion,
+    schemaVersion, battleId, battleKind, battleMode, ...(floor ? { towerFloor: floor, towerRulesVersion: encounter.rulesVersion } : {}), ...(weeklyBossSnapshot ? { weeklyBossSnapshot } : {}),
     encounterSnapshot: { floor, rulesVersion: encounter.rulesVersion, energyCost: encounter.energyCost, expReward: encounter.expReward, enemies: enemySnapshots },
     partySnapshot: { members }, partyStates: members.map((member) => ({ memberId: member.memberId, hp: member.maxHp, status: 'active', guardPercent: 0 })),
     enemySnapshots, enemyStates: enemySnapshots.map((enemy) => ({ enemyInstanceId: enemy.enemyInstanceId, hp: enemy.maxHp, status: 'active' })),

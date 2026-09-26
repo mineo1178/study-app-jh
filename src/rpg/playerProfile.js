@@ -1,7 +1,7 @@
 import { MATERIAL_KEYS } from './rewardConfig.js';
 import { levelForTotalExp } from './levelSystem.js';
 
-export const PLAYER_PROFILE_SCHEMA_VERSION = 5;
+export const PLAYER_PROFILE_SCHEMA_VERSION = 6;
 export const DEFAULT_PARTY_MEMBER_IDS = Object.freeze(['hero', 'guardian', 'mage']);
 export const STARTER_PARTY_MEMBER_IDS = Object.freeze(['hero', 'guardian', 'mage', 'healer']);
 
@@ -20,6 +20,7 @@ export const createEmptyPlayerProfile = () => ({
   partyMemberIds: [...DEFAULT_PARTY_MEMBER_IDS],
   unlockedPartyMemberIds: [...STARTER_PARTY_MEMBER_IDS],
   gacha: { ticketBalances: { normal: 0, silver: 0, gold: 0, premium: 0 }, starFragments: 0, drawsSinceSrPlus: 0, drawsSinceSsr: 0, alchemyItems: {}, recentDraws: [] },
+  weeklyBoss: { clearedWeekIds: [], totalClears: 0, lastClearedAt: null, lastBossId: null },
 });
 
 export const normalizePlayerProfile = (profile = {}) => {
@@ -48,5 +49,6 @@ export const normalizePlayerProfile = (profile = {}) => {
       alchemyItems: { ...(profile.gacha?.alchemyItems || {}) },
       recentDraws: Array.isArray(profile.gacha?.recentDraws) ? profile.gacha.recentDraws.slice(0, 20) : [],
     },
+    weeklyBoss: { ...empty.weeklyBoss, ...(profile.weeklyBoss || {}), clearedWeekIds: Array.isArray(profile.weeklyBoss?.clearedWeekIds) ? profile.weeklyBoss.clearedWeekIds.slice(-12) : [] },
   };
 };
