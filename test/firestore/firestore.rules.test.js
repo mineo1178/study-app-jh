@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { afterAll, beforeAll, beforeEach, describe, it } from 'vitest';
 import { assertFails, assertSucceeds, initializeTestEnvironment } from '@firebase/rules-unit-testing';
-import { deleteDoc, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { collection, deleteDoc, doc, getDoc, getDocs, query, setDoc, updateDoc, where } from 'firebase/firestore';
 
 const projectId = 'demo-study-app-jh';
 const appFamilyId = 'oomine-study-2026';
@@ -42,6 +42,16 @@ describe('Firestore Security Rules', () => {
       const ledger = ref(db, appPath(appFamilyId, collection, 'ledger-1'));
       await assertSucceeds(setDoc(ledger, { value: 1 })); await assertSucceeds(getDoc(ledger)); await assertFails(updateDoc(ledger, { value: 2 })); await assertFails(deleteDoc(ledger));
     }
+  });
+
+  it('allows authenticated fixed-family encyclopedia ledger queries and denies anonymous queries', async () => {
+    await seedDoc(appPath(appFamilyId, 'rpgActionLedger', 'draw-1'), { type: 'gacha_draw' });
+    await seedDoc(appPath(appFamilyId, 'rpgBattleLedger', 'start-1'), { type: 'battle_start' });
+    const actionQuery = query(collection(userDb(), ...appPath(appFamilyId, 'rpgActionLedger', '').slice(0, -1)), where('type', 'in', ['gacha_draw', 'alchemy_craft']));
+    const battleQuery = query(collection(userDb(), ...appPath(appFamilyId, 'rpgBattleLedger', '').slice(0, -1)), where('type', 'in', ['battle_start', 'weekly_boss_clear']));
+    await assertSucceeds(getDocs(actionQuery)); await assertSucceeds(getDocs(battleQuery));
+    const anonymousQuery = query(collection(anonymousDb(), ...appPath(appFamilyId, 'rpgActionLedger', '').slice(0, -1)), where('type', '==', 'gacha_draw'));
+    await assertFails(getDocs(anonymousQuery));
   });
 
   it('allows mutable RPG documents only within the fixed family and denies unknown collections', async () => {
