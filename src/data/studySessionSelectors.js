@@ -83,6 +83,23 @@ export function getSessionsForTask(sessions = [], taskId) {
   return sessions.filter((session) => session.taskId === taskId);
 }
 
+export function getEffectiveSessionsForDate(sessions = [], date, liveSession = null) {
+  const effective = getValidStudySessions(getSessionsForDate(sessions, date));
+  if (liveSession?.date === date && !liveSession.isStale && isEffectiveValidation(liveSession.validation)) {
+    effective.push(liveSession);
+  }
+
+  const seen = new Set();
+  return effective.filter((session) => {
+    const key = session.timerId || session.id;
+    if (!key || !seen.has(key)) {
+      if (key) seen.add(key);
+      return true;
+    }
+    return false;
+  });
+}
+
 export function getEffectiveStudySeconds(sessions = []) {
   return getValidStudySessions(sessions).reduce((sum, session) => sum + (Number(session.recordedSeconds) || 0), 0);
 }

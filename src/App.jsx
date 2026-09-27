@@ -43,7 +43,7 @@ import PurchaseConfirmModal from './components/rpg/PurchaseConfirmModal';
 import MaterialExchangeConfirmModal from './components/rpg/MaterialExchangeConfirmModal';
 import BattleStartConfirmModal from './components/rpg/BattleStartConfirmModal';
 import QuestTreasureResult from './components/rpg/QuestTreasureResult';
-import { formatHms, getEffectiveStudySeconds, getLiveStudySession, getSessionsForDate, getSessionsForTask, getUnifiedStudySessions } from './data/studySessionSelectors';
+import { formatHms, getEffectiveSessionsForDate, getEffectiveStudySeconds, getLiveStudySession, getSessionsForDate, getSessionsForTask, getUnifiedStudySessions } from './data/studySessionSelectors';
 import LiveStudyStatus from './components/study/LiveStudyStatus';
 import MigrationExportButton from './components/dev/MigrationExportButton';
 import LegacyStudySessionMigrationPanel from './components/dev/LegacyStudySessionMigrationPanel';
@@ -85,7 +85,7 @@ const getTasksCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-
 const getTestsCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tests');
 const getStudySessionsCol = () => studySessionsCollection(db, FAMILY_ID);
 const getActiveTimerRef = () => activeTimerRef(db, FAMILY_ID);
-const APP_VERSION = 'v1.93.2';
+const APP_VERSION = 'v1.93.3';
 const TIMER_HEARTBEAT_MS = 30 * 1000;
 const DAILY_TARGET_SECONDS = 2 * 60 * 60;
 const isDocumentHidden = () => typeof document !== 'undefined' && document.hidden;
@@ -283,10 +283,14 @@ const TodayTimeline = ({ tasks, sessions = null, liveSession = null, isSampleMod
         return () => clearInterval(interval);
     }, [isSampleMode, tasks]);
 
+    const effectiveTodaySessions = useMemo(() => sessions
+        ? getEffectiveSessionsForDate(sessions, getTodayStr(), liveSession)
+        : null, [sessions, liveSession]);
+
     const todayHistories = useMemo(() => {
         const todayStr = getTodayStr();
         if (sessions) {
-            const normalized = sessions.filter((session) => session.date === todayStr).map((session) => {
+            return effectiveTodaySessions.map((session) => {
                 const task = tasks.find((item) => item.id === session.taskId) || session.taskSnapshot;
                 const meta = getTaskMeta(task);
                 const first = session.segments?.[0] || {};
@@ -302,17 +306,9 @@ const TodayTimeline = ({ tasks, sessions = null, liveSession = null, isSampleMod
                     categoryLabel: meta.categoryLabel,
                     typeLabel: meta.typeLabel,
                     taskTitle: session.taskSnapshot?.title || task?.title || 'Untitled',
-                    isLive: false,
-                    isInvalid: session.validation?.status === 'invalid',
+                    isLive: Boolean(session.isLive),
                 };
-            });
-            if (liveSession?.date === todayStr) {
-                const meta = getTaskMeta(tasks.find((item) => item.id === liveSession.taskId) || liveSession.taskSnapshot);
-                const first = liveSession.segments?.[0] || {};
-                const last = liveSession.segments?.at(-1) || first;
-                normalized.push({ ...liveSession, duration: liveSession.recordedSeconds, startedAt: first.startedAt, endedAt: last.endedAt, color: meta.color, subjectLabel: meta.subjectLabel, categoryLabel: meta.categoryLabel, typeLabel: meta.typeLabel, taskTitle: liveSession.taskSnapshot?.title || 'Untitled', isLive: !liveSession.isStale, isStale: liveSession.isStale, integrity: { needsReview: liveSession.validation?.status !== 'valid' } });
-            }
-            return normalized.sort((a, b) => (a.startedAt || 0) - (b.startedAt || 0));
+            }).sort((a, b) => (a.startedAt || 0) - (b.startedAt || 0));
         }
         const histories = [];
         tasks.forEach(t => {
@@ -361,24 +357,16 @@ const TodayTimeline = ({ tasks, sessions = null, liveSession = null, isSampleMod
             }
         });
         return histories.sort((a, b) => (a.startedAt || 0) - (b.startedAt || 0));
-    }, [isSampleMode, tasks, sessions, liveSession, nowTick]);
+    }, [effectiveTodaySessions, isSampleMode, tasks, sessions, nowTick]);
 
-    const completedTodaySeconds = useMemo(() => {
+    const totalTodaySeconds = useMemo(() => {
         const todayStr = getTodayStr();
-        if (sessions) return getEffectiveStudySeconds(sessions.filter((session) => session.date === todayStr));
+        if (sessions) return getEffectiveStudySeconds(effectiveTodaySessions);
         if (!isSampleMode) return 0;
-        return tasks.reduce((sum, t) => {
+        const completedSeconds = tasks.reduce((sum, t) => {
             return sum + (t.history || []).filter(h => h.date === todayStr).reduce((acc, h) => acc + (h.duration || 0), 0);
         }, 0);
-    }, [isSampleMode, tasks, sessions]);
-
-    const runningTodaySeconds = useMemo(() => {
-        const todayStr = getTodayStr();
-        if (liveSession) {
-            return liveSession.date === todayStr && !liveSession.isStale && liveSession.validation?.status === 'valid' ? liveSession.recordedSeconds : 0;
-        }
-        if (!isSampleMode) return 0;
-        return tasks.reduce((sum, t) => {
+        const runningSeconds = tasks.reduce((sum, t) => {
             if (!t.isRunning || !t.sessionStartTime)
                 return sum;
             const start = Number(t.sessionStartTime);
@@ -390,9 +378,9 @@ const TodayTimeline = ({ tasks, sessions = null, liveSession = null, isSampleMod
                 return sum;
             return sum + (t.currentDuration || 0) + Math.max(0, Math.floor((nowTick - start) / 1000));
         }, 0);
-    }, [isSampleMode, tasks, liveSession, nowTick]);
+        return completedSeconds + runningSeconds;
+    }, [effectiveTodaySessions, isSampleMode, tasks, sessions, nowTick]);
 
-    const totalTodaySeconds = completedTodaySeconds + runningTodaySeconds;
     const remainingSeconds = Math.max(0, DAILY_TARGET_SECONDS - totalTodaySeconds);
     const goalPercent = Math.min(100, Math.round((totalTodaySeconds / DAILY_TARGET_SECONDS) * 100));
     const runningTask = liveSession || (isSampleMode ? tasks.find(t => t.isRunning) : null);
