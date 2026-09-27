@@ -1,14 +1,22 @@
 import { calculateEnemyActionDamage, calculateHealAmount, calculateSkillDamage, getElementMultiplier } from './battleCalculator.js';
-import { enemyActionForTurn } from './enemyActionCatalog.js';
+import { enemyActionForTurn, getEnemyAction } from './enemyActionCatalog.js';
 
 const fail = (code) => { throw Object.assign(new Error(code), { code }); };
 const n = (value) => Math.max(0, Number(value) || 0);
 const alive = (state) => state.status === 'active';
 const status = (hp) => hp > 0 ? 'active' : 'defeated';
 export const partySkillKey = (memberId, skillId) => `${memberId}:${skillId}`;
+const snapshotEnemyActions = (pattern) => {
+  const source = Array.isArray(pattern) && pattern.length > 0 ? pattern : ['normal_attack'];
+  return source.map((entry) => {
+    const action = typeof entry === 'string' ? getEnemyAction(entry) : entry;
+    if (!action?.id) fail('ENEMY_ACTION_NOT_FOUND');
+    return { id: action.id, name: action.name || action.id, powerPercent: Number(action.powerPercent) || 100 };
+  });
+};
 
 export function createPartyBattle({ battleId, floor = null, encounter, members, now, battleKind, battleMode = 'tower', schemaVersion = 8, weeklyBossSnapshot = null }) {
-  const enemySnapshots = encounter.enemies.map((enemy) => ({ ...enemy }));
+  const enemySnapshots = encounter.enemies.map((enemy) => ({ ...enemy, actionPattern: snapshotEnemyActions(enemy.actionPattern) }));
   return {
     schemaVersion, battleId, battleKind, battleMode, ...(floor ? { towerFloor: floor, towerRulesVersion: encounter.rulesVersion } : {}), ...(weeklyBossSnapshot ? { weeklyBossSnapshot } : {}),
     encounterSnapshot: { floor, rulesVersion: encounter.rulesVersion, energyCost: encounter.energyCost, expReward: encounter.expReward, enemies: enemySnapshots },
@@ -25,7 +33,9 @@ function resolveEnemyPhase(battle, partyStates, round) {
   battle.enemyStates.filter(alive).forEach((enemyState, enemyIndex) => {
     const living = states.filter(alive); if (!living.length) return;
     const target = living[(round + enemyIndex) % living.length]; const member = memberFor(battle, target.memberId); const enemy = enemyFor(battle, enemyState.enemyInstanceId);
-    const action = enemyActionForTurn(enemy.actionPattern, round); const base = calculateEnemyActionDamage({ enemyAttack: enemy.attack, powerPercent: action.powerPercent, playerDefense: member.defense }).damage;
+    const actionEntry = enemyActionForTurn(enemy.actionPattern, round); const action = typeof actionEntry === 'string' ? getEnemyAction(actionEntry) : actionEntry;
+    if (!action?.id) fail('ENEMY_ACTION_NOT_FOUND');
+    const base = calculateEnemyActionDamage({ enemyAttack: enemy.attack, powerPercent: action.powerPercent, playerDefense: member.defense }).damage;
     const damage = target.guardPercent > 0 ? Math.max(1, Math.floor(base * (100 - target.guardPercent) / 100)) : base;
     const hp = Math.max(0, target.hp - damage); states = states.map((state) => state.memberId === target.memberId ? { ...state, hp, status: status(hp), guardPercent: 0 } : { ...state, guardPercent: 0 });
     events.push({ enemyInstanceId: enemyState.enemyInstanceId, targetMemberId: target.memberId, actionId: action.id, damage });

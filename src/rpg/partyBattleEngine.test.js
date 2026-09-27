@@ -3,6 +3,9 @@ import { buildTowerEncounter } from './towerCatalog.js';
 import { buildTowerPartySnapshot, validatePartyMemberIds } from './partyMemberCatalog.js';
 import { createPartyBattle, preparePartyBattleAction } from './partyBattleEngine.js';
 import { normalizePlayerProfile } from './playerProfile.js';
+import { resolvePartyBattleSelection } from './battleUiLogic.js';
+import { preparePartyBattleResult } from '../data/rpgBattleRepository.js';
+import { findUndefinedPaths } from '../test/findUndefinedPaths.js';
 
 const party = buildTowerPartySnapshot({ partyMemberIds: ['hero', 'guardian', 'mage'], level: 4, equipped: {}, ownedEquipment: {} });
 const battleAt = (floor) => createPartyBattle({ battleId: `tower-${floor}`, floor, encounter: buildTowerEncounter({ floor }), members: party, now: 1, battleKind: 'normal' });
@@ -53,5 +56,54 @@ describe('party battle engine', () => {
     const won = preparePartyBattleAction({ battle: mageBattle, action: { actionId: 'aoe', skillId: 'firestorm' }, now: 3 }).battle;
     expect(won.status).toBe('won');
     expect(won.enemyStates.every((state) => state.status === 'defeated')).toBe(true);
+  });
+  it('completes the reproduced floor 10 Mage normal attack and persists valid enemy actions', () => {
+    const encounter = buildTowerEncounter({ floor: 10 });
+    const members = buildTowerPartySnapshot({ partyMemberIds: ['hero', 'guardian', 'mage'], unlockedPartyMemberIds: ['hero', 'guardian', 'mage'], level: 7, equipped: {}, ownedEquipment: {} });
+    const mage = members.find((member) => member.memberId === 'mage');
+    let battle = createPartyBattle({ battleId: 'tower-10-reproduction', floor: 10, encounter, members, now: 1, battleKind: 'boss' });
+    expect(battle.enemySnapshots[0].actionPattern[0]).toEqual({ id: 'normal_attack', name: '通常攻撃', powerPercent: 100 });
+    battle = {
+      ...battle,
+      // v1.93.1 battles stored Tower Boss action IDs as strings.
+      enemySnapshots: encounter.enemies.map((enemy) => ({ ...enemy })),
+      activePartyMemberId: 'mage',
+      actedMemberIds: ['hero', 'guardian'],
+      partyStates: battle.partyStates.map((state) => state.memberId === 'mage' ? { ...state, hp: 44 } : state),
+      enemyStates: battle.enemyStates.map((state, index) => ({ ...state, hp: index === 0 ? 21 : 40 })),
+    };
+    const selectedEnemyId = battle.enemyStates[0].enemyInstanceId;
+    const result = preparePartyBattleResult({
+      battle,
+      profile: { totalExp: 0, level: 7, partyMemberIds: ['hero', 'guardian', 'mage'] },
+      towerProgress: { currentFloor: 10, highestFloor: 9, totalWins: 9 },
+      action: { targetEnemyInstanceId: selectedEnemyId },
+      actionId: 'tower-10-mage-normal',
+      now: 2,
+    });
+
+    expect(mage.maxHp).toBe(44);
+    expect(result.attackLedger.action).toMatchObject({ actorId: 'mage', actionKind: 'normal_attack', targetEnemyInstanceId: 'tower-10-e1-orc_chief' });
+    expect(result.battle.enemyStates[0].hp).toBe(21 - mage.attack);
+    expect(result.battle).toMatchObject({ status: 'active', roundNumber: 2, activePartyMemberId: 'hero' });
+    expect(result.attackLedger.enemyEvents).toEqual(expect.arrayContaining([expect.objectContaining({ enemyInstanceId: 'tower-10-e1-orc_chief', actionId: 'normal_attack' })]));
+    expect(findUndefinedPaths(result.attackLedger)).toEqual([]);
+  });
+  it('attacks a live first target, falls forward from a defeated target, and keeps single-target skills valid', () => {
+    const active = battleAt(10);
+    const firstId = active.enemyStates[0].enemyInstanceId;
+    const secondId = active.enemyStates[1].enemyInstanceId;
+    const firstSelection = resolvePartyBattleSelection(active, firstId, 'hero');
+    const firstAttack = preparePartyBattleAction({ battle: active, action: { actionId: 'first-live', targetEnemyInstanceId: firstSelection.enemyId }, now: 2 });
+    expect(firstAttack.event).toMatchObject({ actorId: 'hero', targetEnemyInstanceId: firstId, actionKind: 'normal_attack' });
+
+    const defeatedFirst = { ...active, enemyStates: active.enemyStates.map((state, index) => index === 0 ? { ...state, hp: 0, status: 'defeated' } : state) };
+    const fallbackSelection = resolvePartyBattleSelection(defeatedFirst, firstId, 'hero');
+    const fallbackAttack = preparePartyBattleAction({ battle: defeatedFirst, action: { actionId: 'fallback-live', targetEnemyInstanceId: fallbackSelection.enemyId }, now: 2 });
+    expect(fallbackSelection.enemyId).toBe(secondId);
+    expect(fallbackAttack.event).toMatchObject({ targetEnemyInstanceId: secondId, actionKind: 'normal_attack' });
+
+    const skill = preparePartyBattleAction({ battle: active, action: { actionId: 'single-skill', skillId: 'aqua_edge', targetEnemyInstanceId: firstSelection.enemyId }, now: 2 });
+    expect(skill.event).toMatchObject({ actorId: 'hero', skillId: 'aqua_edge', targetEnemyInstanceId: firstId, actionKind: 'skill' });
   });
 });
