@@ -2,6 +2,21 @@ import { normalizePlayerProfile } from './playerProfile.js';
 export const battleEnergyState = (profile, enemy) => { const energy = Number(normalizePlayerProfile(profile || {}).battleEnergy) || 0; const required = Number(enemy?.energyCost) || 0; return { energy, required, sufficient: energy >= required }; };
 export const battleHpPercent = (battle) => { const maxHp = Number(battle?.enemySnapshot?.maxHp) || 0; return maxHp ? Math.max(0, Math.min(100, ((Number(battle?.enemyHp) || 0) / maxHp) * 100)) : 0; };
 export const battleIsActive = (battle) => battle?.status === 'active';
+export const canUseBattleActions = (battle, pending = false) => {
+  if (pending || !battleIsActive(battle)) return false;
+  if (Number(battle?.schemaVersion) < 8) return Number(battle?.playerHp) > 0 && Number(battle?.enemyHp) > 0;
+  const actor = (battle?.partyStates || []).find((state) => state.memberId === battle?.activePartyMemberId);
+  return actor?.status === 'active' && (battle?.enemyStates || []).some((state) => state.status === 'active');
+};
+export const resolvePartyBattleSelection = (battle, enemyId, allyId) => {
+  const activeEnemyIds = (battle?.enemyStates || []).filter((state) => state.status === 'active').map((state) => state.enemyInstanceId);
+  const activeAllyIds = (battle?.partyStates || []).filter((state) => state.status === 'active').map((state) => state.memberId);
+  const activeActorId = activeAllyIds.includes(battle?.activePartyMemberId) ? battle.activePartyMemberId : null;
+  return {
+    enemyId: activeEnemyIds.includes(enemyId) ? enemyId : activeEnemyIds[0] || null,
+    allyId: activeAllyIds.includes(allyId) ? allyId : activeActorId || activeAllyIds[0] || null,
+  };
+};
 export const battleHeadingLabel = (battle) => battle?.battleKind === 'boss' ? 'BOSS BATTLE' : 'BATTLE';
 export const getRemainingSkillUses = (skill, used) => Math.max(0, Math.max(0, Number(skill?.maxUses) || 0) - Math.max(0, Number(used) || 0));
 export const getBattleSkillEntries = (battle) => Object.values(battle?.playerSnapshot?.skills || {});

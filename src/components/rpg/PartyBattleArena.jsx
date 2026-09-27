@@ -1,3 +1,33 @@
 import { useState } from 'react';
+import { canUseBattleActions, resolvePartyBattleSelection } from '../../rpg/battleUiLogic.js';
 import { ELEMENT_LABELS } from '../../rpg/elementConfig.js';
-export default function PartyBattleArena({ battle, onAttack, onSkill, attacking, feedback }) { const [enemyId, setEnemyId] = useState(battle.enemyStates.find((state) => state.status === 'active')?.enemyInstanceId || null); const [allyId, setAllyId] = useState(battle.activePartyMemberId); const actor = battle.partySnapshot.members.find((member) => member.memberId === battle.activePartyMemberId); const alive = battle.enemyStates.filter((state) => state.status === 'active'); const title = battle.battleMode === 'weekly_boss' ? ['WEEKLY BOSS', battle.weeklyBossSnapshot?.name] : [`無限の塔 ${battle.towerFloor}F`, '']; return <section className="rounded-[2rem] bg-gradient-to-br from-slate-900 to-indigo-900 p-5 text-white"><p className="text-xs font-black text-indigo-200">{title[0]} {title[1] && `・ ${title[1]}`}</p><p className="mt-1 text-xs font-black text-indigo-200">ROUND {battle.roundNumber} ・ {actor?.name}のターン</p>{battle.battleMode === 'weekly_boss' && <p className="mt-2 text-xs text-amber-200">今週の初回討伐報酬あり</p>}<div className="mt-4 grid gap-3 sm:grid-cols-3">{battle.enemySnapshots.map((enemy) => { const state = battle.enemyStates.find((item) => item.enemyInstanceId === enemy.enemyInstanceId); return <button type="button" disabled={state.status !== 'active'} onClick={() => setEnemyId(enemy.enemyInstanceId)} key={enemy.enemyInstanceId} className={`rounded-xl p-3 text-left ${enemyId === enemy.enemyInstanceId ? 'ring-2 ring-amber-300 bg-rose-700' : 'bg-white/10'} disabled:opacity-40`}><b>{enemy.name}</b><p className="text-xs">{ELEMENT_LABELS[enemy.element] || '無'} / HP {state.hp}/{enemy.maxHp}</p></button>; })}</div><div className="mt-4 grid gap-2 sm:grid-cols-3">{battle.partySnapshot.members.map((member) => { const state = battle.partyStates.find((item) => item.memberId === member.memberId); return <button type="button" disabled={state.status !== 'active'} onClick={() => setAllyId(member.memberId)} key={member.memberId} className={`rounded-xl p-3 text-left ${allyId === member.memberId ? 'bg-emerald-600 ring-2 ring-emerald-200' : 'bg-white/10'} disabled:opacity-40`}><b>{member.name}</b><p className="text-xs">{member.role} / HP {state.hp}/{member.maxHp}</p></button>; })}</div><button type="button" disabled={attacking || !alive.length} onClick={() => onAttack?.(enemyId)} className="mt-5 w-full rounded-xl bg-rose-500 py-3 font-black disabled:bg-slate-500">通常攻撃</button><div className="mt-4 space-y-2">{(actor?.skills || []).map((skill) => { const used = Number(battle.skillUses?.[`${actor.memberId}:${skill.id}`] || 0); return <button type="button" key={skill.id} disabled={attacking || used >= skill.maxUses} onClick={() => onSkill?.(skill.id, skill.targetType === 'single_enemy' ? enemyId : null, skill.targetType === 'single_ally' ? allyId : null)} className="w-full rounded-xl bg-indigo-500 px-4 py-3 text-left font-black disabled:bg-slate-500">{skill.name} <span className="text-xs">残り {skill.maxUses - used}</span></button>; })}</div>{feedback?.length > 0 && <div className="mt-4 rounded-xl bg-white/10 p-3 text-sm">{feedback.map((line, index) => <p key={`${line}-${index}`}>{line}</p>)}</div>}</section>; }
+
+export default function PartyBattleArena({ battle, onAttack, onSkill, attacking, feedback }) {
+  const [enemyId, setEnemyId] = useState(battle.enemyStates.find((state) => state.status === 'active')?.enemyInstanceId || null);
+  const [allyId, setAllyId] = useState(battle.activePartyMemberId);
+  const actor = battle.partySnapshot.members.find((member) => member.memberId === battle.activePartyMemberId);
+  const selected = resolvePartyBattleSelection(battle, enemyId, allyId);
+  const canAct = canUseBattleActions(battle, attacking);
+  const title = battle.battleMode === 'weekly_boss' ? ['WEEKLY BOSS', battle.weeklyBossSnapshot?.name] : [`無限の塔 ${battle.towerFloor}F`, ''];
+
+  return <section className="rounded-[2rem] bg-gradient-to-br from-slate-900 to-indigo-900 p-5 text-white">
+    <p className="text-xs font-black text-indigo-200">{title[0]} {title[1] && `・ ${title[1]}`}</p>
+    <p className="mt-1 text-xs font-black text-indigo-200">ROUND {battle.roundNumber} ・ {actor?.name}のターン</p>
+    {battle.battleMode === 'weekly_boss' && <p className="mt-2 text-xs text-amber-200">今週の初回討伐報酬あり</p>}
+    <div className="mt-4 grid gap-3 sm:grid-cols-3">{battle.enemySnapshots.map((enemy) => {
+      const state = battle.enemyStates.find((item) => item.enemyInstanceId === enemy.enemyInstanceId);
+      return <button type="button" disabled={state.status !== 'active'} onClick={() => setEnemyId(enemy.enemyInstanceId)} key={enemy.enemyInstanceId} className={`rounded-xl p-3 text-left ${selected.enemyId === enemy.enemyInstanceId ? 'ring-2 ring-amber-300 bg-rose-700' : 'bg-white/10'} disabled:opacity-40`}><b>{enemy.name}</b><p className="text-xs">{ELEMENT_LABELS[enemy.element] || '無'} / HP {state.hp}/{enemy.maxHp}</p></button>;
+    })}</div>
+    <div className="mt-4 grid gap-2 sm:grid-cols-3">{battle.partySnapshot.members.map((member) => {
+      const state = battle.partyStates.find((item) => item.memberId === member.memberId);
+      return <button type="button" disabled={state.status !== 'active'} onClick={() => setAllyId(member.memberId)} key={member.memberId} className={`rounded-xl p-3 text-left ${selected.allyId === member.memberId ? 'bg-emerald-600 ring-2 ring-emerald-200' : 'bg-white/10'} disabled:opacity-40`}><b>{member.name}</b><p className="text-xs">{member.role} / HP {state.hp}/{member.maxHp}</p></button>;
+    })}</div>
+    <button type="button" disabled={!canAct || !selected.enemyId} onClick={() => onAttack?.(selected.enemyId)} className="mt-5 w-full rounded-xl bg-rose-500 py-3 font-black disabled:bg-slate-500">通常攻撃</button>
+    <div className="mt-4 space-y-2">{(actor?.skills || []).map((skill) => {
+      const used = Number(battle.skillUses?.[`${actor.memberId}:${skill.id}`] || 0);
+      const hasTarget = skill.targetType === 'single_enemy' ? Boolean(selected.enemyId) : skill.targetType === 'single_ally' ? Boolean(selected.allyId) : true;
+      return <button type="button" key={skill.id} disabled={!canAct || !hasTarget || used >= skill.maxUses} onClick={() => onSkill?.(skill.id, skill.targetType === 'single_enemy' ? selected.enemyId : null, skill.targetType === 'single_ally' ? selected.allyId : null)} className="w-full rounded-xl bg-indigo-500 px-4 py-3 text-left font-black disabled:bg-slate-500">{skill.name} <span className="text-xs">残り {skill.maxUses - used}</span></button>;
+    })}</div>
+    {feedback?.length > 0 && <div className="mt-4 rounded-xl bg-white/10 p-3 text-sm">{feedback.map((line, index) => <p key={`${line}-${index}`}>{line}</p>)}</div>}
+  </section>;
+}
