@@ -10,9 +10,10 @@ import PartyPanel from './PartyPanel.jsx';
 import GachaPanel from './GachaPanel.jsx';
 import AlchemyPanel from './AlchemyPanel.jsx';
 import EncyclopediaPanel from './EncyclopediaPanel.jsx';
+import AchievementPanel from './AchievementPanel.jsx';
 import { createCachedEncyclopediaLedgerLoader } from '../../data/rpgEncyclopediaRepository.js';
 
-export default function RpgHub({ profile, progress, towerProgress, questState, onClaimQuest, pendingQuestId, onPurchaseRequest, onMaterialExchangeRequest, pendingMaterialExchange, onEquip, onUnequip, pendingItemId, pendingAction, status, battle, onStartBattleRequest, onAttackBattle, onUseBattleSkill, startingEnemyId, attacking, onBattleBack, battleFeedback, onSaveParty, savingParty, onGachaBuy, onGachaDraw, onGachaExchange, onAlchemyCraft, loadEncyclopediaLedgers, gachaPending, alchemyPending }) {
+export default function RpgHub({ profile, progress, towerProgress, achievements, unlockedTitles, selectedTitle, onSelectTitle, savingTitle, questState, onClaimQuest, pendingQuestId, onPurchaseRequest, onMaterialExchangeRequest, pendingMaterialExchange, onEquip, onUnequip, pendingItemId, pendingAction, status, battle, onStartBattleRequest, onAttackBattle, onUseBattleSkill, startingEnemyId, attacking, onBattleBack, battleFeedback, onSaveParty, savingParty, onGachaBuy, onGachaDraw, onGachaExchange, onAlchemyCraft, loadEncyclopediaLedgers, gachaPending, alchemyPending }) {
   const [section, setSection] = useState('battle');
   const loaderRef = useRef(null);
   const loadStartedRef = useRef(false);
@@ -29,5 +30,27 @@ export default function RpgHub({ profile, progress, towerProgress, questState, o
     setEncyclopediaLoading(true);
     loaderRef.current().then((ledgers) => { if (mountedRef.current) setEncyclopediaLedgers(ledgers); }).catch((error) => { if (mountedRef.current) setEncyclopediaError(error); }).finally(() => { if (mountedRef.current) setEncyclopediaLoading(false); });
   };
-  return <section className="space-y-6 animate-in fade-in duration-500"><div><p className="text-[10px] font-black tracking-widest text-violet-600">STUDY ADVENTURE</p><h1 className="text-2xl font-black text-slate-800">RPG</h1></div><RpgWalletPanel profile={profile}/><div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-9 rounded-2xl bg-slate-100 p-1">{[['battle', '戦闘'], ['party', 'パーティー'], ['gacha', 'ガチャ'], ['alchemy', '錬金'], ['quest', 'クエスト'], ['shop', 'ショップ'], ['equipment', '装備'], ['materials', '素材'], ['encyclopedia', '図鑑']].map(([id, label]) => <button type="button" key={id} onClick={() => selectSection(id)} className={`rounded-xl py-3 text-sm font-black ${section === id ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500'}`}>{label}</button>)}</div>{status && <div className={`rounded-xl px-4 py-3 text-sm font-bold ${status.kind === 'error' ? 'bg-rose-50 text-rose-700' : 'text-emerald-700'}`}>{status.message}</div>}{section === 'battle' ? <BattlePanel profile={profile} progress={progress} towerProgress={towerProgress} battle={battle} onStartRequest={onStartBattleRequest} onAttack={onAttackBattle} onSkill={onUseBattleSkill} startingEnemyId={startingEnemyId} attacking={attacking} onBack={onBattleBack} feedback={battleFeedback}/> : section === 'party' ? <PartyPanel profile={profile} onSave={onSaveParty} pending={savingParty}/> : section === 'gacha' ? <GachaPanel profile={profile} onBuy={onGachaBuy} onDraw={onGachaDraw} onExchange={onGachaExchange} pending={gachaPending}/> : section === 'alchemy' ? <AlchemyPanel profile={profile} onCraft={onAlchemyCraft} pending={alchemyPending}/> : section === 'quest' ? <QuestBoard profile={profile} progress={progress} questState={questState} onClaim={onClaimQuest} pendingQuestId={pendingQuestId}/> : section === 'shop' ? <RpgShop profile={profile} onPurchaseRequest={onPurchaseRequest} pendingItemId={pendingItemId}/> : section === 'equipment' ? <EquipmentPanel profile={profile} onEquip={onEquip} onUnequip={onUnequip} pendingAction={pendingAction}/> : section === 'encyclopedia' ? <EncyclopediaPanel profile={profile} ledgers={encyclopediaLedgers} loading={encyclopediaLoading} error={encyclopediaError}/> : <div className="space-y-8"><MaterialCatalog materials={profile?.materials}/><MaterialExchange profile={profile} onExchangeRequest={onMaterialExchangeRequest} pending={pendingMaterialExchange}/></div>}</section>;
+  const sections = [['battle', '戦闘'], ['party', 'パーティー'], ['gacha', 'ガチャ'], ['alchemy', '錬金'], ['quest', 'クエスト'], ['achievements', '実績・称号'], ['shop', 'ショップ'], ['equipment', '装備'], ['materials', '素材'], ['encyclopedia', '図鑑']];
+  return <section className="space-y-6 animate-in fade-in duration-500">
+    <div>
+      <p className="text-[10px] font-black tracking-widest text-violet-600">STUDY ADVENTURE</p>
+      <h1 className="text-2xl font-black text-slate-800">RPG</h1>
+      {selectedTitle && <p className="mt-1 text-xs font-black text-violet-700">称号：{selectedTitle.name}</p>}
+    </div>
+    <RpgWalletPanel profile={profile}/>
+    <div className="grid grid-cols-2 rounded-2xl bg-slate-100 p-1 sm:grid-cols-3 lg:grid-cols-10">
+      {sections.map(([id, label]) => <button type="button" key={id} onClick={() => selectSection(id)} className={`rounded-xl py-3 text-sm font-black ${section === id ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500'}`}>{label}</button>)}
+    </div>
+    {status && <div className={`rounded-xl px-4 py-3 text-sm font-bold ${status.kind === 'error' ? 'bg-rose-50 text-rose-700' : 'text-emerald-700'}`}>{status.message}</div>}
+    {section === 'battle' ? <BattlePanel profile={profile} progress={progress} towerProgress={towerProgress} battle={battle} onStartRequest={onStartBattleRequest} onAttack={onAttackBattle} onSkill={onUseBattleSkill} startingEnemyId={startingEnemyId} attacking={attacking} onBack={onBattleBack} feedback={battleFeedback}/>
+      : section === 'party' ? <PartyPanel profile={profile} onSave={onSaveParty} pending={savingParty}/>
+        : section === 'gacha' ? <GachaPanel profile={profile} onBuy={onGachaBuy} onDraw={onGachaDraw} onExchange={onGachaExchange} pending={gachaPending}/>
+          : section === 'alchemy' ? <AlchemyPanel profile={profile} onCraft={onAlchemyCraft} pending={alchemyPending}/>
+            : section === 'quest' ? <QuestBoard profile={profile} progress={progress} questState={questState} onClaim={onClaimQuest} pendingQuestId={pendingQuestId}/>
+              : section === 'achievements' ? <AchievementPanel achievements={achievements} unlockedTitles={unlockedTitles} selectedTitle={selectedTitle} onSelectTitle={onSelectTitle} savingTitle={savingTitle}/>
+                : section === 'shop' ? <RpgShop profile={profile} onPurchaseRequest={onPurchaseRequest} pendingItemId={pendingItemId}/>
+                  : section === 'equipment' ? <EquipmentPanel profile={profile} onEquip={onEquip} onUnequip={onUnequip} pendingAction={pendingAction}/>
+                    : section === 'encyclopedia' ? <EncyclopediaPanel profile={profile} ledgers={encyclopediaLedgers} loading={encyclopediaLoading} error={encyclopediaError}/>
+                      : <div className="space-y-8"><MaterialCatalog materials={profile?.materials}/><MaterialExchange profile={profile} onExchangeRequest={onMaterialExchangeRequest} pending={pendingMaterialExchange}/></div>}
+  </section>;
 }

@@ -21,6 +21,7 @@ export const createEmptyPlayerProfile = () => ({
   unlockedPartyMemberIds: [...STARTER_PARTY_MEMBER_IDS],
   gacha: { ticketBalances: { normal: 0, silver: 0, gold: 0, premium: 0 }, starFragments: 0, drawsSinceSrPlus: 0, drawsSinceSsr: 0, alchemyItems: {}, recentDraws: [] },
   weeklyBoss: { clearedWeekIds: [], totalClears: 0, lastClearedAt: null, lastBossId: null },
+  selectedTitleId: null,
 });
 
 export const normalizePlayerProfile = (profile = {}) => {
@@ -50,5 +51,6 @@ export const normalizePlayerProfile = (profile = {}) => {
       recentDraws: Array.isArray(profile.gacha?.recentDraws) ? profile.gacha.recentDraws.slice(0, 20) : [],
     },
     weeklyBoss: { ...empty.weeklyBoss, ...(profile.weeklyBoss || {}), clearedWeekIds: Array.isArray(profile.weeklyBoss?.clearedWeekIds) ? profile.weeklyBoss.clearedWeekIds.slice(-12) : [] },
+    selectedTitleId: typeof profile.selectedTitleId === 'string' ? profile.selectedTitleId : null,
   };
 };

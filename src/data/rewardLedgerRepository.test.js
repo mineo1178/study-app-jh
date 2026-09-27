@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyRewardToPlayerProfile, prepareCanonicalStudySessionReward } from './rewardLedgerRepository.js';
+import { applyRewardToPlayerProfile, prepareCanonicalStudySessionReward, selectedTitlePatch } from './rewardLedgerRepository.js';
 
 describe('study reward and equipment coexistence', () => {
   it('adds only reward assets while preserving v2 equipment state', () => {
@@ -34,5 +34,10 @@ describe('study reward and equipment coexistence', () => {
   it('rejects a legacy canonical session even when a caller snapshot is non-legacy', () => {
     const canonicalSession = { id: 'session-3', recordedSeconds: 600, rewardPolicyVersion: 'rpg-reward-v1', validation: { status: 'valid' }, taskSnapshot: { subjectId: 's_math' }, legacySource: { taskId: 'task-1', historyId: 'history-1' } };
     expect(prepareCanonicalStudySessionReward(canonicalSession)).toMatchObject({ eligible: false, reason: 'INELIGIBLE' });
+  });
+  it('builds a merge-safe title-only profile update', () => {
+    expect(selectedTitlePatch('title_first_step')).toEqual({ selectedTitleId: 'title_first_step' });
+    expect(selectedTitlePatch(null)).toEqual({ selectedTitleId: null });
+    expect(selectedTitlePatch('title_first_step')).not.toHaveProperty('gold');
   });
 });

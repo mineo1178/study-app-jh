@@ -18,4 +18,8 @@ describe('player profile v2', () => {
     expect(profile.unlockedPartyMemberIds).toEqual(expect.arrayContaining(['hero', 'guardian', 'mage', 'healer']));
     expect(profile.gacha.ticketBalances).toEqual({ normal: 0, silver: 0, gold: 0, premium: 0 });
   });
+  it('supports profiles with and without an optional selected title', () => {
+    expect(normalizePlayerProfile({}).selectedTitleId).toBeNull();
+    expect(normalizePlayerProfile({ selectedTitleId: 'title_first_step' }).selectedTitleId).toBe('title_first_step');
+  });
 });

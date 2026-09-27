@@ -12,7 +12,7 @@ import { breakRemainingSeconds, isActiveTimer, isBreakFinished, isStaleActiveTim
 import { getRunningTimerTask, getTaskLiveSession, getTimerViewTask, hasAnyRunningTimer } from './timer/timerRuntimeState';
 import { activeTimerRef, finishActiveTimer, heartbeatActiveTimer, invalidateStaleActiveTimer, pauseActiveTimer, resumeActiveTimer, startBreakActiveTimer, startOrSwitchActiveTimer } from './data/activeTimerRepository';
 import { studySessionsCollection } from './data/studySessionRepository';
-import { applyStudySessionReward, emptyPlayerProfile, playerProfileRef, rewardLedgerRef } from './data/rewardLedgerRepository';
+import { applyStudySessionReward, emptyPlayerProfile, playerProfileRef, rewardLedgerRef, updateSelectedTitle } from './data/rewardLedgerRepository';
 import { correctStudySessionReward, retryPendingRewardCorrection, rewardIntegrityRef } from './data/rewardCorrectionRepository';
 import { createRpgActionId, equipItem, purchaseEquipment, unequipSlot } from './data/rpgShopRepository';
 import { createMaterialExchangeActionId, exchangeMaterial } from './data/rpgMaterialExchangeRepository';
@@ -36,6 +36,8 @@ import { normalizeQuestState } from './rpg/questState';
 import { isStudySessionRewardEligible } from './rpg/rewardCalculator';
 import { MATERIAL_DEFS } from './rpg/rewardConfig';
 import { shouldUseLegacyRpgUi } from './rpg/legacyRpgUi';
+import { deriveAchievements, deriveUnlockedTitles, getSelectedUnlockedTitle, isTitleUnlocked } from './rpg/achievementSelectors';
+import { DAILY_TARGET_SECONDS } from './studyTargets';
 import RpgWalletPanel from './components/rpg/RpgWalletPanel';
 import RewardResultModal from './components/rpg/RewardResultModal';
 import RpgHub from './components/rpg/RpgHub';
@@ -85,9 +87,8 @@ const getTasksCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-
 const getTestsCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tests');
 const getStudySessionsCol = () => studySessionsCollection(db, FAMILY_ID);
 const getActiveTimerRef = () => activeTimerRef(db, FAMILY_ID);
-const APP_VERSION = 'v1.93.3';
+const APP_VERSION = 'v1.94.0';
 const TIMER_HEARTBEAT_MS = 30 * 1000;
-const DAILY_TARGET_SECONDS = 2 * 60 * 60;
 const isDocumentHidden = () => typeof document !== 'undefined' && document.hidden;
 // ==========================================
 // Constants & Master Data
@@ -873,6 +874,7 @@ export default function App() {
     const [isAttackingBattle, setIsAttackingBattle] = useState(false);
     const [battleTurnFeedback, setBattleTurnFeedback] = useState(null);
     const [savingParty, setSavingParty] = useState(false);
+    const [savingTitle, setSavingTitle] = useState(false);
     const [gachaPending, setGachaPending] = useState(false);
     const [alchemyPending, setAlchemyPending] = useState(false);
     const [activeTimer, setActiveTimer] = useState(null);
@@ -915,6 +917,9 @@ export default function App() {
     const loadEncyclopediaLedgers = useCallback(() => loadRpgEncyclopediaLedgers({ db, familyId: FAMILY_ID }), []);
     const activeTimerTask = useMemo(() => isActiveTimer(activeTimer) ? tasks.find((task) => task.id === activeTimer.taskId) || null : null, [activeTimer, tasks]);
     const liveSession = useMemo(() => getLiveStudySession(activeTimer, activeTimerTask, liveNow), [activeTimer, activeTimerTask, liveNow]);
+    const achievements = useMemo(() => deriveAchievements({ sessions: unifiedSessions, playerProfile, rpgProgress, towerProgress }), [unifiedSessions, playerProfile, rpgProgress, towerProgress]);
+    const unlockedTitles = useMemo(() => deriveUnlockedTitles(achievements), [achievements]);
+    const selectedTitle = useMemo(() => getSelectedUnlockedTitle(playerProfile.selectedTitleId, unlockedTitles), [playerProfile.selectedTitleId, unlockedTitles]);
     const activeTimerIsOwner = useMemo(() => isTimerOwner(activeTimer, currentClientId), [activeTimer, currentClientId]);
     const isAnyTaskRunning = useMemo(() => hasAnyRunningTimer({ isSampleMode, activeTimer, tasks }), [isSampleMode, activeTimer, tasks]);
     const runningTask = useMemo(() => getRunningTimerTask({ isSampleMode, activeTimerTask, tasks }), [isSampleMode, activeTimerTask, tasks]);
@@ -1341,6 +1346,20 @@ export default function App() {
         try { const result = await saveParty({ db, familyId: FAMILY_ID, partyMemberIds }); setRpgStatus({ kind: 'success', message: result.applied ? 'パーティーを保存しました' : '編成は変更されていません' }); }
         catch (error) { setRpgStatus({ kind: 'error', message: battleErrorMessage(error) }); }
         finally { setSavingParty(false); }
+    };
+    const handleSelectTitle = async (selectedTitleId) => {
+        if (isSampleMode || !user || savingTitle) return;
+        if (!isTitleUnlocked(selectedTitleId, achievements)) {
+            setRpgStatus({ kind: 'error', message: '未解放の称号は選択できません' });
+            return;
+        }
+        setSavingTitle(true); setRpgStatus(null);
+        try {
+            await updateSelectedTitle({ db, familyId: FAMILY_ID, selectedTitleId });
+            setRpgStatus({ kind: 'success', message: selectedTitleId ? '称号を変更しました' : '称号を外しました' });
+        } catch {
+            setRpgStatus({ kind: 'error', message: '称号の保存に失敗しました。もう一度お試しください。' });
+        } finally { setSavingTitle(false); }
     };
     const handleSaveLegacyRecord = async (task, totalSeconds) => {
         if (savingRecordRef.current)
@@ -2136,7 +2155,7 @@ export default function App() {
                 </div>
               </div>)}
             {activeTab === 'rpg' && !isSampleMode && (
-              <RpgHub profile={playerProfile} progress={rpgProgress} towerProgress={towerProgress} questState={questState} onClaimQuest={handleClaimQuest} pendingQuestId={pendingQuestId} onPurchaseRequest={handlePurchaseRequest} onMaterialExchangeRequest={handleMaterialExchangeRequest} pendingMaterialExchange={pendingMaterialExchange} onEquip={handleEquip} onUnequip={handleUnequip} pendingItemId={pendingPurchaseItemId} pendingAction={pendingEquipmentAction} status={rpgStatus} battle={activeBattle || lastBattle} onStartBattleRequest={handleBattleStartRequest} onAttackBattle={handleAttackBattle} onUseBattleSkill={handleUseBattleSkill} startingEnemyId={pendingBattleEnemyId} attacking={isAttackingBattle} onBattleBack={handleBattleResultClose} battleFeedback={battleTurnFeedback} onSaveParty={handleSaveParty} savingParty={savingParty} onGachaBuy={(type) => handleGacha('buy', type)} onGachaDraw={(type) => handleGacha('draw', type)} onGachaExchange={(kind, id) => handleGacha('exchange', kind, id)} onAlchemyCraft={handleAlchemyCraft} loadEncyclopediaLedgers={loadEncyclopediaLedgers} gachaPending={gachaPending} alchemyPending={alchemyPending}/>
+              <RpgHub profile={playerProfile} progress={rpgProgress} towerProgress={towerProgress} achievements={achievements} unlockedTitles={unlockedTitles} selectedTitle={selectedTitle} onSelectTitle={handleSelectTitle} savingTitle={savingTitle} questState={questState} onClaimQuest={handleClaimQuest} pendingQuestId={pendingQuestId} onPurchaseRequest={handlePurchaseRequest} onMaterialExchangeRequest={handleMaterialExchangeRequest} pendingMaterialExchange={pendingMaterialExchange} onEquip={handleEquip} onUnequip={handleUnequip} pendingItemId={pendingPurchaseItemId} pendingAction={pendingEquipmentAction} status={rpgStatus} battle={activeBattle || lastBattle} onStartBattleRequest={handleBattleStartRequest} onAttackBattle={handleAttackBattle} onUseBattleSkill={handleUseBattleSkill} startingEnemyId={pendingBattleEnemyId} attacking={isAttackingBattle} onBattleBack={handleBattleResultClose} battleFeedback={battleTurnFeedback} onSaveParty={handleSaveParty} savingParty={savingParty} onGachaBuy={(type) => handleGacha('buy', type)} onGachaDraw={(type) => handleGacha('draw', type)} onGachaExchange={(kind, id) => handleGacha('exchange', kind, id)} onAlchemyCraft={handleAlchemyCraft} loadEncyclopediaLedgers={loadEncyclopediaLedgers} gachaPending={gachaPending} alchemyPending={alchemyPending}/>
             )}
             {activeTab === 'review' && canReview && !isSampleMode && <ManualReviewPanel queue={reviewQueue} profile={playerProfile} studySessions={studySessions} ledgersBySessionId={pendingCorrectionLedgers} busySessionIds={reviewBusySessionIds} message={reviewError} onOpenCorrection={openHistoryCorrection} onRetry={handlePendingCorrectionRetry}/>}
           </main>

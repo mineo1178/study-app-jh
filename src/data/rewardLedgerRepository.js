@@ -1,4 +1,4 @@
-import { doc, runTransaction } from 'firebase/firestore';
+import { doc, runTransaction, setDoc } from 'firebase/firestore';
 import { REWARD_POLICY_VERSION, REWARD_SCHEMA_VERSION } from '../rpg/rewardConfig.js';
 import { createEmptyPlayerProfile, normalizePlayerProfile } from '../rpg/playerProfile.js';
 import { calculateStudyReward, isStudySessionRewardEligible } from '../rpg/rewardCalculator.js';
@@ -8,6 +8,12 @@ export const rewardLedgerRef = (db, familyId, sessionId) => doc(db, ...appPath(f
 export const playerProfileRef = (db, familyId) => doc(db, ...appPath(familyId, 'rpg', 'playerProfile'));
 const studySessionRef = (db, familyId, sessionId) => doc(db, ...appPath(familyId, 'studySessions', sessionId));
 export const emptyPlayerProfile = createEmptyPlayerProfile;
+
+export const selectedTitlePatch = (selectedTitleId) => ({ selectedTitleId: typeof selectedTitleId === 'string' ? selectedTitleId : null });
+
+export async function updateSelectedTitle({ db, familyId, selectedTitleId }) {
+  await setDoc(playerProfileRef(db, familyId), selectedTitlePatch(selectedTitleId), { merge: true });
+}
 
 export function applyRewardToPlayerProfile(profile, rewards, updatedAt) {
   const current = normalizePlayerProfile(profile);
