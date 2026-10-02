@@ -1,0 +1,19 @@
+.result-feedback {
+  position: fixed;
+  z-index: 170;
+  right: max(16px, env(safe-area-inset-right));
+  bottom: max(16px, env(safe-area-inset-bottom));
+  width: min(360px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  overflow: auto;
+  overflow-wrap: anywhere;
+  padding: 20px;
+  border: 1px solid #fcd34d;
+  border-radius: 20px;
+  background: #1e293b;
+  color: white;
+  box-shadow: 0 12px 32px #0f172a40;
+  animation: feedback-appear 180ms ease-out;
+}
+@keyframes feedback-appear { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .result-feedback { animation: none; } }

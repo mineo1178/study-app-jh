@@ -38,7 +38,8 @@ import { shouldUseLegacyRpgUi } from './rpg/legacyRpgUi';
 import { deriveAchievements, deriveUnlockedTitles, getSelectedUnlockedTitle, isTitleUnlocked } from './rpg/achievementSelectors';
 import { DAILY_TARGET_SECONDS } from './studyTargets';
 import RpgWalletPanel from './components/rpg/RpgWalletPanel';
-import RewardResultModal from './components/rpg/RewardResultModal';
+import FeedbackOverlay from './components/feedback/FeedbackOverlay';
+import { feedbackSession, studyFeedback, progressFeedback, battleFeedback } from './feedback/feedbackEvents';
 import RpgHub from './components/rpg/RpgHub';
 import PurchaseConfirmModal from './components/rpg/PurchaseConfirmModal';
 import MaterialExchangeConfirmModal from './components/rpg/MaterialExchangeConfirmModal';
@@ -87,7 +88,7 @@ const getTasksCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-
 const getTestsCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tests');
 const getStudySessionsCol = () => studySessionsCollection(db, FAMILY_ID);
 const getActiveTimerRef = () => activeTimerRef(db, FAMILY_ID);
-const APP_VERSION = 'v1.96.0';
+const APP_VERSION = 'v1.97.0';
 const TIMER_HEARTBEAT_MS = 30 * 1000;
 const isDocumentHidden = () => typeof document !== 'undefined' && document.hidden;
 // ==========================================
@@ -918,7 +919,8 @@ export default function App() {
     const [testEndDate, setTestEndDate] = useState(getTodayStr);
     const [visibleSubjects, setVisibleSubjects] = useState(['s_math', 's_english', 'j_math', 'average']);
     const [questResult, setQuestResult] = useState(null);
-    const [rewardResult, setRewardResult] = useState(null);
+    const feedbackLoadedRef = useRef(new Set());
+    const feedbackBattleReadyRef = useRef(new Set());
     const [staleCheckNow, setStaleCheckNow] = useState(() => Date.now());
     const [liveNow, setLiveNow] = useState(() => Date.now());
     const [isSavingRecord, setIsSavingRecord] = useState(false);
@@ -942,6 +944,24 @@ export default function App() {
     const liveSession = useMemo(() => getLiveStudySession(activeTimer, activeTimerTask, liveNow), [activeTimer, activeTimerTask, liveNow]);
     const achievements = useMemo(() => deriveAchievements({ sessions: unifiedSessions, playerProfile, rpgProgress, towerProgress }), [unifiedSessions, playerProfile, rpgProgress, towerProgress]);
     const unlockedTitles = useMemo(() => deriveUnlockedTitles(achievements), [achievements]);
+    useEffect(() => {
+        if (isSampleMode || !user || feedbackLoadedRef.current.size < 5) return;
+        const next = { level: playerProfile.level, achievements, titles: unlockedTitles };
+        if (!feedbackSession.progress) { feedbackSession.progress = next; return; }
+        const timeout = setTimeout(() => {
+            feedbackSession.queue.enqueue(progressFeedback(feedbackSession.progress, next));
+            feedbackSession.progress = next;
+        }, 350);
+        return () => clearTimeout(timeout);
+    }, [achievements, unlockedTitles, playerProfile.level, isSampleMode, user]);
+    useEffect(() => {
+        if (isSampleMode || !user) return;
+        const battle = activeBattle || lastBattle;
+        if (!battle?.battleId || !feedbackBattleReadyRef.current.has(battle.battleId)) return;
+        const before = feedbackSession.battles.get(battle.battleId);
+        feedbackSession.queue.enqueue(battleFeedback(before?.battle, battle, before?.highestFloor));
+        feedbackSession.battles.set(battle.battleId, { battle, highestFloor: towerProgress.highestFloor });
+    }, [activeBattle, lastBattle, towerProgress.highestFloor, isSampleMode, user]);
     const selectedTitle = useMemo(() => getSelectedUnlockedTitle(playerProfile.selectedTitleId, unlockedTitles), [playerProfile.selectedTitleId, unlockedTitles]);
     const activeTimerIsOwner = useMemo(() => isTimerOwner(activeTimer, currentClientId), [activeTimer, currentClientId]);
     const isAnyTaskRunning = useMemo(() => hasAnyRunningTimer({ isSampleMode, activeTimer, tasks }), [isSampleMode, activeTimer, tasks]);
@@ -998,7 +1018,7 @@ export default function App() {
     }, [isSampleMode, studySessions, user]);
     useEffect(() => {
         if (isSampleMode || !user) return undefined;
-        return onSnapshot(playerProfileRef(db, FAMILY_ID), (snap) => { const next = normalizePlayerProfile(snap.exists() ? snap.data() : emptyPlayerProfile()); setPlayerProfile(next); if (next.activeBattleId) setBattleWatchId(next.activeBattleId); }, (err) => console.error('PlayerProfile realtime sync error:', err));
+        return onSnapshot(playerProfileRef(db, FAMILY_ID), { includeMetadataChanges: true }, (snap) => { const next = normalizePlayerProfile(snap.exists() ? snap.data() : emptyPlayerProfile()); if (!snap.metadata.fromCache) feedbackLoadedRef.current.add('profile'); setPlayerProfile(next); if (next.activeBattleId) setBattleWatchId(next.activeBattleId); }, (err) => console.error('PlayerProfile realtime sync error:', err));
     }, [isSampleMode, user]);
     useEffect(() => {
         if (isSampleMode || !user) return undefined;
@@ -1016,11 +1036,11 @@ export default function App() {
     }, [canReview, isSampleMode, reviewQueue.pendingCorrectionSessionIds, user]);
     useEffect(() => {
         if (isSampleMode || !user) return undefined;
-        return onSnapshot(rpgProgressRef(db, FAMILY_ID), (snap) => setRpgProgress(normalizeRpgProgress(snap.exists() ? snap.data() : {})), (err) => console.error('RpgProgress realtime sync error:', err));
+        return onSnapshot(rpgProgressRef(db, FAMILY_ID), { includeMetadataChanges: true }, (snap) => { if (!snap.metadata.fromCache) feedbackLoadedRef.current.add('campaign'); setRpgProgress(normalizeRpgProgress(snap.exists() ? snap.data() : {})); }, (err) => console.error('RpgProgress realtime sync error:', err));
     }, [isSampleMode, user]);
     useEffect(() => {
         if (isSampleMode || !user) return undefined;
-        return onSnapshot(rpgTowerProgressRef(db, FAMILY_ID), (snap) => setTowerProgress(normalizeTowerProgress(snap.exists() ? snap.data() : {})), (err) => console.error('Tower progress realtime sync error:', err));
+        return onSnapshot(rpgTowerProgressRef(db, FAMILY_ID), { includeMetadataChanges: true }, (snap) => { if (!snap.metadata.fromCache) feedbackLoadedRef.current.add('tower'); setTowerProgress(normalizeTowerProgress(snap.exists() ? snap.data() : {})); }, (err) => console.error('Tower progress realtime sync error:', err));
     }, [isSampleMode, user]);
     useEffect(() => {
         if (isSampleMode || !user) return undefined;
@@ -1028,7 +1048,7 @@ export default function App() {
     }, [isSampleMode, user]);
     useEffect(() => {
         if (isSampleMode || !user || !battleWatchId) return undefined;
-        return onSnapshot(rpgBattleRef(db, FAMILY_ID, battleWatchId), (snap) => { const snapshot = resolveBattleWatchSnapshot(snap.exists() ? normalizeBattle(snap.data()) : null, battleWatchId); setActiveBattle(snapshot.activeBattle); setLastBattle(snapshot.lastBattle); setBattleWatchId(snapshot.battleWatchId); }, (err) => console.error('Battle realtime sync error:', err));
+        return onSnapshot(rpgBattleRef(db, FAMILY_ID, battleWatchId), { includeMetadataChanges: true }, (snap) => { if (!snap.metadata.fromCache) feedbackBattleReadyRef.current.add(battleWatchId); else feedbackBattleReadyRef.current.delete(battleWatchId); const snapshot = resolveBattleWatchSnapshot(snap.exists() ? normalizeBattle(snap.data()) : null, battleWatchId); setActiveBattle(snapshot.activeBattle); setLastBattle(snapshot.lastBattle); setBattleWatchId(snapshot.battleWatchId); }, (err) => console.error('Battle realtime sync error:', err));
     }, [battleWatchId, isSampleMode, user]);
     useEffect(() => {
         if (!activeTimerIsOwner || activeTimer?.state !== 'running' || isSampleMode || !user) return;
@@ -1131,7 +1151,8 @@ export default function App() {
     useEffect(() => {
         if (!user || isSampleMode)
             return;
-        const unsubTasks = onSnapshot(getTasksCol(), (snap) => {
+        const unsubTasks = onSnapshot(getTasksCol(), { includeMetadataChanges: true }, (snap) => {
+            if (!snap.metadata.fromCache) feedbackLoadedRef.current.add('tasks');
             setTasks(snap.docs.map(d => ({ id: d.id, ...d.data() })));
             setLoading(false);
         }, (err) => {
@@ -1143,7 +1164,8 @@ export default function App() {
         }, (err) => {
             console.error("Test realtime sync error:", err);
         });
-        const unsubSessions = onSnapshot(getStudySessionsCol(), (snap) => {
+        const unsubSessions = onSnapshot(getStudySessionsCol(), { includeMetadataChanges: true }, (snap) => {
+            if (!snap.metadata.fromCache) feedbackLoadedRef.current.add('sessions');
             setStudySessions(snap.docs.map(d => ({ id: d.id, ...d.data() })));
         }, (err) => {
             console.error("Study session realtime sync error:", err);
@@ -1340,22 +1362,26 @@ export default function App() {
     const handleAttackBattle = async (targetEnemyInstanceId = null) => {
         if (!activeBattle?.battleId || isSampleMode || !user || isAttackingBattle) return;
         setIsAttackingBattle(true);
+        feedbackSession.queue.hold();
         try {
             const result = await attackBattle({ db, familyId: FAMILY_ID, battleId: activeBattle.battleId, actionId: createBattleActionId(), targetEnemyInstanceId });
             setBattleTurnFeedback(buildBattleTurnFeedback({ ...result, skill: null }, activeBattle.enemySnapshot?.name));
+            if (result.applied && result.battle) feedbackSession.queue.enqueue(battleFeedback(activeBattle, result.battle, towerProgress.highestFloor));
             if (result.victory) setRpgStatus({ kind: 'success', message: `${activeBattle.enemySnapshot?.name || '敵'}に勝利しました` });
         } catch (error) { setRpgStatus({ kind: 'error', message: battleErrorMessage(error) }); }
-        finally { setIsAttackingBattle(false); }
+        finally { feedbackSession.queue.release(); setIsAttackingBattle(false); }
     };
     const handleUseBattleSkill = async (skillId, targetEnemyInstanceId = null, targetMemberId = null) => {
         if (!activeBattle?.battleId || isSampleMode || !user || isAttackingBattle) return;
         setIsAttackingBattle(true);
+        feedbackSession.queue.hold();
         try {
             const result = await runBattleSkill({ db, familyId: FAMILY_ID, battleId: activeBattle.battleId, skillId, actionId: `skill-${createBattleActionId()}`, targetEnemyInstanceId, targetMemberId });
             setBattleTurnFeedback(buildBattleTurnFeedback(result, activeBattle.enemySnapshot?.name));
+            if (result.applied && result.battle) feedbackSession.queue.enqueue(battleFeedback(activeBattle, result.battle, towerProgress.highestFloor));
             if (result.victory) setRpgStatus({ kind: 'success', message: `${activeBattle.enemySnapshot?.name || '敵'}に勝利しました` });
         } catch (error) { setRpgStatus({ kind: 'error', message: error.code === 'SKILL_NOT_AVAILABLE' ? 'このスキルは現在の戦闘では使用できません' : error.code === 'SKILL_NO_USES' ? 'このスキルの使用回数を使い切りました' : battleErrorMessage(error) }); }
-        finally { setIsAttackingBattle(false); }
+        finally { feedbackSession.queue.release(); setIsAttackingBattle(false); }
     };
     const handleSaveParty = async (partyMemberIds) => {
         if (isSampleMode || !user || savingParty) return;
@@ -1483,6 +1509,7 @@ export default function App() {
         setIsSavingRecord(true);
         try {
             const memo = memoOverride ?? prompt('学習内容：') ?? '';
+            feedbackSession.queue.hold();
             const now = Date.now();
             const endAt = endAtOverride || now;
             const result = await finishActiveTimer({
@@ -1494,25 +1521,19 @@ export default function App() {
                 memo,
             });
             const validation = result.session.validation;
+            feedbackSession.queue.enqueue(studyFeedback(result, task.title));
+            let reward = null;
             if (!result.alreadyFinished && result.session.rewardPolicyVersion) {
                 try {
-                    const reward = await applyStudySessionReward({ db, familyId: FAMILY_ID, session: { ...result.session, id: activeTimer.timerId } });
-                    setRewardResult({ recordedSeconds: result.session.recordedSeconds, rewards: reward.applied ? reward.rewards : null, deferred: !reward.applied });
-                } catch {
-                    setRewardResult({ recordedSeconds: result.session.recordedSeconds, rewards: null, deferred: true });
+                    reward = await applyStudySessionReward({ db, familyId: FAMILY_ID, session: { ...result.session, id: activeTimer.timerId } });
+                } catch (error) {
+                    console.error('Study reward deferred:', error);
                 }
             }
-            if (!result.alreadyFinished) {
-                setQuestResult({
-                    exp: validation.status === 'valid' ? 0 : 0,
-                    recordedDuration: result.session.recordedSeconds,
-                    creditedDuration: validation.status === 'valid' ? result.session.recordedSeconds : 0,
-                    damage: 0,
-                    levelUp: false,
-                    newItems: [], newSkills: [], chest: false,
-                    needsReview: validation.status !== 'valid',
-                    flags: validation.reasonCodes,
-                });
+            const completedFeedback = studyFeedback(result, task.title, reward)[0];
+            if (completedFeedback) feedbackSession.queue.update(completedFeedback);
+            if (!result.alreadyFinished && validation.status !== 'valid') {
+                setStaleTimerNotice('要確認セッションです。学習記録は保存済みですが、有効学習・成功報酬の対象にはなりません。');
             }
             setSelectedTaskId(null);
         }
@@ -1521,6 +1542,7 @@ export default function App() {
             alert(err.message === 'TIMER_NOT_ACTIVE' ? 'このタイマーはすでに停止されています。' : '保存に失敗しました。');
         }
         finally {
+            feedbackSession.queue.release();
             savingRecordRef.current = false;
             setIsSavingRecord(false);
         }
@@ -2207,7 +2229,7 @@ export default function App() {
             <button type="button" aria-label="学習結果を閉じる" onClick={() => setQuestResult(null)} className="mt-6 w-full rounded-2xl bg-indigo-600 py-4 text-sm font-black text-white">冒険を続ける</button>
           </div>
         </div>)}
-        <RewardResultModal result={rewardResult} profile={playerProfile} onClose={() => setRewardResult(null)} />
+        {!isSampleMode && <FeedbackOverlay />}
         <PurchaseConfirmModal item={purchaseCandidate} profile={playerProfile} purchasing={Boolean(pendingPurchaseItemId)} onCancel={() => !pendingPurchaseItemId && setPurchaseCandidate(null)} onConfirm={handlePurchaseConfirm}/>
         <MaterialExchangeConfirmModal exchange={exchangeCandidate} profile={playerProfile} exchanging={pendingMaterialExchange} onCancel={() => !pendingMaterialExchange && setExchangeCandidate(null)} onConfirm={handleMaterialExchangeConfirm}/>
         <BattleStartConfirmModal enemy={battleCandidate} starting={Boolean(pendingBattleEnemyId)} onCancel={() => !pendingBattleEnemyId && setBattleCandidate(null)} onConfirm={handleBattleStartConfirm}/>
