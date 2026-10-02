@@ -3,7 +3,7 @@ import { Play, Pause, Trash2, X, Zap, History, TrendingUp, Calendar as CalendarI
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from 'firebase/auth';
-import { getFirestore, collection, doc, getDoc, getDocs, updateDoc, deleteDoc, enableIndexedDbPersistence, addDoc, setDoc, onSnapshot } from 'firebase/firestore';
+import { getFirestore, collection, doc, getDoc, getDocs, updateDoc, deleteDoc, deleteField, enableIndexedDbPersistence, addDoc, onSnapshot } from 'firebase/firestore';
 import { HIGH_RISK_SESSION_MINUTES, LONG_SESSION_MINUTES, REVIEW_SESSION_MINUTES, damageForRecord, elapsedSeconds, gameProgress, getCreditedStudySeconds, getLastHeartbeatTime, getStaleSessionRecoveryDuration, isStaleRunningTask, recordIntegrity, timerStateAfterPause, timerStateAfterStart, totalSecondsForFinish } from './gameLogic';
 import { ACTIVITY_TYPES, inferLegacyActivityType, normalizeActivityType } from './integrity/activityTypes';
 import { validateStudySession } from './integrity/studyValidation';
@@ -53,6 +53,7 @@ import { DESKTOP_SIDEBAR_NAV_CLASS, DESKTOP_SIDEBAR_SCROLL_CLASS } from './layou
 import ManualReviewPanel from './components/review/ManualReviewPanel';
 import HistoryCorrectionModal from './components/review/HistoryCorrectionModal';
 import { buildReviewQueue, isCanonicalHistoryCorrectionTarget, reviewErrorMessage } from './review/manualReviewUi';
+import { applyTestRecordUpdate, buildDeviationFieldPatch, buildDeviationUpdate, compareTestRecords, filterTestRecordsByDateRange, formatTestDateLabel, getCalendarMonthsAgoDateString, getDeviationDomain, isValidTestDate, normalizeTestRecord } from './tests/testRecord';
 // ==========================================
 // Firebase Initialization (Vite/Vercel Dedicated)
 // ==========================================
@@ -87,7 +88,7 @@ const getTasksCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-
 const getTestsCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tests');
 const getStudySessionsCol = () => studySessionsCollection(db, FAMILY_ID);
 const getActiveTimerRef = () => activeTimerRef(db, FAMILY_ID);
-const APP_VERSION = 'v1.94.0';
+const APP_VERSION = 'v1.95.0';
 const TIMER_HEARTBEAT_MS = 30 * 1000;
 const isDocumentHidden = () => typeof document !== 'undefined' && document.hidden;
 // ==========================================
@@ -140,9 +141,7 @@ const getTodayStr = () => {
     return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')}`;
 };
 const getHalfYearAgoStr = () => {
-    const d = new Date();
-    d.setMonth(d.getMonth() - 6);
-    return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')}`;
+    return getCalendarMonthsAgoDateString(getTodayStr(), 6);
 };
 const getDateStrFromTimestamp = (timestamp) => {
     if (!timestamp)
@@ -202,6 +201,29 @@ const getTaskMeta = (task) => {
         color: subjectInfo?.hex || categoryInfo?.hex || '#94a3b8',
         typeLabel: task?.type === 'homework' ? '宿題' : '自習'
     };
+};
+const TestChartTooltip = ({ active, payload }) => {
+    if (!active || !payload?.length)
+        return null;
+    const test = payload[0]?.payload;
+    if (!test)
+        return null;
+    const categoryLabel = test.category === CATEGORIES.SCHOOL.id
+        ? CATEGORIES.SCHOOL.label
+        : test.category === CATEGORIES.JUKU.id
+            ? CATEGORIES.JUKU.label
+            : 'カテゴリ不明';
+    const values = payload.filter(item => typeof item.value === 'number' && Number.isFinite(item.value));
+    return (<div className="min-w-44 rounded-2xl border border-slate-100 bg-white p-4 shadow-xl">
+      <p className="font-black text-slate-800">{test.name || '名称未設定'}</p>
+      <p className="mt-1 text-xs font-bold text-slate-400">{test.date} ・ {categoryLabel}</p>
+      <div className="mt-3 space-y-2">
+        {values.map(item => (<div key={item.dataKey} className="flex items-center justify-between gap-4 text-xs font-black">
+          <span style={{ color: item.color }}>{item.name}</span>
+          <span className="font-mono text-slate-700">偏差値 {item.value}</span>
+        </div>))}
+      </div>
+    </div>);
 };
 const generateSampleData = () => {
     const tasks = [];
@@ -884,6 +906,8 @@ export default function App() {
     const [isAddingTask, setIsAddingTask] = useState(false);
     const [isAddingTest, setIsAddingTest] = useState(false);
     const [editingTest, setEditingTest] = useState(null);
+    const [testFormCategory, setTestFormCategory] = useState('school');
+    const [testFormError, setTestFormError] = useState(null);
     const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
     const [startDate, setStartDate] = useState(() => {
         const d = new Date();
@@ -1083,7 +1107,7 @@ export default function App() {
             const testSnap = await getDocs(getTestsCol());
             const sessionSnap = await getDocs(getStudySessionsCol());
             setTasks(taskSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-            setTests(testSnap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()));
+            setTests(testSnap.docs.map(d => normalizeTestRecord(d.id, d.data())).sort(compareTestRecords));
             setStudySessions(sessionSnap.docs.map(d => ({ id: d.id, ...d.data() })));
         }
         catch (err) {
@@ -1122,7 +1146,7 @@ export default function App() {
             console.error("Task realtime sync error:", err);
         });
         const unsubTests = onSnapshot(getTestsCol(), (snap) => {
-            setTests(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()));
+            setTests(snap.docs.map(d => normalizeTestRecord(d.id, d.data())).sort(compareTestRecords));
         }, (err) => {
             console.error("Test realtime sync error:", err);
         });
@@ -1161,7 +1185,7 @@ export default function App() {
         if (!isSampleMode) {
             const { tasks: sTasks, tests: sTests } = generateSampleData();
             setTasks(sTasks);
-            setTests(sTests);
+            setTests(sTests.map(test => normalizeTestRecord(test.id, test)).sort(compareTestRecords));
             setActiveTab('daily');
             setIsSampleMode(true);
             setLoading(false);
@@ -1556,37 +1580,57 @@ export default function App() {
         const fd = new FormData(e.currentTarget);
         const testCat = fd.get('testCategory');
         const subType = fd.get('testSubType');
-        const scores = {};
-        const relevantSubjects = [...SUBJECT_DEFS.school, ...SUBJECT_DEFS.juku];
-        relevantSubjects.forEach(s => {
-            const val = fd.get(`score_${s.id}`);
-            if (val !== null && val !== "")
-                scores[s.id] = Number(val);
+        const date = fd.get('date');
+        const relevantSubjects = SUBJECT_DEFS[testCat] || [];
+        const subjectIds = relevantSubjects.map(subject => subject.id);
+        const scoreInputs = Object.fromEntries(subjectIds.map(subjectId => [subjectId, fd.get(`score_${subjectId}`)]));
+        const deviationUpdate = buildDeviationUpdate({
+            averageInput: fd.get('average'),
+            scoreInputs,
+            subjectIds
         });
-        const testData = {
-            name: fd.get('name'), date: fd.get('date'),
-            category: testCat, subType, scores,
-            average: Number(fd.get('average')), rank: fd.get('rank'),
+        if (!SUBJECT_DEFS[testCat] || !isValidTestDate(date) || !deviationUpdate.valid) {
+            setTestFormError(!SUBJECT_DEFS[testCat] || !isValidTestDate(date)
+                ? 'カテゴリと実施日を確認してください。'
+                : Object.values(deviationUpdate.errors)[0]);
+            return;
+        }
+        const baseData = {
+            name: fd.get('name'), date,
+            category: testCat, subType, rank: fd.get('rank'),
             lastUpdatedAt: Date.now()
         };
         if (isSampleMode) {
             if (editingTest)
-                setTests(prev => prev.map(t => t.id === editingTest.id ? { ...t, ...testData } : t));
+                setTests(prev => prev.map(t => t.id === editingTest.id
+                    ? normalizeTestRecord(t.id, applyTestRecordUpdate(t, baseData, deviationUpdate))
+                    : t));
             else
-                setTests(prev => [{ id: `st-${Date.now()}`, ...testData }, ...prev]);
+                setTests(prev => {
+                    const id = `st-${Date.now()}`;
+                    return [normalizeTestRecord(id, applyTestRecordUpdate({}, baseData, deviationUpdate)), ...prev];
+                });
         }
         else {
             try {
-                if (editingTest)
-                    await setDoc(doc(getTestsCol(), editingTest.id), testData, { merge: true });
-                else
-                    await addDoc(getTestsCol(), testData);
+                if (editingTest) {
+                    const updateData = {
+                        ...baseData,
+                        ...buildDeviationFieldPatch(deviationUpdate, deleteField())
+                    };
+                    await updateDoc(doc(getTestsCol(), editingTest.id), updateData);
+                }
+                else {
+                    await addDoc(getTestsCol(), applyTestRecordUpdate({}, baseData, deviationUpdate));
+                }
                 fetchData(true);
             }
             catch {
                 alert("保存に失敗しました。");
+                return;
             }
         }
+        setTestFormError(null);
         setIsAddingTest(false);
         setEditingTest(null);
     };
@@ -1672,15 +1716,7 @@ export default function App() {
         return { totalSec, breakdown, dailyData: Array.from(dailyMap.values()).sort((a, b) => new Date(a.name).getTime() - new Date(b.name).getTime()) };
     }, [unifiedSessions, startDate, endDate]);
     const filteredTests = useMemo(() => {
-        const sDate = new Date(testStartDate);
-        const eDate = new Date(testEndDate);
-        eDate.setHours(23, 59, 59, 999);
-        return tests
-            .filter(t => {
-                const d = new Date(t.date);
-                return d >= sDate && d <= eDate;
-            })
-            .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        return filterTestRecordsByDateRange(tests, testStartDate, testEndDate);
     }, [tests, testStartDate, testEndDate]);
     const testSummary = useMemo(() => {
         const latest = filteredTests[filteredTests.length - 1] || null;
@@ -1701,6 +1737,7 @@ export default function App() {
         ...SUBJECT_DEFS.school.filter(s => !s.isMajor).map(s => ({ ...s, label: `${s.label}(中)` })),
         ...SUBJECT_DEFS.juku.map(s => ({ ...s, label: `${s.label}(塾)` }))
     ], []);
+    const deviationDomain = useMemo(() => getDeviationDomain(filteredTests, visibleSubjects), [filteredTests, visibleSubjects]);
     // モーダル等のCSS制御用
     const modalOverlayClass = isMobileView
         ? "absolute inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4"
@@ -1800,29 +1837,31 @@ export default function App() {
                      <input type="date" value={activeTab === 'tests' ? testEndDate : endDate} onChange={e => activeTab === 'tests' ? setTestEndDate(e.target.value) : setEndDate(e.target.value)} className="bg-transparent border-none p-0 text-xs sm:text-sm font-black outline-none leading-none"/>
                   </div>
                   <div className="flex gap-1 overflow-x-auto no-scrollbar whitespace-nowrap">
-                     {(activeTab === 'tests' ? [183, 365, 0] : [7, 14, 30, 0]).map(days => (<button type="button" key={days} onClick={() => {
+                     {(activeTab === 'tests' ? ['half', 'year', 'all'] : [7, 14, 30, 0]).map(period => (<button type="button" key={period} onClick={() => {
                     const d = new Date();
                     if (activeTab === 'tests') {
-                        if (days === 0)
+                        if (period === 'all')
                             setTestStartDate("2026-01-01");
+                        else if (period === 'half')
+                            setTestStartDate(getHalfYearAgoStr());
                         else {
-                            d.setDate(d.getDate() - days);
+                            d.setDate(d.getDate() - 365);
                             setTestStartDate(d.toISOString().split('T')[0]);
                         }
                         setTestEndDate(getTodayStr());
                         return;
                     }
-                    if (days === 0)
+                    if (period === 0)
                         setStartDate("2026-01-01");
                     else {
-                        d.setDate(d.getDate() - days);
+                        d.setDate(d.getDate() - period);
                         setStartDate(d.toISOString().split('T')[0]);
                     }
                     setEndDate(new Date().toISOString().split('T')[0]);
                 }} className="px-3 py-2 bg-slate-100 hover:bg-blue-50 hover:text-blue-600 rounded-lg text-[10px] sm:text-xs font-black transition-all whitespace-nowrap leading-none">
                          {activeTab === 'tests'
-                             ? days === 183 ? '半年' : days === 365 ? '1年' : '全'
-                             : days === 30 ? '1月' : days === 14 ? '2週' : days === 7 ? '1週' : '全'}
+                             ? period === 'half' ? '半年' : period === 'year' ? '1年' : '全'
+                             : period === 30 ? '1月' : period === 14 ? '2週' : period === 7 ? '1週' : '全'}
                        </button>))}
                      {!isSampleMode && <button type="button" aria-label="データを更新" title="更新" onClick={() => fetchData()} className="p-2 bg-blue-50 text-blue-600 rounded-lg ml-2 leading-none"><RefreshCw size={14}/></button>}
                   </div>
@@ -2032,13 +2071,14 @@ export default function App() {
                   <h3 className="text-2xl sm:text-3xl font-black text-slate-800 tracking-tight flex items-center justify-center gap-2 leading-none text-center text-center">
                     <TrendingUp className="text-rose-500" size={26}/> 偏差値推移
                   </h3>
-                  <button type="button" onClick={() => { setEditingTest(null); setIsAddingTest(true); }} className="w-full sm:w-auto bg-rose-500 text-white font-black px-8 py-4 rounded-2xl shadow-xl active:scale-95 transition text-base leading-none">偏差値を登録</button>
+                  <button type="button" onClick={() => { setEditingTest(null); setTestFormCategory('school'); setTestFormError(null); setIsAddingTest(true); }} className="w-full sm:w-auto bg-rose-500 text-white font-black px-8 py-4 rounded-2xl shadow-xl active:scale-95 transition text-base leading-none">偏差値を登録</button>
                 </div>
 
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 px-1">
                   <div className="rounded-[1.5rem] bg-slate-900 text-white p-4 sm:p-5 shadow-sm text-left">
                     <p className="text-[10px] sm:text-xs font-black text-slate-300 mb-2">最新偏差値</p>
                     <p className="text-3xl sm:text-4xl font-black font-mono">{testSummary.latest?.average ?? '-'}</p>
+                    <p className="mt-2 truncate text-[10px] font-bold text-slate-300">{testSummary.latest ? `${testSummary.latest.name || '名称未設定'} ・ ${testSummary.latest.date}` : '対象データなし'}</p>
                   </div>
                   <div className="rounded-[1.5rem] bg-white border border-slate-100 p-4 sm:p-5 shadow-sm text-left">
                     <p className="text-[10px] sm:text-xs font-black text-slate-400 mb-2">前回差</p>
@@ -2093,18 +2133,19 @@ export default function App() {
 
                 <div className="bg-white p-5 sm:p-10 rounded-[2.5rem] border border-slate-100 shadow-sm relative overflow-hidden text-center leading-none text-center">
                    <div className="h-80 sm:h-[28rem] w-full text-center leading-none text-center">
-                      <ResponsiveContainer width="100%" height="100%">
+                      {filteredTests.length === 0 ? (<div className="flex h-full items-center justify-center rounded-2xl bg-slate-50 px-6 text-sm font-black text-slate-400">
+                        この期間の成績はありません
+                      </div>) : (<ResponsiveContainer width="100%" height="100%">
                          <LineChart data={filteredTests} margin={{ top: 10, right: 14, left: -8, bottom: 0 }}>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9"/>
-                            <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 12, fontWeight: '900', fill: '#94a3b8' }}/>
-                            <YAxis domain={[30, 75]} axisLine={false} tickLine={false} tick={{ fontSize: 12, fontWeight: '900', fill: '#94a3b8' }}/>
-                            <Tooltip contentStyle={{ borderRadius: '14px', border: 'none', fontSize: '13px', fontWeight: '900' }}/>
-                            <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px', fontWeight: '900', fontSize: '12px' }}/>
+                            <XAxis dataKey="date" tickFormatter={formatTestDateLabel} minTickGap={24} tickMargin={10} axisLine={false} tickLine={false} tick={{ fontSize: 12, fontWeight: '900', fill: '#94a3b8' }}/>
+                            <YAxis domain={deviationDomain} axisLine={false} tickLine={false} tick={{ fontSize: 12, fontWeight: '900', fill: '#94a3b8' }}/>
+                            <Tooltip content={<TestChartTooltip/>}/>
                             
                             {visibleSubjects.includes('average') && (<Line type="monotone" dataKey="average" name="総合偏差値" stroke="#0f172a" strokeWidth={4} dot={{ r: 5, fill: '#0f172a', strokeWidth: 2, stroke: '#fff' }} connectNulls/>)}
                             {allChartSubjects.filter(s => s.id !== 'average').map(sub => (visibleSubjects.includes(sub.id) && (<Line key={sub.id} type="monotone" dataKey={`scores.${sub.id}`} name={sub.label} stroke={sub.hex} strokeWidth={3} dot={{ r: 4, fill: sub.hex, strokeWidth: 1, stroke: '#fff' }} connectNulls animationDuration={800}/>)))}
                          </LineChart>
-                      </ResponsiveContainer>
+                      </ResponsiveContainer>)}
                    </div>
                 </div>
 
@@ -2136,14 +2177,14 @@ export default function App() {
                                 <p className="text-xs font-bold text-slate-400 mt-1 text-left leading-none text-left">{test.date}</p>
                               </td>
                               <td className="px-4 py-5 text-center font-mono font-black text-slate-800 text-base leading-none text-left">{test.average ?? "-"}</td>
-                              <td className="px-4 py-5 text-center font-mono font-black text-blue-600 text-base leading-none text-left">{test.scores[`${prefix}math`] || "-"}</td>
-                              <td className="px-4 py-5 text-center font-mono font-black text-rose-600 text-base leading-none text-left">{test.scores[`${prefix}japanese`] || "-"}</td>
-                              <td className="px-4 py-5 text-center font-mono font-black text-indigo-600 text-base leading-none text-left">{test.scores[`${prefix}english`] || "-"}</td>
-                              <td className="px-4 py-5 text-center font-mono font-black text-emerald-600 text-base leading-none text-left">{test.scores[`${prefix}science`] || "-"}</td>
-                              <td className="px-4 py-5 text-center font-mono font-black text-amber-600 text-base leading-none text-left">{test.scores[`${prefix}social`] || "-"}</td>
+                              <td className="px-4 py-5 text-center font-mono font-black text-blue-600 text-base leading-none text-left">{test.scores?.[`${prefix}math`] ?? "-"}</td>
+                              <td className="px-4 py-5 text-center font-mono font-black text-rose-600 text-base leading-none text-left">{test.scores?.[`${prefix}japanese`] ?? "-"}</td>
+                              <td className="px-4 py-5 text-center font-mono font-black text-indigo-600 text-base leading-none text-left">{test.scores?.[`${prefix}english`] ?? "-"}</td>
+                              <td className="px-4 py-5 text-center font-mono font-black text-emerald-600 text-base leading-none text-left">{test.scores?.[`${prefix}science`] ?? "-"}</td>
+                              <td className="px-4 py-5 text-center font-mono font-black text-amber-600 text-base leading-none text-left">{test.scores?.[`${prefix}social`] ?? "-"}</td>
                               <td className="px-6 py-5 text-right leading-none text-left text-left">
                                 <div className="flex justify-end gap-2 leading-none text-left">
-                                  <button type="button" aria-label="成績を編集" title="編集" onClick={() => { setEditingTest(test); setIsAddingTest(true); }} className="p-1.5 bg-slate-100 text-slate-400 rounded-lg hover:bg-blue-600 hover:text-white transition-all leading-none text-left"><Edit3 size={14}/></button>
+                                  <button type="button" aria-label="成績を編集" title="編集" onClick={() => { setEditingTest(test); setTestFormCategory(SUBJECT_DEFS[test.category] ? test.category : 'school'); setTestFormError(null); setIsAddingTest(true); }} className="p-1.5 bg-slate-100 text-slate-400 rounded-lg hover:bg-blue-600 hover:text-white transition-all leading-none text-left"><Edit3 size={14}/></button>
                                   <button type="button" aria-label="成績を削除" title="削除" onClick={() => handleDeleteTest(test.id)} className="p-1.5 bg-slate-100 text-slate-400 rounded-lg hover:bg-rose-600 hover:text-white transition-all leading-none text-left"><Trash2 size={14}/></button>
                                 </div>
                               </td>
@@ -2298,13 +2339,13 @@ export default function App() {
              <div className="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 h-[85vh] flex flex-col text-left">
                 <div className="p-6 border-b border-slate-50 flex justify-between items-center bg-slate-50/50 shrink-0 text-left leading-none text-left text-left">
                    <h3 className="text-xl sm:text-2xl font-black tracking-tight text-center flex-1 leading-none text-center">偏差値登録</h3>
-                   <button type="button" aria-label="成績登録を閉じる" title="閉じる" onClick={() => { setIsAddingTest(false); setEditingTest(null); }} className="p-2 bg-white rounded-xl shadow-sm transition leading-none text-left text-left text-left text-left"><X size={20}/></button>
+                   <button type="button" aria-label="成績登録を閉じる" title="閉じる" onClick={() => { setIsAddingTest(false); setEditingTest(null); setTestFormError(null); }} className="p-2 bg-white rounded-xl shadow-sm transition leading-none text-left text-left text-left text-left"><X size={20}/></button>
                 </div>
                 <form onSubmit={handleSaveTest} className="p-6 space-y-6 overflow-y-auto no-scrollbar pb-24 text-left leading-none text-left text-left">
                    <div className="grid grid-cols-2 gap-4 text-left leading-none text-left text-left text-left">
                       <div className="text-left leading-none text-left text-left text-left">
                         <label className="block text-xs font-black text-slate-500 mb-2 leading-none text-left text-left text-left">カテゴリ</label>
-                        <select name="testCategory" defaultValue={editingTest?.category || "school"} className="w-full bg-slate-50 border-none rounded-xl p-4 font-black text-base shadow-inner appearance-none leading-none"><option value="school">中学校</option><option value="juku">塾</option></select>
+                        <select name="testCategory" value={testFormCategory} onChange={event => setTestFormCategory(event.target.value)} className="w-full bg-slate-50 border-none rounded-xl p-4 font-black text-base shadow-inner appearance-none leading-none"><option value="school">中学校</option><option value="juku">塾</option></select>
                       </div>
                       <div className="text-left leading-none text-left text-left text-left">
                         <label className="block text-xs font-black text-slate-500 mb-2 leading-none text-left text-left text-left">種別</label>
@@ -2317,17 +2358,18 @@ export default function App() {
                    </div>
                    <div className="space-y-4 text-left">
                       <label className="block text-base font-black text-slate-700 leading-none text-left">教科別偏差値</label>
-                      <div className="grid grid-cols-3 gap-3 text-left">
-                         {[...SUBJECT_DEFS.school, ...SUBJECT_DEFS.juku].map(sub => (<div key={sub.id} className="bg-slate-50 p-3 rounded-2xl border border-slate-100 shadow-inner text-center leading-none">
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-left">
+                         {(SUBJECT_DEFS[testFormCategory] || []).map(sub => (<div key={sub.id} className="bg-slate-50 p-3 rounded-2xl border border-slate-100 shadow-inner text-center leading-none">
                               <p className="text-xs font-black text-slate-500 mb-2 truncate leading-none text-center">{sub.label}</p>
-                              <input name={`score_${sub.id}`} type="number" step="0.1" inputMode="decimal" defaultValue={editingTest?.scores?.[sub.id]} placeholder="50.0" className="w-full bg-white border-none rounded-xl p-3 font-black text-lg text-center shadow-sm outline-none focus:ring-2 focus:ring-blue-600 leading-none"/>
+                              <input name={`score_${sub.id}`} type="number" min="0.1" max="99.9" step="0.1" inputMode="decimal" defaultValue={editingTest?.scores?.[sub.id]} placeholder="50.0" className="w-full bg-white border-none rounded-xl p-3 font-black text-lg text-center shadow-sm outline-none focus:ring-2 focus:ring-blue-600 leading-none"/>
                            </div>))}
                       </div>
                    </div>
                    <div className="grid grid-cols-2 gap-4 border-t border-slate-50 pt-6 text-left">
-                      <div className="text-left"><label className="block text-xs font-black text-slate-500 mb-2 leading-none text-left">総合偏差値</label><input name="average" type="number" step="0.1" inputMode="decimal" defaultValue={editingTest?.average} placeholder="50.0" className="w-full bg-slate-50 border-none rounded-xl p-4 font-black text-lg leading-none"/></div>
+                      <div className="text-left"><label className="block text-xs font-black text-slate-500 mb-2 leading-none text-left">総合偏差値</label><input name="average" type="number" min="0.1" max="99.9" step="0.1" inputMode="decimal" defaultValue={editingTest?.average} placeholder="50.0" className="w-full bg-slate-50 border-none rounded-xl p-4 font-black text-lg leading-none"/></div>
                       <div className="text-left"><label className="block text-xs font-black text-slate-500 mb-2 leading-none text-left">順位 任意</label><input name="rank" defaultValue={editingTest?.rank} placeholder="例: 10位 / 1234人中" className="w-full bg-slate-50 border-none rounded-xl p-4 font-black text-base leading-none"/></div>
                    </div>
+                   {testFormError && <p role="alert" className="rounded-xl bg-rose-50 px-4 py-3 text-sm font-black leading-relaxed text-rose-600">{testFormError}</p>}
                    <button type="submit" className="w-full bg-rose-500 text-white font-black py-5 rounded-2xl shadow-xl active:scale-95 transition text-lg leading-none mt-4 text-center">保存する</button>
                 </form>
              </div>
