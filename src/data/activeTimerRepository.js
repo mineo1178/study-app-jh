@@ -1,4 +1,5 @@
 import { doc, runTransaction } from 'firebase/firestore';
+import { inferLegacyActivityType, normalizeActivityType } from '../integrity/activityTypes.js';
 import { VALIDATION_VERSION } from '../integrity/validationConfig.js';
 import { validateStudySession } from '../integrity/studyValidation.js';
 import { REWARD_POLICY_VERSION } from '../rpg/rewardConfig.js';
@@ -115,7 +116,7 @@ export function buildForcedInvalidTimerSession(timer, task = {}, reasonCode, now
     taskSnapshot: {
       categoryId: taskSnapshot.categoryId || null,
       subjectId: taskSnapshot.subjectId || null,
-      activityType: taskSnapshot.activityType || 'other',
+      activityType: normalizeActivityType(taskSnapshot.activityType || inferLegacyActivityType(taskSnapshot.subjectId, taskSnapshot.title)),
       title: taskSnapshot.title || '',
       type: taskSnapshot.type || 'self',
     },
@@ -211,7 +212,7 @@ export function buildFinishedTimerSession(timer, task = {}, { endAt = Date.now()
     taskSnapshot: {
       categoryId: taskSnapshot.categoryId || null,
       subjectId: taskSnapshot.subjectId || null,
-      activityType: taskSnapshot.activityType || 'other',
+      activityType: normalizeActivityType(taskSnapshot.activityType || inferLegacyActivityType(taskSnapshot.subjectId, taskSnapshot.title)),
       title: taskSnapshot.title || '',
       type: taskSnapshot.type || 'self',
     },
@@ -219,7 +220,7 @@ export function buildFinishedTimerSession(timer, task = {}, { endAt = Date.now()
     segments,
     breaks: [...(timer.breaks || []), ...activeBreak],
     recordedSeconds,
-    validation: stale ? { status: 'invalid', reasonCodes: ['stale_timer_forced_invalid'], validationVersion: VALIDATION_VERSION } : validation,
+    validation: stale ? { status: 'invalid', reasonCodes: ['stale_timer_forced_invalid'], validationVersion: VALIDATION_VERSION } : validation || validateStudySession({ recordedSeconds, segments, taskSnapshot: { activityType: normalizeActivityType(taskSnapshot.activityType || inferLegacyActivityType(taskSnapshot.subjectId, taskSnapshot.title)) } }),
     memo,
     legacySource: null,
     createdAt: endAt,
@@ -227,7 +228,7 @@ export function buildFinishedTimerSession(timer, task = {}, { endAt = Date.now()
   };
 }
 
-export async function finishActiveTimer({ db, familyId, task, timerId, endAt = Date.now(), validation, memo = '' }) {
+export async function finishActiveTimer({ db, familyId, task, timerId, endAt = Date.now(), memo = '' }) {
   const timerRef = activeTimerRef(db, familyId);
   const sessionRef = doc(db, 'families', familyId, 'apps', 'junior-high', 'studySessions', timerId);
   return runTransaction(db, async (transaction) => {
@@ -235,7 +236,7 @@ export async function finishActiveTimer({ db, familyId, task, timerId, endAt = D
     if (existingSession.exists()) return { session: existingSession.data(), alreadyFinished: true };
     const timer = timerSnap.data();
     if (!canFinishActiveTimer(timer, timerId)) throw new Error('TIMER_NOT_ACTIVE');
-    const session = buildFinishedTimerSession(timer, task, { endAt, validation, memo });
+    const session = buildFinishedTimerSession(timer, task, { endAt, memo });
     transaction.set(sessionRef, session);
     // Delete only after the Session write is part of this same transaction. This also
     // makes an owner heartbeat that races after STOP a no-op rather than a revival.

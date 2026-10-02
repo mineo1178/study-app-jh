@@ -6,9 +6,8 @@ import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from
 import { getFirestore, collection, doc, getDoc, getDocs, updateDoc, deleteDoc, deleteField, enableIndexedDbPersistence, addDoc, onSnapshot } from 'firebase/firestore';
 import { HIGH_RISK_SESSION_MINUTES, LONG_SESSION_MINUTES, REVIEW_SESSION_MINUTES, damageForRecord, elapsedSeconds, gameProgress, getCreditedStudySeconds, getLastHeartbeatTime, getStaleSessionRecoveryDuration, isStaleRunningTask, recordIntegrity, timerStateAfterPause, timerStateAfterStart, totalSecondsForFinish } from './gameLogic';
 import { ACTIVITY_TYPES, inferLegacyActivityType, normalizeActivityType } from './integrity/activityTypes';
-import { validateStudySession } from './integrity/studyValidation';
 import { getCurrentClientId, createTimerId } from './timer/timerClient';
-import { breakRemainingSeconds, isActiveTimer, isBreakFinished, isStaleActiveTimer, isTimerOwner, shouldAutoFinishReading, timerRecordedSeconds, timerSegmentsAtEnd } from './timer/timerEngine';
+import { breakRemainingSeconds, isActiveTimer, isBreakFinished, isStaleActiveTimer, isTimerOwner, shouldAutoFinishReading, timerRecordedSeconds } from './timer/timerEngine';
 import { getRunningTimerTask, getTaskLiveSession, getTimerViewTask, hasAnyRunningTimer } from './timer/timerRuntimeState';
 import { activeTimerRef, finishActiveTimer, heartbeatActiveTimer, invalidateStaleActiveTimer, pauseActiveTimer, resumeActiveTimer, startBreakActiveTimer, startOrSwitchActiveTimer } from './data/activeTimerRepository';
 import { studySessionsCollection } from './data/studySessionRepository';
@@ -45,7 +44,7 @@ import PurchaseConfirmModal from './components/rpg/PurchaseConfirmModal';
 import MaterialExchangeConfirmModal from './components/rpg/MaterialExchangeConfirmModal';
 import BattleStartConfirmModal from './components/rpg/BattleStartConfirmModal';
 import QuestTreasureResult from './components/rpg/QuestTreasureResult';
-import { formatHms, getEffectiveSessionsForDate, getEffectiveStudySeconds, getLiveStudySession, getSessionsForDate, getSessionsForTask, getUnifiedStudySessions } from './data/studySessionSelectors';
+import { formatHms, getEffectiveSessionsForDate, getEffectiveStudySeconds, getEffectiveStudySecondsForTask, getLiveStudySession, getSessionsForDate, getSessionsForTask, getUnifiedStudySessions } from './data/studySessionSelectors';
 import LiveStudyStatus from './components/study/LiveStudyStatus';
 import MigrationExportButton from './components/dev/MigrationExportButton';
 import LegacyStudySessionMigrationPanel from './components/dev/LegacyStudySessionMigrationPanel';
@@ -88,7 +87,7 @@ const getTasksCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-
 const getTestsCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tests');
 const getStudySessionsCol = () => studySessionsCollection(db, FAMILY_ID);
 const getActiveTimerRef = () => activeTimerRef(db, FAMILY_ID);
-const APP_VERSION = 'v1.95.0';
+const APP_VERSION = 'v1.96.0';
 const TIMER_HEARTBEAT_MS = 30 * 1000;
 const isDocumentHidden = () => typeof document !== 'undefined' && document.hidden;
 // ==========================================
@@ -954,9 +953,8 @@ export default function App() {
         return tasks.flatMap(task => {
             const meta = getTaskMeta(task);
             const todaySessions = getSessionsForDate(getSessionsForTask(unifiedSessions, task.id), todayStr);
-            const isLiveTask = liveSession?.taskId === task.id;
-            const liveEffectiveSeconds = isLiveTask && liveSession.validation?.status === 'valid' && !liveSession.isStale ? liveSession.recordedSeconds : 0;
-            const totalDuration = getEffectiveStudySeconds(todaySessions) + liveEffectiveSeconds;
+            const isLiveTask = liveSession?.taskId === task.id && liveSession.date === todayStr;
+            const totalDuration = getEffectiveStudySecondsForTask(unifiedSessions, todayStr, task.id, liveSession);
             const latestTimestamp = todaySessions.length > 0
                 ? Math.max(...todaySessions.map(session => session.segments?.at(-1)?.endedAt || session.segments?.[0]?.startedAt || 0))
                 : 0;
@@ -1122,18 +1120,12 @@ export default function App() {
         const unsub = onAuthStateChanged(auth, (u) => {
             if (!isSampleMode) {
                 setUser(u);
-                if (u)
-                    fetchData();
-                else
+                if (!u)
                     setLoading(false);
             }
         });
         return () => unsub();
-    }, [isSampleMode, fetchData]);
-    useEffect(() => {
-        if (user && !isSampleMode)
-            queueMicrotask(() => fetchData(true));
-    }, [user, isSampleMode, fetchData]);
+    }, [isSampleMode]);
 
     // 他端末で開始・停止されたタイマーを即時反映するため、Firestoreをリアルタイム購読する。
     useEffect(() => {
@@ -1144,6 +1136,7 @@ export default function App() {
             setLoading(false);
         }, (err) => {
             console.error("Task realtime sync error:", err);
+            setLoading(false);
         });
         const unsubTests = onSnapshot(getTestsCol(), (snap) => {
             setTests(snap.docs.map(d => normalizeTestRecord(d.id, d.data())).sort(compareTestRecords));
@@ -1491,23 +1484,16 @@ export default function App() {
         try {
             const memo = memoOverride ?? prompt('学習内容：') ?? '';
             const now = Date.now();
-            const endAt = endAtOverride || (isStaleActiveTimer(activeTimer, now) ? activeTimer.lastHeartbeatAt : now);
-            const segments = timerSegmentsAtEnd(activeTimer, endAt);
-            const candidate = {
-                recordedSeconds: timerRecordedSeconds(activeTimer, endAt),
-                segments,
-                taskSnapshot: { activityType: normalizeActivityType(task.activityType || inferLegacyActivityType(task.subjectId)) },
-            };
-            const validation = validateStudySession(candidate);
+            const endAt = endAtOverride || now;
             const result = await finishActiveTimer({
                 db,
                 familyId: FAMILY_ID,
                 task,
                 timerId: activeTimer.timerId,
                 endAt,
-                validation,
                 memo,
             });
+            const validation = result.session.validation;
             if (!result.alreadyFinished && result.session.rewardPolicyVersion) {
                 try {
                     const reward = await applyStudySessionReward({ db, familyId: FAMILY_ID, session: { ...result.session, id: activeTimer.timerId } });

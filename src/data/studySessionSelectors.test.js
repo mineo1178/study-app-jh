@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatHms, getEffectiveSessionsForDate, getEffectiveStudySeconds, getLiveStudySession, getUnifiedStudySessions, normalizeLegacyHistory } from './studySessionSelectors';
+import { formatHms, getEffectiveSessionsForDate, getEffectiveStudySeconds, getEffectiveStudySecondsForTask, getLiveStudySession, getUnifiedStudySessions, normalizeLegacyHistory } from './studySessionSelectors';
 
 const task = { id: 'math', categoryId: 'school', subjectId: 's_math', title: '問題集', history: [{ id: 'h1', date: '2026-09-19', duration: 600, startedAt: 1_000, endedAt: 601_000 }] };
 describe('study session selectors', () => {
@@ -101,5 +101,22 @@ describe('study session selectors', () => {
     expect(session.validation.status).toBe('invalid');
     expect(session.validation.reasonCodes).toContain('starts_after_end');
     expect(new Set(session.validation.reasonCodes).size).toBe(session.validation.reasonCodes.length);
+  });
+});
+
+describe('task totals share Timeline effective sessions', () => {
+  const date = '2026-10-03';
+  const saved = { id: 't', timerId: 't', taskId: 'math', date, recordedSeconds: 60, validation: { status: 'valid' } };
+  it('does not double count live data while STOP listeners arrive separately', () => {
+    const live = { ...saved, id: 'live-t', recordedSeconds: 61 };
+    expect(getEffectiveStudySecondsForTask([saved], date, 'math', live)).toBe(60);
+  });
+  it('does not credit a previous-day live timer to today', () => {
+    expect(getEffectiveStudySecondsForTask([saved], date, 'math', { ...saved, timerId: 'other', date: '2026-10-02' })).toBe(60);
+  });
+  it('excludes stale, invalid and pending live data from task totals', () => {
+    for (const live of [{ ...saved, isStale: true }, { ...saved, validation: { status: 'invalid' } }, { ...saved, validation: { status: 'pending_review' } }]) {
+      expect(getEffectiveStudySecondsForTask([], date, 'math', live)).toBe(0);
+    }
   });
 });

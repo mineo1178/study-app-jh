@@ -100,6 +100,10 @@ export function getEffectiveSessionsForDate(sessions = [], date, liveSession = n
   });
 }
 
+export function getEffectiveStudySecondsForTask(sessions, date, taskId, liveSession = null) {
+  return getEffectiveStudySeconds(getSessionsForTask(getEffectiveSessionsForDate(sessions, date, liveSession), taskId));
+}
+
 export function getEffectiveStudySeconds(sessions = []) {
   return getValidStudySessions(sessions).reduce((sum, session) => sum + (Number(session.recordedSeconds) || 0), 0);
 }
