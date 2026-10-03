@@ -17,6 +17,10 @@ export default function LearningDashboard({ summary, onNavigate, studyGoals, onS
       {onSaveGoals && <StudyGoalEditor studyGoals={studyGoals} onSave={onSaveGoals}/>}
     </div>
     <div className={box}>
+      <h2 className="text-lg font-black">今日の予定</h2>
+      {s.todayPlan?.length ? <><ul className="mt-3 space-y-3">{s.todayPlan.slice(0,3).map(goal => <li key={goal.id} className="break-words text-sm"><b>{goal.name}</b><p>{duration(goal.seconds)} / {duration(goal.targetSeconds)} ・ {goal.achieved ? '達成' : `あと${duration(goal.remaining)}`}</p><progress aria-label={`${goal.name}の今日の予定達成率`} value={goal.barPercent} max="100" className="mt-1 block w-full accent-blue-600"/></li>)}</ul>{s.todayPlan.length > 3 && <p className="mt-2 text-xs">ほか{s.todayPlan.length - 3}科目。予定は「目標を変更」で確認できます。</p>}</> : <p className="mt-3 text-sm">今日は学習プランが設定されていません</p>}
+    </div>
+    <div className={box}>
       <h2 className="text-lg font-black">次にやること</h2>
       <ul className="mt-3 divide-y divide-slate-100">{s.actions.map(a => <li key={a.id} className="py-3 break-words"><h3 className="text-sm font-black text-blue-700">{a.title}</h3><p className="mt-1 text-xs leading-relaxed text-slate-500">{a.detail}</p><button type="button" className={link} onClick={() => onNavigate(a.tab)}>{a.action}</button></li>)}</ul>
       {!s.actions.length && <p className="mt-3 text-sm">学習目標を達成しました。次の学習を続けましょう。</p>}

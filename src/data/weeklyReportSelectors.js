@@ -1,3 +1,4 @@
+import { deriveWeeklyPlanProgress } from '../weeklyStudyPlan.js';
 import { deriveSubjectGoalProgress } from '../subjectStudyGoals.js';
 import { SUBJECT_DEFS } from '../subjectCatalog.js';
 import { getValidStudySessions } from './studySessionSelectors.js';
@@ -15,7 +16,7 @@ export const reportDuration = value => {
 };
 const dateLabel = date => date.split('-').map(Number).join('/');
 const createWeek = (startAt, today) => {
-  const days = Array.from({ length: 7 }, (_, index) => ({ date: studyDate(startAt + index * DAY_MS), weekday: ['月','火','水','木','金','土','日'][index], seconds: 0, count: 0, achieved: false }));
+  const days = Array.from({ length: 7 }, (_, index) => ({ date: studyDate(startAt + index * DAY_MS), weekday: ['月','火','水','木','金','土','日'][index], seconds: 0, count: 0, achieved: false, future: studyDate(startAt + index * DAY_MS) > today }));
   return { id: getWeeklyBossWeekId(startAt), startAt, label: `${dateLabel(days[0].date)} - ${dateLabel(days[6].date)}`, days, seconds: 0, count: 0, subjectIds: new Set(), subjects: new Map(), today };
 };
 
@@ -67,7 +68,7 @@ export function deriveWeeklyReport({ sessions = [], now, ready = false, subjectD
     const hints = goals.map((goal,index) => ({ id: goal.id, text: goal.completed ? `${goal.name}達成` : `あと${goal.target - goal.current}${index === 0 ? '日' : '教科'}で${goal.name}` }));
     const currentDay = days.find(day => day.date === today);
     if (currentDay) hints.push({ id: 'daily', text: currentDay.achieved ? `今日の${reportDuration(dailyTargetSeconds)}目標達成` : `今日あと${reportDuration(dailyTargetSeconds - currentDay.seconds)}で${reportDuration(dailyTargetSeconds)}目標` });
-    return { subjectGoals: deriveSubjectGoalProgress(studyGoals?.subjectWeeklyTargets, week.subjects, subjectDefinitions), dailyTargetSeconds, weeklyTargetSeconds, weeklyStudyDays, id: week.id, startAt: week.startAt, label: week.label, days, seconds: week.seconds, count: week.count, learningDays, subjectCount: week.subjectIds.size, subjects, highlights: highlights.slice(0,3), hints: hints.slice(0,3) };
+    return { plan: week.id === allWeeks[0].id ? deriveWeeklyPlanProgress(studyGoals?.weeklyPlan, days, week.subjects, subjectDefinitions) : null, subjectGoals: deriveSubjectGoalProgress(studyGoals?.subjectWeeklyTargets, week.subjects, subjectDefinitions), dailyTargetSeconds, weeklyTargetSeconds, weeklyStudyDays, id: week.id, startAt: week.startAt, label: week.label, days, seconds: week.seconds, count: week.count, learningDays, subjectCount: week.subjectIds.size, subjects, highlights: highlights.slice(0,3), hints: hints.slice(0,3) };
   });
   return { status: 'ready', weeks: weeks.slice(0,4).map((week,index) => {
     const previous = weeks[index + 1];

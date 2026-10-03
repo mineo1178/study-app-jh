@@ -49,6 +49,10 @@ export default function WeeklyReport({ sessions, now, ready, subjectDefinitions,
         <p className="mt-2 text-xs text-slate-500">現在の目標を基準に表示。実績条件（週5日・週3教科）は固定です。</p>
       </div>
       <div className={card}>
+        <h2 className="text-lg font-black">週間プラン vs 実績</h2>
+        {week.plan ? <><p className="mt-2 text-xs">毎週繰り返す現在の予定。実績は今日までの確定記録です。</p><p className="mt-3 text-sm font-bold">週間予定 {duration(week.plan.plannedSeconds)} ・ 週間実績 {duration(week.plan.actualSeconds)}</p>{!week.plan.plannedSeconds && <p className="mt-2 text-sm">週間プランは設定されていません。</p>}<ul className="mt-3 space-y-2 text-sm">{week.plan.days.map(day => <li key={day.date} className="break-words">{day.weekday}：予定 {day.plannedSeconds ? duration(day.plannedSeconds) : 'なし'} ・ 実績 {duration(day.seconds)}{day.plannedSeconds > 0 && ` ・ ${day.future ? '予定' : day.planAchieved ? '達成' : '未達'}`}</li>)}</ul><ul className="mt-4 space-y-2 text-sm">{week.plan.subjects.map(subject => <li key={subject.id} className="break-words"><b>{subject.name}</b>：予定 {duration(subject.plannedSeconds)} ・ 実績 {duration(subject.seconds)}</li>)}</ul></> : <p className="mt-3 text-sm">週間プランの比較は今週のみ表示されます</p>}
+      </div>
+      <div className={card}>
         <h2 className="text-lg font-black">日別の学習</h2>
         <ul className="mt-3 space-y-3">{week.days.map(day => <li key={day.date} className="min-w-0"><div className="flex flex-wrap justify-between gap-1 text-xs"><span className="font-bold">{day.weekday}（{day.date.slice(5).replace('-', '/')}）</span><span>{duration(day.seconds)}{day.achieved && ` ・ ${duration(week.dailyTargetSeconds)}達成`}</span></div><progress aria-label={`${day.weekday}曜日の学習時間`} value={day.seconds} max={dailyMax} className="mt-1 block h-2 w-full max-w-full accent-blue-600"/></li>)}</ul>
       </div>

@@ -1,3 +1,4 @@
+import { deriveTodayPlanProgress } from '../weeklyStudyPlan.js';
 import { deriveSubjectGoalProgress, prioritizeSubjectGoals } from '../subjectStudyGoals.js';
 import { getValidStudySessions } from '../data/studySessionSelectors.js';
 import { timestampForStudyDate } from '../rpg/achievementSelectors.js';
@@ -19,7 +20,7 @@ export function deriveDashboardSummary({ sessions = [], now, ready = false, rewa
   if (!ready || !Number.isFinite(now)) return { status: 'loading', actions: [] };
   const today = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Tokyo' }).format(new Date(now));
   const weekId = getWeeklyBossWeekId(now);
-  const weeklySubjects = new Map();
+  const weeklySubjects = new Map(), todaySubjectSeconds = new Map();
   const dates = new Set(), subjects = new Set(), todaySubjects = new Set(), seen = new Set();
   let todaySeconds = 0, weekSeconds = 0, todayCount = 0;
   // One pass over effective records; recordedSeconds already excludes pauses.
@@ -35,6 +36,7 @@ export function deriveDashboardSummary({ sessions = [], now, ready = false, rewa
     const knownSubject = typeof subject === 'string' && subject.trim() && subject !== 'unknown';
     if (session.date === today) {
       todaySeconds += seconds; todayCount += 1;
+      todaySubjectSeconds.set(subject, { seconds: (todaySubjectSeconds.get(subject)?.seconds || 0) + seconds });
       if (knownSubject) todaySubjects.add(subject);
     }
     if (getWeeklyBossWeekId(timestamp) === weekId) {
@@ -46,11 +48,14 @@ export function deriveDashboardSummary({ sessions = [], now, ready = false, rewa
   }
   const { dailyTargetSeconds, weeklyTargetSeconds, weeklyStudyDays: daysTarget } = personalStudyTargets(playerProfile?.studyGoals);
   const subjectGoals = prioritizeSubjectGoals(deriveSubjectGoalProgress(playerProfile?.studyGoals?.subjectWeeklyTargets, weeklySubjects));
+  const todayPlan = deriveTodayPlanProgress(playerProfile?.studyGoals?.weeklyPlan, today, todaySubjectSeconds);
   const subjectsTarget = ACHIEVEMENT_CATALOG.find(a => a.id === 'achievement_week_3subjects').target;
   const remaining = personalGoalProgress(todaySeconds, dailyTargetSeconds).remaining;
   const actions = [];
   const add = (id, title, detail, action, tab) => actions.push({ id, title, detail, action, tab });
   if (remaining) add('daily', `今日の目標まであと${dashboardDuration(remaining)}`, '今日の目標は未達成です。学習を積み重ねましょう', '学習項目を選ぶ', 'study');
+  const nextPlan = prioritizeSubjectGoals(todayPlan).find(goal => !goal.achieved);
+  if (nextPlan) add(`plan-${nextPlan.id}`, `${nextPlan.name} あと${dashboardDuration(nextPlan.remaining)}で今日の予定`, '今日の学習予定に取り組みましょう', '学習項目を選ぶ', 'study');
   if (dates.size < daysTarget) add('days', `今週の自分の目標まであと${daysTarget - dates.size}日`, 'まだ学習していない日に取り組みましょう', '学習を記録する', 'study');
   if (dates.size >= daysTarget && weekSeconds < weeklyTargetSeconds) add('week-time', `今週の自分の目標時間まであと${dashboardDuration(weeklyTargetSeconds - weekSeconds)}`, '自分の週間目標時間を目指しましょう', '学習を記録する', 'study');
   const nextSubject = subjectGoals.find(goal => !goal.achieved);
@@ -80,5 +85,5 @@ export function deriveDashboardSummary({ sessions = [], now, ready = false, rewa
     }
   }
   const achievement = (rpgReady ? achievements : []).filter(a => !a.completed && Number.isFinite(a.current) && Number.isFinite(a.target) && a.target > 0 && a.current > 0).sort((a,b) => b.current / b.target - a.current / a.target)[0] || null;
-  return { status: 'ready', subjectGoals, todaySeconds, todayCount, todaySubjects: todaySubjects.size, target: dailyTargetSeconds, weeklyTargetSeconds, weeklyStudyDays: daysTarget, remaining, percent: personalGoalProgress(todaySeconds, dailyTargetSeconds).percent, weekSeconds, weekDays: dates.size, weekSubjects: subjects.size, actions: actions.slice(0,3), rewardProgress, rpg, achievement, latestGrade: gradesReady ? grades.find(g => g.date) || null : undefined };
+  return { status: 'ready', todayPlan: [...todayPlan].sort((a,b) => Number(a.achieved) - Number(b.achieved) || a.remaining - b.remaining), subjectGoals, todaySeconds, todayCount, todaySubjects: todaySubjects.size, target: dailyTargetSeconds, weeklyTargetSeconds, weeklyStudyDays: daysTarget, remaining, percent: personalGoalProgress(todaySeconds, dailyTargetSeconds).percent, weekSeconds, weekDays: dates.size, weekSubjects: subjects.size, actions: actions.slice(0,3), rewardProgress, rpg, achievement, latestGrade: gradesReady ? grades.find(g => g.date) || null : undefined };
 }

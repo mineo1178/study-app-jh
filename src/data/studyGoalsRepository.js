@@ -1,3 +1,4 @@
+import { PLAN_DAYS, normalizeWeeklyStudyPlan } from '../weeklyStudyPlan.js';
 import { deleteField, setDoc } from 'firebase/firestore';
 import { playerProfileRef } from './rewardLedgerRepository.js';
 import { normalizeStudyGoals } from '../personalStudyGoals.js';
@@ -14,6 +15,13 @@ export function saveStudyGoals({ db, familyId, studyGoals }) {
       mergeFields.push(`studyGoals.subjectWeeklyTargets.${subject.id}`);
       return [subject.id, targets[subject.id] || deleteField()];
     }));
+  }
+  if (Object.hasOwn(studyGoals || {}, 'weeklyPlan')) {
+    const plan = normalizeWeeklyStudyPlan(studyGoals.weeklyPlan);
+    goals.weeklyPlan = Object.fromEntries(PLAN_DAYS.map(day => [day, Object.fromEntries(goalSubjects().map(subject => {
+      mergeFields.push(`studyGoals.weeklyPlan.${day}.${subject.id}`);
+      return [subject.id, plan[day]?.[subject.id] || deleteField()];
+    }))]));
   }
   return setDoc(playerProfileRef(db, familyId), { studyGoals: goals }, {
     mergeFields,

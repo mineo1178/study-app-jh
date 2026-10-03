@@ -61,3 +61,25 @@ it('keeps subject settings on a daily-only write and on subject save failure', a
   await expect(saveStudyGoals({ db: {}, familyId: 'family', studyGoals: { dailyTargetMinutes: 15, weeklyStudyDays: 1, subjectWeeklyTargets: { s_math: 600 } } })).rejects.toThrow('offline');
   expect(mock.profile).toEqual(before);
 });
+
+it('saves all goal kinds once, reloads plans, and clears only known plan IDs', async () => {
+  mock.profile.studyGoals.weeklyPlan = { mon: { s_math: 60, orphan: 45 }, special: { s_math: 15 } };
+  await saveStudyGoals({ db: {}, familyId: 'family', studyGoals: { dailyTargetMinutes: 90, weeklyStudyDays: 3, subjectWeeklyTargets: { s_math: 180 }, weeklyPlan: { mon: { s_math: 45, s_english: 30 }, sun: { j_math: 360 } } } });
+  expect(mock.writes).toBe(1);
+  expect(normalizePlayerProfile(mock.profile).studyGoals).toMatchObject({ future: true, dailyTargetMinutes: 90, weeklyStudyDays: 3, subjectWeeklyTargets: { s_math: 180 }, weeklyPlan: { mon: { s_math: 45, s_english: 30, orphan: 45 }, sun: { j_math: 360 }, special: { s_math: 15 } } });
+  await saveStudyGoals({ db: {}, familyId: 'family', studyGoals: { dailyTargetMinutes: 90, weeklyStudyDays: 3, weeklyPlan: {} } });
+  expect(mock.profile.studyGoals.weeklyPlan.mon).toEqual({ orphan: 45 });
+  expect(mock.profile.studyGoals.weeklyPlan.sun).toEqual({});
+  expect(mock.profile.studyGoals.weeklyPlan.special).toEqual({ s_math: 15 });
+  expect(mock.profile.studyGoals.subjectWeeklyTargets.s_math).toBe(180);
+  expect(mock.profile.gold).toBe(99);
+});
+
+it('preserves plans on basic-only save and failed plan write', async () => {
+  mock.profile.studyGoals.weeklyPlan = { mon: { s_math: 60, orphan: 45 } };
+  await saveStudyGoals({ db: {}, familyId: 'family', studyGoals: DEFAULT_STUDY_GOALS });
+  expect(mock.profile.studyGoals.weeklyPlan.mon).toEqual({ s_math: 60, orphan: 45 });
+  const before = structuredClone(mock.profile); mock.fail = true;
+  await expect(saveStudyGoals({ db: {}, familyId: 'family', studyGoals: { ...DEFAULT_STUDY_GOALS, weeklyPlan: {} } })).rejects.toThrow('offline');
+  expect(mock.profile).toEqual(before);
+});
