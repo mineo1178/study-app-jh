@@ -49,6 +49,9 @@ import LiveStudyStatus from './components/study/LiveStudyStatus';
 import RewardProgressCard from './components/study/RewardProgressCard';
 import { deriveRewardProgress } from './rpg/rewardProgress';
 import useTimerHeartbeat from './timer/useTimerHeartbeat';
+import useTimerDiagnostics from './timer/useTimerDiagnostics';
+import TimerDiagnosticsPanel from './components/dev/TimerDiagnosticsPanel';
+import { diagnosticErrorCode, diagnosticTimerState, recordTimerDiagnostic, recordTimerSnapshot } from './timer/timerDiagnostics';
 import { TIMER_HEARTBEAT_MS } from './timer/timerHeartbeat';
 import MigrationExportButton from './components/dev/MigrationExportButton';
 import LegacyStudySessionMigrationPanel from './components/dev/LegacyStudySessionMigrationPanel';
@@ -93,7 +96,7 @@ const getTasksCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-
 const getTestsCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tests');
 const getStudySessionsCol = () => studySessionsCollection(db, FAMILY_ID);
 const getActiveTimerRef = () => activeTimerRef(db, FAMILY_ID);
-const APP_VERSION = 'v1.98.0';
+const APP_VERSION = 'v1.98.1';
 const isDocumentHidden = () => typeof document !== 'undefined' && document.hidden;
 // ==========================================
 // Constants & Master Data
@@ -883,6 +886,11 @@ export default function App() {
     const [gachaPending, setGachaPending] = useState(false);
     const [alchemyPending, setAlchemyPending] = useState(false);
     const [activeTimer, setActiveTimer] = useState(null);
+    const [deviceTestEnabled] = useState(() => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('deviceTest') === '1');
+    const diagnosticAuthRef = useRef(undefined);
+    const diagnosticSubscriptionRef = useRef(0);
+    const diagnosticTimerRef = useRef(null);
+    const diagnosticTimerIdsRef = useRef(new Set());
     const [tests, setTests] = useState([]);
     const [loading, setLoading] = useState(true);
     const [selectedTaskId, setSelectedTaskId] = useState(null);
@@ -953,6 +961,8 @@ export default function App() {
     const activeTimerIsOwner = useMemo(() => isTimerOwner(activeTimer, currentClientId), [activeTimer, currentClientId]);
     const isAnyTaskRunning = useMemo(() => hasAnyRunningTimer({ isSampleMode, activeTimer, tasks }), [isSampleMode, activeTimer, tasks]);
     const runningTask = useMemo(() => getRunningTimerTask({ isSampleMode, activeTimerTask, tasks }), [isSampleMode, activeTimerTask, tasks]);
+    useTimerDiagnostics({ timer: activeTimer, isOwner: activeTimerIsOwner, activeTab, sampleMode: isSampleMode, hasTimerTask: Boolean(activeTimerTask) });
+    useEffect(() => { recordTimerDiagnostic('stale_ui_check', { ...diagnosticTimerState(activeTimer, staleCheckNow), source: 'app.stale_effect' }); }, [activeTimer, staleCheckNow]);
     const activeStaleTimer = useMemo(() => isStaleActiveTimer(activeTimer, staleCheckNow) ? activeTimer : null, [activeTimer, staleCheckNow]);
     const legacyAdventure = useMemo(() => shouldUseLegacyRpgUi(isSampleMode) ? gameProgress(tasks, getTodayStr(), unifiedSessions) : null, [isSampleMode, tasks, unifiedSessions]);
     const todayTaskSummaries = useMemo(() => {
@@ -1044,6 +1054,7 @@ export default function App() {
     });
     useEffect(() => {
         if (!activeStaleTimer || isSampleMode || !user || staleInvalidatingRef.current) return;
+        recordTimerDiagnostic('stale_auto_request', { ...diagnosticTimerState(activeStaleTimer), source: 'app.stale_effect', reason: 'HEARTBEAT_15_MINUTES' });
         staleInvalidatingRef.current = true;
         const task = tasks.find((item) => item.id === activeStaleTimer.taskId) || {};
         invalidateStaleActiveTimer({ db, familyId: FAMILY_ID, task, now: Date.now() })
@@ -1119,6 +1130,8 @@ export default function App() {
     }, [isSampleMode]);
     useEffect(() => {
         const unsub = onAuthStateChanged(auth, (u) => {
+            recordTimerDiagnostic('auth_state', { authenticated: Boolean(u), authChanged: diagnosticAuthRef.current !== undefined && diagnosticAuthRef.current !== (u?.uid || null), sampleMode: isSampleMode, source: 'app.auth_listener' });
+            diagnosticAuthRef.current = u?.uid || null;
             if (!isSampleMode) {
                 setUser(u);
                 if (!u)
@@ -1132,6 +1145,8 @@ export default function App() {
     useEffect(() => {
         if (!user || isSampleMode)
             return;
+        const subscriptionId = ++diagnosticSubscriptionRef.current;
+        recordTimerDiagnostic('subscription_start', { subscriptionId, authenticated: Boolean(user), sampleMode: isSampleMode, source: 'app.timer_subscription' });
         const unsubTasks = onSnapshot(getTasksCol(), { includeMetadataChanges: true }, (snap) => {
             if (!snap.metadata.fromCache) feedbackLoadedRef.current.add('tasks');
             setTasks(snap.docs.map(d => ({ id: d.id, ...d.data() })));
@@ -1147,13 +1162,26 @@ export default function App() {
         });
         const unsubSessions = onSnapshot(getStudySessionsCol(), { includeMetadataChanges: true }, (snap) => {
             if (!snap.metadata.fromCache) feedbackLoadedRef.current.add('sessions');
+            for (const change of snap.docChanges()) {
+                if (change.type === 'removed' || !diagnosticTimerIdsRef.current.has(change.doc.id)) continue;
+                const session = change.doc.data();
+                recordTimerDiagnostic('session_snapshot', { timerId: change.doc.id, validationStatus: session.validation?.status, recordedSeconds: session.recordedSeconds, fromCache: snap.metadata.fromCache, hasPendingWrites: snap.metadata.hasPendingWrites, subscriptionId, source: 'app.session_subscription' });
+            }
             setStudySessions(snap.docs.map(d => ({ id: d.id, ...d.data() })));
         }, (err) => {
             console.error("Study session realtime sync error:", err);
         });
-        const unsubActiveTimer = onSnapshot(getActiveTimerRef(), (snap) => {
-            setActiveTimer(snap.exists() ? snap.data() : null);
+        const unsubActiveTimer = onSnapshot(getActiveTimerRef(), { includeMetadataChanges: true }, (snap) => {
+            const next = snap.exists() ? snap.data() : null;
+            recordTimerSnapshot(diagnosticTimerRef.current, next, snap.metadata, subscriptionId);
+            diagnosticTimerRef.current = next;
+            if (next?.timerId) {
+                diagnosticTimerIdsRef.current.add(next.timerId);
+                if (diagnosticTimerIdsRef.current.size > 64) diagnosticTimerIdsRef.current.delete(diagnosticTimerIdsRef.current.values().next().value);
+            }
+            setActiveTimer(next);
         }, (err) => {
+            recordTimerDiagnostic('subscription_error', { subscriptionId, errorCode: diagnosticErrorCode(err), source: 'app.timer_subscription' });
             console.error("Active timer realtime sync error:", err);
         });
         return () => {
@@ -1161,6 +1189,7 @@ export default function App() {
             unsubTests();
             unsubSessions();
             unsubActiveTimer();
+            recordTimerDiagnostic('subscription_end', { subscriptionId, reason: 'AUTH_SAMPLE_OR_UNMOUNT', source: 'app.timer_subscription' });
         };
     }, [user, isSampleMode]);
     const handleLogin = async (e) => {
@@ -1178,6 +1207,7 @@ export default function App() {
         }
     };
     const toggleSampleMode = () => {
+        recordTimerDiagnostic('sample_mode_change', { ...diagnosticTimerState(activeTimer), sampleMode: !isSampleMode, source: 'app.sample_mode' });
         if (!isSampleMode) {
             const { tasks: sTasks, tests: sTests } = generateSampleData();
             setTasks(sTasks);
@@ -1444,6 +1474,7 @@ export default function App() {
     };
     const handleTimerUpdate = useCallback(async (taskId, updates) => {
         const task = tasks.find((item) => item.id === taskId);
+        recordTimerDiagnostic('timer_control', { ...diagnosticTimerState(activeTimer), reason: updates.isRunning ? activeTimer?.state === 'paused' ? 'RESUME_CLICK' : 'START_CLICK' : 'PAUSE_CLICK', sampleMode: isSampleMode, authenticated: Boolean(user), source: 'app.handleTimerUpdate' });
         if (!task || isSampleMode || !user) {
             // Sample mode keeps the old local timer behavior for demonstration data.
             return handleUpdateLocalTask(taskId, updates, false);
@@ -1474,6 +1505,7 @@ export default function App() {
     const handleBreak = useCallback(async (taskId, plannedSeconds, alarmEnabled) => {
         if (isSampleMode || !user || activeTimer?.taskId !== taskId) return;
         try {
+            recordTimerDiagnostic('break_control', { ...diagnosticTimerState(activeTimer), reason: 'USER_BREAK', source: 'app.handleBreak' });
             await startBreakActiveTimer({ db, familyId: FAMILY_ID, timerId: activeTimer.timerId, ownerClientId: currentClientId, plannedSeconds, alarmEnabled });
         } catch (err) {
             alert(err.message === 'TIMER_NOT_OWNER' ? '休憩は開始した端末から開始してください。' : '休憩の開始に失敗しました。');
@@ -1481,7 +1513,8 @@ export default function App() {
     }, [activeTimer, currentClientId, isSampleMode, user]);
     // The latest closure is deliberately mirrored into autoFinishHandlerRef for the five-hour timer callback.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    const handleSaveRecord = async (task, totalSeconds, { memoOverride = null, endAtOverride = null } = {}) => {
+    const handleSaveRecord = async (task, totalSeconds, { memoOverride = null, endAtOverride = null, reason = 'USER_STOP' } = {}) => {
+        recordTimerDiagnostic('stop_control', { ...diagnosticTimerState(activeTimer), reason, sampleMode: isSampleMode, source: 'app.handleSaveRecord' });
         if (isSampleMode || !user || !activeTimer || activeTimer.taskId !== task.id) {
             return handleSaveLegacyRecord(task, totalSeconds);
         }
@@ -1534,7 +1567,7 @@ export default function App() {
     useEffect(() => {
         if (!activeTimerIsOwner || !activeTimerTask || !shouldAutoFinishReading(activeTimer, normalizeActivityType(activeTimerTask.activityType || inferLegacyActivityType(activeTimerTask.subjectId)), liveNow)) return;
         const autoFinish = setTimeout(() => {
-            autoFinishHandlerRef.current?.(activeTimerTask, timerRecordedSeconds(activeTimer, liveNow), { memoOverride: '読書の連続5時間上限により自動終了' });
+            autoFinishHandlerRef.current?.(activeTimerTask, timerRecordedSeconds(activeTimer, liveNow), { memoOverride: '読書の連続5時間上限により自動終了', reason: 'READING_5H_AUTO_FINISH' });
         }, 0);
         return () => clearTimeout(autoFinish);
     }, [activeTimer, activeTimerIsOwner, activeTimerTask, liveNow]);
@@ -1734,10 +1767,11 @@ export default function App() {
     const taskDetailOverlayClass = isMobileView
         ? "absolute inset-0 z-[100] flex items-end justify-center p-0"
         : "fixed inset-0 z-[100] flex items-end lg:items-center justify-center p-0 sm:p-4";
+    const diagnosticPanel = deviceTestEnabled ? <TimerDiagnosticsPanel timer={activeTimer} authenticated={Boolean(user)} isOwner={activeTimerIsOwner}/> : null;
     if (loading && !isSampleMode)
-        return <div className="h-screen flex items-center justify-center bg-slate-50 font-black text-blue-600 animate-pulse uppercase tracking-[0.2em]">Syncing System...</div>;
+        return <>{diagnosticPanel}<div className="h-screen flex items-center justify-center bg-slate-50 font-black text-blue-600 animate-pulse uppercase tracking-[0.2em]">Syncing System...</div></>;
     if (!user && !isSampleMode)
-        return (<div className="h-screen bg-slate-100 flex items-center justify-center p-4 text-center">
+        return (<div className="h-screen bg-slate-100 flex items-center justify-center p-4 text-center">{diagnosticPanel}
       <div className="w-full max-w-sm bg-white rounded-[2.5rem] shadow-2xl p-8 space-y-6">
         <div className="mx-auto w-20 h-20 bg-blue-600 rounded-3xl flex items-center justify-center text-white shadow-xl shadow-blue-100">
            <GraduationCap size={40}/>
@@ -1754,6 +1788,7 @@ export default function App() {
     return (<div className={isMobileView
             ? "min-h-screen bg-slate-800 p-4 sm:p-8 flex justify-center items-center font-sans selection:bg-blue-100"
             : "min-h-screen bg-slate-50 text-slate-900 lg:pl-72 pb-24 lg:pb-0 font-sans selection:bg-blue-100 overflow-x-hidden text-left"}>
+      {diagnosticPanel}
       {staleTimerNotice && <div className="fixed right-4 top-4 z-[150] max-w-sm rounded-2xl bg-slate-900 px-4 py-3 text-xs font-bold text-white shadow-2xl"><div>{staleTimerNotice}</div><button type="button" onClick={() => setStaleTimerNotice(null)} className="mt-2 text-[10px] font-black text-blue-200">閉じる</button></div>}
       <div className={isMobileView
             ? "w-full max-w-[400px] h-[800px] bg-slate-50 rounded-[3rem] shadow-2xl relative overflow-hidden border-[12px] border-slate-900 text-slate-900 flex flex-col text-left"

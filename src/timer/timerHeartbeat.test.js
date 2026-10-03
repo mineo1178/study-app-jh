@@ -22,6 +22,23 @@ describe('short-running timers', () => {
 });
 
 describe('heartbeat clock', () => {
+  it('keeps the timer active after three heartbeat failures and four-minute background suspension', async () => {
+    vi.useFakeTimers(); vi.setSystemTime(1_000_000);
+    const timer = buildActiveTimer({ task: { id: 'math' }, timerId: 't', ownerClientId: 'owner', now: Date.now() });
+    const target = new EventTarget(); const error = vi.fn();
+    const send = vi.fn().mockRejectedValue(new Error('offline'));
+    const stop = startTimerHeartbeat({ send, visibilityTarget: target, onError: error });
+    await vi.advanceTimersByTimeAsync(90_000);
+    expect(error).toHaveBeenCalledTimes(3);
+    // Background throttling: advance wall time without executing interval callbacks.
+    vi.setSystemTime(1_000_000 + 240_000);
+    target.dispatchEvent(new Event('visibilitychange'));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(isActiveTimer(timer)).toBe(true);
+    expect(canForceInvalidateStaleTimer(timer, Date.now())).toBe(false);
+    expect(send).toHaveBeenCalledTimes(4);
+    stop();
+  });
   it('keeps the cadence across frequent snapshot updates and visibility changes', async () => {
     vi.useFakeTimers(); vi.setSystemTime(1_000_000);
     const target = new EventTarget(); let snapshot = { version: 0 };

@@ -1,4 +1,5 @@
 import { doc, runTransaction } from 'firebase/firestore';
+import { diagnosticTimerState, recordTimerDiagnostic, traceTimerOperation } from '../timer/timerDiagnostics.js';
 import { inferLegacyActivityType, normalizeActivityType } from '../integrity/activityTypes.js';
 import { VALIDATION_VERSION } from '../integrity/validationConfig.js';
 import { validateStudySession } from '../integrity/studyValidation.js';
@@ -29,18 +30,18 @@ export function buildActiveTimer({ task, timerId, ownerClientId, now = Date.now(
 
 export async function startActiveTimer({ db, familyId, task, timerId, ownerClientId, now = Date.now() }) {
   const ref = activeTimerRef(db, familyId);
-  return runTransaction(db, async (transaction) => {
+  return traceTimerOperation('start', { timerId, source: 'repository.startActiveTimer' }, () => runTransaction(db, async (transaction) => {
     const existing = (await transaction.get(ref)).data();
     if (isActiveTimer(existing)) throw new Error('ACTIVE_TIMER_EXISTS');
     const timer = buildActiveTimer({ task, timerId, ownerClientId, now });
     transaction.set(ref, timer);
     return timer;
-  });
+  }));
 }
 
 export async function pauseActiveTimer({ db, familyId, timerId, ownerClientId, now = Date.now() }) {
   const ref = activeTimerRef(db, familyId);
-  return runTransaction(db, async (transaction) => {
+  return traceTimerOperation('pause', { timerId, source: 'repository.pauseActiveTimer' }, () => runTransaction(db, async (transaction) => {
     const timer = (await transaction.get(ref)).data();
     if (!timer || timer.timerId !== timerId || timer.ownerClientId !== ownerClientId) throw new Error('TIMER_NOT_OWNER');
     if (timer.state !== 'running') return timer;
@@ -55,12 +56,12 @@ export async function pauseActiveTimer({ db, familyId, timerId, ownerClientId, n
       updatedAt: now,
     });
     return { ...timer, state: 'paused', accumulatedSeconds, segmentStartedAt: null };
-  });
+  }));
 }
 
 export async function startBreakActiveTimer({ db, familyId, timerId, ownerClientId, plannedSeconds, alarmEnabled, now = Date.now() }) {
   const ref = activeTimerRef(db, familyId);
-  return runTransaction(db, async (transaction) => {
+  return traceTimerOperation('break', { timerId, source: 'repository.startBreakActiveTimer' }, () => runTransaction(db, async (transaction) => {
     const timer = (await transaction.get(ref)).data();
     if (!timer || timer.timerId !== timerId || timer.ownerClientId !== ownerClientId) throw new Error('TIMER_NOT_OWNER');
     if (timer.state !== 'running') return timer;
@@ -72,12 +73,12 @@ export async function startBreakActiveTimer({ db, familyId, timerId, ownerClient
       segmentStartedAt: null, accumulatedSeconds, break: breakInfo, lastHeartbeatAt: now, updatedAt: now,
     });
     return { ...timer, state: 'paused', accumulatedSeconds, segmentStartedAt: null, break: breakInfo };
-  });
+  }));
 }
 
 export async function resumeActiveTimer({ db, familyId, timerId, ownerClientId, now = Date.now() }) {
   const ref = activeTimerRef(db, familyId);
-  return runTransaction(db, async (transaction) => {
+  return traceTimerOperation('resume', { timerId, source: 'repository.resumeActiveTimer' }, () => runTransaction(db, async (transaction) => {
     const timer = (await transaction.get(ref)).data();
     if (!timer || timer.timerId !== timerId || timer.ownerClientId !== ownerClientId) throw new Error('TIMER_NOT_OWNER');
     if (timer.state !== 'paused') return timer;
@@ -88,17 +89,17 @@ export async function resumeActiveTimer({ db, familyId, timerId, ownerClientId, 
     const breaks = completedBreak ? [...(timer.breaks || []), completedBreak] : (timer.breaks || []);
     transaction.update(ref, { state: 'running', segmentStartedAt: now, lastHeartbeatAt: now, updatedAt: now, break: null, breaks });
     return { ...timer, state: 'running', segmentStartedAt: now, lastHeartbeatAt: now, break: null, breaks };
-  });
+  }));
 }
 
 export async function heartbeatActiveTimer({ db, familyId, timerId, ownerClientId, now = Date.now() }) {
   const ref = activeTimerRef(db, familyId);
-  return runTransaction(db, async (transaction) => {
+  return traceTimerOperation('heartbeat', { timerId, source: 'repository.heartbeatActiveTimer' }, () => runTransaction(db, async (transaction) => {
     const timer = (await transaction.get(ref)).data();
     if (!canHeartbeatActiveTimer(timer, timerId, ownerClientId)) return false;
     transaction.update(ref, { lastHeartbeatAt: now, updatedAt: now });
     return true;
-  });
+  }));
 }
 
 export function buildStaleTimerInvalidSession(timer, task = {}, now = Date.now()) {
@@ -153,7 +154,7 @@ export function buildTimerSwitchPlan({ existingTimer, existingTask, nextTask, ne
 
 export async function startOrSwitchActiveTimer({ db, familyId, task, tasks = [], timerId, ownerClientId, now = Date.now() }) {
   const ref = activeTimerRef(db, familyId);
-  return runTransaction(db, async (transaction) => {
+  return traceTimerOperation('start_or_switch', { timerId, source: 'repository.startOrSwitchActiveTimer' }, () => runTransaction(db, async (transaction) => {
     const timerSnap = await transaction.get(ref);
     const existingTimer = timerSnap.exists() ? timerSnap.data() : null;
     const existingTask = tasks.find((item) => item.id === existingTimer?.taskId) || null;
@@ -176,15 +177,16 @@ export async function startOrSwitchActiveTimer({ db, familyId, task, tasks = [],
     }
     transaction.set(ref, plan.nextTimer);
     return { ...plan, timer: plan.nextTimer };
-  });
+  }));
 }
 
 export async function invalidateStaleActiveTimer({ db, familyId, task, now = Date.now() }) {
   const timerRef = activeTimerRef(db, familyId);
-  return runTransaction(db, async (transaction) => {
+  return traceTimerOperation('stale_invalidate', { source: 'repository.invalidateStaleActiveTimer' }, () => runTransaction(db, async (transaction) => {
     const timerSnap = await transaction.get(timerRef);
     if (!timerSnap.exists()) return { invalidated: false, reason: 'NO_ACTIVE_TIMER' };
     const timer = timerSnap.data();
+    recordTimerDiagnostic('stale_transaction_check', { ...diagnosticTimerState(timer, now), source: 'repository.invalidateStaleActiveTimer' });
     if (!canForceInvalidateStaleTimer(timer, now)) return { invalidated: false, reason: 'TIMER_HEARTBEAT_RECOVERED' };
     const sessionRef = doc(db, 'families', familyId, 'apps', 'junior-high', 'studySessions', staleTimerSessionId(timer));
     const existingSession = await transaction.get(sessionRef);
@@ -193,7 +195,7 @@ export async function invalidateStaleActiveTimer({ db, familyId, task, now = Dat
     transaction.set(sessionRef, session);
     transaction.delete(timerRef);
     return { invalidated: true, session };
-  });
+  }));
 }
 
 export function buildFinishedTimerSession(timer, task = {}, { endAt = Date.now(), validation, memo = '' } = {}) {
@@ -231,16 +233,17 @@ export function buildFinishedTimerSession(timer, task = {}, { endAt = Date.now()
 export async function finishActiveTimer({ db, familyId, task, timerId, endAt = Date.now(), memo = '' }) {
   const timerRef = activeTimerRef(db, familyId);
   const sessionRef = doc(db, 'families', familyId, 'apps', 'junior-high', 'studySessions', timerId);
-  return runTransaction(db, async (transaction) => {
+  return traceTimerOperation('stop', { timerId, source: 'repository.finishActiveTimer' }, () => runTransaction(db, async (transaction) => {
     const [timerSnap, existingSession] = await Promise.all([transaction.get(timerRef), transaction.get(sessionRef)]);
     if (existingSession.exists()) return { session: existingSession.data(), alreadyFinished: true };
     const timer = timerSnap.data();
     if (!canFinishActiveTimer(timer, timerId)) throw new Error('TIMER_NOT_ACTIVE');
+    recordTimerDiagnostic('stop_transaction_state', { ...diagnosticTimerState(timer, endAt), source: 'repository.finishActiveTimer' });
     const session = buildFinishedTimerSession(timer, task, { endAt, memo });
     transaction.set(sessionRef, session);
     // Delete only after the Session write is part of this same transaction. This also
     // makes an owner heartbeat that races after STOP a no-op rather than a revival.
     transaction.delete(timerRef);
     return { session, alreadyFinished: false };
-  });
+  }));
 }

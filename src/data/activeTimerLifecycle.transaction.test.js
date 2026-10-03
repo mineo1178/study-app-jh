@@ -28,6 +28,14 @@ const args = { db: {}, familyId: 'f', task, timerId: 't', ownerClientId: 'owner'
 beforeEach(() => { state.store.clear(); state.race = null; state.attempts = 0; });
 
 describe('active timer transaction lifecycle', () => {
+  it('reproduces early stale deletion when a different client clock is fifteen minutes ahead', async () => {
+    await startActiveTimer({ ...args, now: start });
+    const observerNow = start + 30_000 + 15 * 60_000;
+    const result = await invalidateStaleActiveTimer({ ...args, now: observerNow });
+    expect(result.invalidated).toBe(true);
+    expect(result.session.validation.status).toBe('invalid');
+    expect(state.store.has(ref)).toBe(false);
+  });
   it.each([30, 60, 299, 301])('does not delete a STARTed timer after %s seconds with delayed heartbeats', async (seconds) => {
     await startActiveTimer({ ...args, now: start });
     expect(await invalidateStaleActiveTimer({ ...args, now: start + seconds * 1000 })).toMatchObject({ invalidated: false });
