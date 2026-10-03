@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { battleFeedback, createFeedbackQueue, progressFeedback, studyFeedback } from './feedbackEvents.js';
+import { battleFeedback, createFeedbackQueue, idleStopFeedback, progressFeedback, studyFeedback } from './feedbackEvents.js';
 
 const event = (key, type = 'study_complete') => ({ key, type });
 const state = (completed = false, level = 4) => ({ level, achievements: [{ id: 'a', name: '3日連続', completed }], titles: completed ? [{ id: 't', name: '継続の芽' }] : [] });
@@ -56,6 +56,20 @@ describe('initial state and progress transitions', () => {
 });
 
 describe('STOP feedback', () => {
+  it('shows idle reason before study completion, without duplicate results', () => {
+    const queue = createFeedbackQueue(); queue.hold();
+    queue.enqueue(studyFeedback(study(), '数学'));
+    queue.enqueue(idleStopFeedback(study())); queue.enqueue(idleStopFeedback(study())); queue.release();
+    expect(queue.getSnapshot().map((item) => item.type)).toEqual(['idle_stop', 'study_complete']);
+    expect(queue.getSnapshot()[0].name).toContain('5分間操作がなかった');
+    queue.close('idle:session-1'); expect(queue.getSnapshot()[0].type).toBe('study_complete');
+    expect(idleStopFeedback({ ...study(), alreadyFinished: true })).toEqual([]);
+  });
+  it.each(['invalid', 'pending_review'])('idle %s feedback never claims credited study time', (status) => {
+    const feedback = idleStopFeedback(study(status))[0];
+    expect(feedback.details.join()).toContain('実績と報酬には含めていません');
+    expect(studyFeedback(study(status), '数学')).toEqual([]);
+  });
   it('uses successful confirmed duration and task name', () => {
     const feedback = studyFeedback(study(), '数学')[0];
     expect(feedback.name).toBe('数学'); expect(feedback.details[0]).toContain('10');

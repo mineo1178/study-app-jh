@@ -30,7 +30,7 @@ describe('user activity observation has no timer side effects', () => {
   it('samples high frequency activity but retains the latest actual operation', () => {
     const surface = target(); const record = vi.fn(); let now = startedAt;
     const cleanup = listenTimerUserActivity(record, surface, () => now);
-    for (let index = 0; index < 60_000; index++) { now = startedAt + index; surface.emit('pointermove'); }
+    for (let index = 0; index < 60_000; index++) { now = startedAt + index; surface.emit('wheel'); }
     expect(record).toHaveBeenCalledTimes(1);
     expect(diagnosticUserActivity(now).lastUserActivityAt).toBe(now);
     now = startedAt + 60_000; surface.emit('click'); expect(record).toHaveBeenCalledTimes(2); cleanup();
@@ -39,7 +39,7 @@ describe('user activity observation has no timer side effects', () => {
     const surface = target(); const record = vi.fn();
     const cleanup = listenTimerUserActivity(record, surface, () => startedAt);
     surface.emit('click', false);
-    for (const event of ['heartbeat', 'snapshot', 'render', 'state_update', 'tick', 'feedback', 'lazy_load', 'network_response', 'visibilitychange', 'focus', 'poll']) surface.emit(event);
+    for (const event of ['heartbeat', 'snapshot', 'render', 'state_update', 'tick', 'feedback', 'lazy_load', 'network_response', 'visibilitychange', 'focus', 'poll', 'pointermove', 'mousemove', 'scroll']) surface.emit(event);
     expect(diagnosticUserActivity().lastUserActivityAt).toBeNull(); expect(record).not.toHaveBeenCalled();
     cleanup(); const cleanupAgain = listenTimerUserActivity(record, surface, () => startedAt);
     expect(surface.listeners.size).toBe(TIMER_ACTIVITY_EVENTS.length); cleanupAgain();

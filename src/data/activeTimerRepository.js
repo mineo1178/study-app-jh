@@ -5,6 +5,7 @@ import { VALIDATION_VERSION } from '../integrity/validationConfig.js';
 import { validateStudySession } from '../integrity/studyValidation.js';
 import { REWARD_POLICY_VERSION } from '../rpg/rewardConfig.js';
 import { closeSegment, isActiveTimer, isStaleActiveTimer, timerRecordedSeconds, timerSegmentsAtEnd } from '../timer/timerEngine.js';
+import { IDLE_AUTO_STOP_SECONDS } from '../timer/timerIdle.js';
 
 const ACTIVE_TIMER_ID = 'current';
 export const activeTimerRef = (db, familyId) => doc(db, 'families', familyId, 'apps', 'junior-high', 'activeTimers', ACTIVE_TIMER_ID);
@@ -230,13 +231,19 @@ export function buildFinishedTimerSession(timer, task = {}, { endAt = Date.now()
   };
 }
 
-export async function finishActiveTimer({ db, familyId, task, timerId, endAt = Date.now(), memo = '' }) {
+export async function finishActiveTimer({ db, familyId, task, timerId, endAt = Date.now(), memo = '', idle = null }) {
   const timerRef = activeTimerRef(db, familyId);
   const sessionRef = doc(db, 'families', familyId, 'apps', 'junior-high', 'studySessions', timerId);
   return traceTimerOperation('stop', { timerId, source: 'repository.finishActiveTimer' }, () => runTransaction(db, async (transaction) => {
     const [timerSnap, existingSession] = await Promise.all([transaction.get(timerRef), transaction.get(sessionRef)]);
     if (existingSession.exists()) return { session: existingSession.data(), alreadyFinished: true };
     const timer = timerSnap.data();
+    if (idle && (!canFinishActiveTimer(timer, timerId) || timer.state !== 'running'
+      || timer.ownerClientId !== idle.ownerClientId || timer.segmentStartedAt !== idle.segmentStartedAt
+      || !Number.isFinite(idle.lastUserActivityAt) || idle.lastUserActivityAt < timer.segmentStartedAt
+      || endAt !== idle.lastUserActivityAt + IDLE_AUTO_STOP_SECONDS * 1000)) {
+      return { skipped: true, reason: 'IDLE_STATE_CHANGED' };
+    }
     if (!canFinishActiveTimer(timer, timerId)) throw new Error('TIMER_NOT_ACTIVE');
     recordTimerDiagnostic('stop_transaction_state', { ...diagnosticTimerState(timer, endAt), source: 'repository.finishActiveTimer' });
     const session = buildFinishedTimerSession(timer, task, { endAt, memo });

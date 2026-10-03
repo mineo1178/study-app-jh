@@ -1,6 +1,6 @@
 import { formatHms } from '../data/studySessionSelectors.js';
 
-const priority = { study_complete: 0, chapter_clear: 0, campaign_clear: 1, tower_floor_clear: 0, tower_boss_clear: 0, weekly_boss_clear: 0, level_up: 2, achievement_complete: 3, title_unlocked: 4 };
+const priority = { idle_stop: -1, study_complete: 0, chapter_clear: 0, campaign_clear: 1, tower_floor_clear: 0, tower_boss_clear: 0, weekly_boss_clear: 0, level_up: 2, achievement_complete: 3, title_unlocked: 4 };
 
 export function createFeedbackQueue() {
   let events = [];
@@ -34,6 +34,17 @@ export function createFeedbackQueue() {
     update(event) { held = held.map((item) => item.key === event.key ? event : item); events = events.map((item) => item.key === event.key ? event : item); notify(); },
     close(key) { events = events.filter((event) => event.key !== key); notify(); },
   };
+}
+
+export function idleStopFeedback(result) {
+  if (!result?.session || result.alreadyFinished) return [];
+  const session = result.session;
+  return [{ key: `idle:${session.timerId}`, type: 'idle_stop', title: 'タイマーを自動停止しました',
+    name: '5分間操作がなかったため、タイマーを停止しました。',
+    details: [session.validation?.status === 'valid'
+      ? `停止予定時刻までの学習時間 ${formatHms(session.recordedSeconds)}を記録しました。`
+      : 'この記録は確認が必要なため、実績と報酬には含めていません。「確認」画面で確認してください。',
+    'もう一度STARTすると計測を再開できます。'] }];
 }
 
 export function studyFeedback(result, taskName, reward) {

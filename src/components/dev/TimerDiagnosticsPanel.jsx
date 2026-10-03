@@ -1,16 +1,17 @@
 import { useState, useSyncExternalStore } from 'react';
 import { diagnosticTimerState, diagnosticUserActivity, timerDiagnostics } from '../../timer/timerDiagnostics.js';
+import { getTimerIdleDiagnostic, IDLE_AUTO_STOP_SECONDS } from '../../timer/timerIdle.js';
 
 const time = (value) => typeof value === 'number' && Number.isFinite(value) ? new Date(value).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '—';
 
-export default function TimerDiagnosticsPanel({ timer, authenticated, isOwner }) {
+export default function TimerDiagnosticsPanel({ timer, authenticated, isOwner, currentClientId }) {
   const entries = useSyncExternalStore(timerDiagnostics.subscribe, timerDiagnostics.getSnapshot, timerDiagnostics.getSnapshot);
   const [expanded, setExpanded] = useState(true);
   const [exportText, setExportText] = useState('');
   const [message, setMessage] = useState('');
   const state = diagnosticTimerState(timer, entries.at(-1)?.timestamp || 0);
-  const activity = diagnosticUserActivity(entries.at(-1)?.timestamp || 0);
-  const lastStop = entries.findLast((entry) => entry.event === 'stop_control' || entry.event === 'session_finalized');
+  const activity = getTimerIdleDiagnostic() || diagnosticUserActivity(entries.at(-1)?.timestamp || 0);
+  const lastStop = entries.findLast((entry) => entry.event === 'stop_control' || entry.event === 'session_finalized' || entry.event === 'idle_stop_committed');
   const copy = async () => {
     const text = timerDiagnostics.export();
     setExportText(text);
@@ -24,11 +25,14 @@ export default function TimerDiagnosticsPanel({ timer, authenticated, isOwner })
       <dl className="mt-3 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1">
         <dt>状態</dt><dd>{state.status} / stale: {String(state.stale)}</dd>
         <dt>timerId</dt><dd className="break-all">{state.timerId || '—'}</dd>
+        <dt>owner / device:tab</dt><dd>{timer?.ownerClientId || '—'}</dd>
+        <dt>このタブ</dt><dd>{currentClientId || '—'}</dd>
         <dt>startedAt</dt><dd>{time(state.startedAt)}</dd>
         <dt>lastHeartbeatAt</dt><dd>{time(state.lastHeartbeatAt)}</dd>
-        <dt>lastUserActivityAt</dt><dd>{time(activity.lastUserActivityAt)}（このページで観測）</dd>
+        <dt>lastUserActivityAt</dt><dd>{time(activity.lastUserActivityAt)}（この端末・タブ）</dd>
         <dt>無操作秒数（ログ更新時）</dt><dd>{activity.elapsedIdleSeconds ?? '未観測'}</dd>
-        <dt>無操作停止 / deadline</dt><dd>未実装 / なし</dd>
+        <dt>無操作停止</dt><dd>{IDLE_AUTO_STOP_SECONDS}秒（5分・開始したタブのみ）</dd>
+        <dt>idle deadline</dt><dd>{time(activity.idleDeadline)}</dd>
         <dt>通信停止判定</dt><dd>15分（ユーザー操作とは別）</dd>
         <dt>focus</dt><dd>{String(entries.at(-1)?.focus ?? 'unknown')}</dd>
         <dt>直近終了理由</dt><dd>{lastStop?.reason || '—'}</dd>

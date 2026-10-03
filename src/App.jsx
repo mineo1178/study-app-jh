@@ -38,7 +38,7 @@ import { deriveAchievements, deriveUnlockedTitles, getSelectedUnlockedTitle, isT
 import { DAILY_TARGET_SECONDS } from './studyTargets';
 import RpgWalletPanel from './components/rpg/RpgWalletPanel';
 import FeedbackOverlay from './components/feedback/FeedbackOverlay';
-import { feedbackSession, studyFeedback, progressFeedback, battleFeedback } from './feedback/feedbackEvents';
+import { feedbackSession, idleStopFeedback, studyFeedback, progressFeedback, battleFeedback } from './feedback/feedbackEvents';
 import LazyPanel from './components/common/LazyPanel';
 import PurchaseConfirmModal from './components/rpg/PurchaseConfirmModal';
 import MaterialExchangeConfirmModal from './components/rpg/MaterialExchangeConfirmModal';
@@ -50,6 +50,8 @@ import LearningDashboard from './components/study/LearningDashboard';
 import { deriveDashboardSummary } from './data/dashboardSelectors';
 import { deriveRewardProgress } from './rpg/rewardProgress';
 import useTimerHeartbeat from './timer/useTimerHeartbeat';
+import useTimerIdleStop from './timer/useTimerIdleStop';
+import { rememberTimerIdleStart } from './timer/timerIdle';
 import useTimerDiagnostics from './timer/useTimerDiagnostics';
 import TimerDiagnosticsPanel from './components/dev/TimerDiagnosticsPanel';
 import { diagnosticErrorCode, diagnosticTimerState, recordTimerDiagnostic, recordTimerSnapshot } from './timer/timerDiagnostics';
@@ -98,7 +100,7 @@ const getTasksCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-
 const getTestsCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tests');
 const getStudySessionsCol = () => studySessionsCollection(db, FAMILY_ID);
 const getActiveTimerRef = () => activeTimerRef(db, FAMILY_ID);
-const APP_VERSION = 'v2.0.1';
+const APP_VERSION = 'v2.0.2';
 const isDocumentHidden = () => typeof document !== 'undefined' && document.hidden;
 // ==========================================
 // Constants & Master Data
@@ -1063,8 +1065,20 @@ export default function App() {
         enabled: activeTimerIsOwner && !isSampleMode && Boolean(user),
         onHeartbeat: (timerId) => heartbeatActiveTimer({ db, familyId: FAMILY_ID, timerId, ownerClientId: currentClientId }),
     });
+    const idleController = useTimerIdleStop({
+        timer: activeTimer, ownerClientId: currentClientId,
+        enabled: activeTimerIsOwner && !isSampleMode && Boolean(user),
+        onStop: ({ timerId, endAt, idle }) => {
+            if (activeTimer?.timerId !== timerId) return { skipped: true, reason: 'IDLE_STATE_CHANGED' };
+            if (!activeTimerTask) throw new Error('IDLE_TASK_NOT_READY');
+            return autoFinishHandlerRef.current?.(activeTimerTask, 0, {
+                memoOverride: '', endAtOverride: endAt, reason: 'IDLE_5_MINUTES', idle,
+            });
+        },
+    });
     useEffect(() => {
         if (!activeStaleTimer || isSampleMode || !user || staleInvalidatingRef.current) return;
+        if (activeTimerIsOwner && idleController.current?.blocksStale()) return;
         recordTimerDiagnostic('stale_auto_request', { ...diagnosticTimerState(activeStaleTimer), source: 'app.stale_effect', reason: 'HEARTBEAT_15_MINUTES' });
         staleInvalidatingRef.current = true;
         const task = tasks.find((item) => item.id === activeStaleTimer.taskId) || {};
@@ -1080,7 +1094,7 @@ export default function App() {
                 staleInvalidatingRef.current = false;
                 setStaleCheckNow(Date.now());
             });
-    }, [activeStaleTimer, isSampleMode, tasks, user]);
+    }, [activeStaleTimer, activeTimerIsOwner, idleController, isSampleMode, tasks, user]);
     const openHistoryCorrection = (session, decision = 'valid') => {
         if (!canReview || !isCanonicalHistoryCorrectionTarget(session)) return;
         setReviewError(null);
@@ -1492,11 +1506,15 @@ export default function App() {
             // Sample mode keeps the old local timer behavior for demonstration data.
             return handleUpdateLocalTask(taskId, updates, false);
         }
+        if (idleController.current?.blocksStale()) return;
         try {
             if (updates.isRunning) {
                 const result = activeTimer?.taskId === taskId && activeTimer.state === 'paused'
                   ? await resumeActiveTimer({ db, familyId: FAMILY_ID, timerId: activeTimer.timerId, ownerClientId: currentClientId })
                   : await startOrSwitchActiveTimer({ db, familyId: FAMILY_ID, task, tasks, timerId: createTimerId(), ownerClientId: currentClientId });
+                if (result.nextTimer || result.resumed || result.state === 'running') {
+                    rememberTimerIdleStart(result.timer || result, currentClientId);
+                }
                 if (result.switched) {
                     const message = result.invalidatedPrevious
                       ? `停止したまま残っていた計測を無効化し、${task.title}を開始しました。`
@@ -1514,21 +1532,28 @@ export default function App() {
         catch (err) {
             alert(err.message === 'TIMER_NOT_OWNER' ? 'このタイマーは開始した端末から再開してください。' : 'タイマー操作に失敗しました。');
         }
-    }, [activeTimer, currentClientId, handleUpdateLocalTask, isSampleMode, tasks, user]);
+    }, [activeTimer, currentClientId, handleUpdateLocalTask, idleController, isSampleMode, tasks, user]);
     const handleBreak = useCallback(async (taskId, plannedSeconds, alarmEnabled) => {
         if (isSampleMode || !user || activeTimer?.taskId !== taskId) return;
+        if (idleController.current?.blocksStale()) return;
         try {
             recordTimerDiagnostic('break_control', { ...diagnosticTimerState(activeTimer), reason: 'USER_BREAK', source: 'app.handleBreak' });
             await startBreakActiveTimer({ db, familyId: FAMILY_ID, timerId: activeTimer.timerId, ownerClientId: currentClientId, plannedSeconds, alarmEnabled });
         } catch (err) {
             alert(err.message === 'TIMER_NOT_OWNER' ? '休憩は開始した端末から開始してください。' : '休憩の開始に失敗しました。');
         }
-    }, [activeTimer, currentClientId, isSampleMode, user]);
-    // The latest closure is deliberately mirrored into autoFinishHandlerRef for the five-hour timer callback.
+    }, [activeTimer, currentClientId, idleController, isSampleMode, user]);
+    // The latest closure is mirrored for reading-limit and idle callbacks.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    const handleSaveRecord = async (task, totalSeconds, { memoOverride = null, endAtOverride = null, reason = 'USER_STOP' } = {}) => {
+    const handleSaveRecord = async (task, totalSeconds, { memoOverride = null, endAtOverride = null, reason = 'USER_STOP', idle = null } = {}) => {
+        if (!idle && idleController.current?.blocksStale()) {
+            const state = idleController.current.getState();
+            idle = { ownerClientId: currentClientId, segmentStartedAt: activeTimer.segmentStartedAt, lastUserActivityAt: state.lastUserActivityAt };
+            endAtOverride = state.idleDeadline; memoOverride = ''; reason = 'IDLE_5_MINUTES';
+        }
         recordTimerDiagnostic('stop_control', { ...diagnosticTimerState(activeTimer), reason, sampleMode: isSampleMode, source: 'app.handleSaveRecord' });
         if (isSampleMode || !user || !activeTimer || activeTimer.taskId !== task.id) {
+            if (idle) return { skipped: true, reason: 'IDLE_STATE_CHANGED' };
             return handleSaveLegacyRecord(task, totalSeconds);
         }
         if (savingRecordRef.current) return;
@@ -1536,6 +1561,12 @@ export default function App() {
         setIsSavingRecord(true);
         try {
             const memo = memoOverride ?? prompt('学習内容：') ?? '';
+            // A blocking memo prompt may outlive the idle deadline.
+            if (!idle && idleController.current?.blocksStale()) {
+                const state = idleController.current.getState();
+                idle = { ownerClientId: currentClientId, segmentStartedAt: activeTimer.segmentStartedAt, lastUserActivityAt: state.lastUserActivityAt };
+                endAtOverride = state.idleDeadline;
+            }
             feedbackSession.queue.hold();
             const now = Date.now();
             const endAt = endAtOverride || now;
@@ -1546,8 +1577,11 @@ export default function App() {
                 timerId: activeTimer.timerId,
                 endAt,
                 memo,
+                idle,
             });
+            if (result.skipped) return result;
             const validation = result.session.validation;
+            if (idle) feedbackSession.queue.enqueue(idleStopFeedback(result));
             feedbackSession.queue.enqueue(studyFeedback(result, task.title));
             let reward = null;
             if (!result.alreadyFinished && result.session.rewardPolicyVersion) {
@@ -1559,13 +1593,15 @@ export default function App() {
             }
             const completedFeedback = studyFeedback(result, task.title, reward)[0];
             if (completedFeedback) feedbackSession.queue.update(completedFeedback);
-            if (!result.alreadyFinished && validation.status !== 'valid') {
+            if (!idle && !result.alreadyFinished && validation.status !== 'valid') {
                 setStaleTimerNotice('この学習時間は確認が必要なため、実績と報酬には含めていません。「確認」画面で記録内容を確認してください。');
             }
             setSelectedTaskId(null);
+            return result;
         }
         catch (err) {
             console.error('Study session finish failed:', err);
+            if (idle) throw err;
             alert(err.message === 'TIMER_NOT_ACTIVE' ? 'このタイマーはすでに停止されています。' : '保存に失敗しました。');
         }
         finally {
@@ -1780,7 +1816,7 @@ export default function App() {
     const taskDetailOverlayClass = isMobileView
         ? "absolute inset-0 z-[100] flex items-end justify-center p-0"
         : "fixed inset-0 z-[100] flex items-end lg:items-center justify-center p-0 sm:p-4";
-    const diagnosticPanel = deviceTestEnabled ? <TimerDiagnosticsPanel timer={activeTimer} authenticated={Boolean(user)} isOwner={activeTimerIsOwner}/> : null;
+    const diagnosticPanel = deviceTestEnabled ? <TimerDiagnosticsPanel timer={activeTimer} authenticated={Boolean(user)} isOwner={activeTimerIsOwner} currentClientId={currentClientId}/> : null;
     if (loading && !isSampleMode)
         return <>{diagnosticPanel}<div className="h-screen flex items-center justify-center bg-slate-50 font-black text-blue-600 animate-pulse uppercase tracking-[0.2em]">Syncing System...</div></>;
     if (!user && !isSampleMode)
