@@ -79,6 +79,11 @@ const makeResult = (id, current, progressText, targetOverride) => {
   return { ...definition, target, current, completed: current >= target, progressText };
 };
 
+export const deriveWeeklyGoalProgress = ({ days = 0, subjects = 0 } = {}) => [
+  makeResult('achievement_week_5days', days, `${days} / 5日`),
+  makeResult('achievement_week_3subjects', subjects, `${subjects} / 3教科`),
+];
+
 export function deriveAchievements({ sessions = [], playerProfile = {}, rpgProgress = {}, towerProgress = {} } = {}) {
   const study = summarizeStudy(sessions);
   const level = levelForTotalExp(playerProfile.totalExp);
@@ -96,8 +101,7 @@ export function deriveAchievements({ sessions = [], playerProfile = {}, rpgProgr
     makeResult('achievement_study_10h', study.totalSeconds, `${formatHours(study.totalSeconds)} / 10時間`),
     makeResult('achievement_daily_2h', study.bestDaySeconds, `${formatHours(study.bestDaySeconds)} / 2時間`),
     makeResult('achievement_streak_3', study.longestStreak, `${study.longestStreak} / 3日`),
-    makeResult('achievement_week_5days', study.bestWeekDays, `${study.bestWeekDays} / 5日`),
-    makeResult('achievement_week_3subjects', study.bestWeekSubjects, `${study.bestWeekSubjects} / 3教科`),
+    ...deriveWeeklyGoalProgress({ days: study.bestWeekDays, subjects: study.bestWeekSubjects }),
     makeResult('achievement_level_5', level, `Lv.${level} / Lv.5`),
     makeResult('achievement_first_equipment', equipmentCount, `${equipmentCount} / 1個`),
     makeResult('achievement_chapter1', chapterOneComplete, `${chapterOneComplete} / 1章`),

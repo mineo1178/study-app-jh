@@ -63,6 +63,7 @@ import { buildReviewQueue, isCanonicalHistoryCorrectionTarget, reviewErrorMessag
 import { applyTestRecordUpdate, buildDeviationFieldPatch, buildDeviationUpdate, compareTestRecords, filterTestRecordsByDateRange, getCalendarMonthsAgoDateString, getDeviationDomain, isValidTestDate, normalizeTestRecord } from './tests/testRecord';
 const RpgHub = lazy(() => import('./components/rpg/RpgHub'));
 const StudyCharts = lazy(() => import('./components/charts/StudyCharts'));
+const WeeklyReport = lazy(() => import('./components/study/WeeklyReport'));
 // ==========================================
 // Firebase Initialization (Vite/Vercel Dedicated)
 // ==========================================
@@ -97,7 +98,7 @@ const getTasksCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-
 const getTestsCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tests');
 const getStudySessionsCol = () => studySessionsCollection(db, FAMILY_ID);
 const getActiveTimerRef = () => activeTimerRef(db, FAMILY_ID);
-const APP_VERSION = 'v1.99.0';
+const APP_VERSION = 'v2.0.0';
 const isDocumentHidden = () => typeof document !== 'undefined' && document.hidden;
 // ==========================================
 // Constants & Master Data
@@ -2037,6 +2038,7 @@ export default function App() {
                 </div>
               </div>)}
 
+            {activeTab === 'weekly-report' && <LazyPanel label="週間レポート"><WeeklyReport sessions={unifiedSessions} now={dashboardDay} ready={isSampleMode || (dashboardLoaded.tasks && dashboardLoaded.sessions)} subjectDefinitions={SUBJECT_DEFS} onBack={() => setActiveTab('daily')}/></LazyPanel>}
             {activeTab === 'stats' && (<div className="space-y-8 sm:space-y-10 animate-in slide-in-from-bottom-5 duration-500 text-center">
                 
                 {/* 追加: 当日の学習タイムラインを実績分析画面にも表示 */}
