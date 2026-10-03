@@ -1,3 +1,4 @@
+import SubjectGoalProgress from './SubjectGoalProgress.jsx';
 import { useMemo, useState } from 'react';
 import { deriveWeeklyReport, moveReportWeek, reportDuration as duration } from '../../data/weeklyReportSelectors.js';
 
@@ -50,6 +51,11 @@ export default function WeeklyReport({ sessions, now, ready, subjectDefinitions,
       <div className={card}>
         <h2 className="text-lg font-black">日別の学習</h2>
         <ul className="mt-3 space-y-3">{week.days.map(day => <li key={day.date} className="min-w-0"><div className="flex flex-wrap justify-between gap-1 text-xs"><span className="font-bold">{day.weekday}（{day.date.slice(5).replace('-', '/')}）</span><span>{duration(day.seconds)}{day.achieved && ` ・ ${duration(week.dailyTargetSeconds)}達成`}</span></div><progress aria-label={`${day.weekday}曜日の学習時間`} value={day.seconds} max={dailyMax} className="mt-1 block h-2 w-full max-w-full accent-blue-600"/></li>)}</ul>
+      </div>
+      <div className={card}>
+        <h2 className="text-lg font-black">科目別目標</h2>
+        <p className="mt-2 text-xs text-slate-500">現在の目標を基準に表示</p>
+        {week.subjectGoals.length ? <SubjectGoalProgress goals={week.subjectGoals}/> : <p className="mt-3 text-sm text-slate-500">科目別目標は設定されていません。Dashboardの「目標を変更」から設定できます。</p>}
       </div>
       <div className={card}>
         <h2 className="text-lg font-black">教科のバランス</h2>

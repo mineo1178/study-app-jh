@@ -1,3 +1,5 @@
+import { deriveSubjectGoalProgress } from '../subjectStudyGoals.js';
+import { SUBJECT_DEFS } from '../subjectCatalog.js';
 import { getValidStudySessions } from './studySessionSelectors.js';
 import { deriveWeeklyGoalProgress, timestampForStudyDate } from '../rpg/achievementSelectors.js';
 import { getNextWeeklyBossResetAt, getWeeklyBossWeekId } from '../rpg/weeklyBossCatalog.js';
@@ -18,7 +20,7 @@ const createWeek = (startAt, today) => {
 };
 
 // Effective-record filtering once, followed by one aggregation for all displayed weeks.
-export function deriveWeeklyReport({ sessions = [], now, ready = false, subjectDefinitions = {}, studyGoals } = {}) {
+export function deriveWeeklyReport({ sessions = [], now, ready = false, subjectDefinitions = SUBJECT_DEFS, studyGoals } = {}) {
   if (!ready || !Number.isFinite(now)) return { status: 'loading', weeks: [] };
   const { dailyTargetSeconds, weeklyTargetSeconds, weeklyStudyDays } = personalStudyTargets(studyGoals);
   const today = studyDate(now);
@@ -65,7 +67,7 @@ export function deriveWeeklyReport({ sessions = [], now, ready = false, subjectD
     const hints = goals.map((goal,index) => ({ id: goal.id, text: goal.completed ? `${goal.name}達成` : `あと${goal.target - goal.current}${index === 0 ? '日' : '教科'}で${goal.name}` }));
     const currentDay = days.find(day => day.date === today);
     if (currentDay) hints.push({ id: 'daily', text: currentDay.achieved ? `今日の${reportDuration(dailyTargetSeconds)}目標達成` : `今日あと${reportDuration(dailyTargetSeconds - currentDay.seconds)}で${reportDuration(dailyTargetSeconds)}目標` });
-    return { dailyTargetSeconds, weeklyTargetSeconds, weeklyStudyDays, id: week.id, startAt: week.startAt, label: week.label, days, seconds: week.seconds, count: week.count, learningDays, subjectCount: week.subjectIds.size, subjects, highlights: highlights.slice(0,3), hints: hints.slice(0,3) };
+    return { subjectGoals: deriveSubjectGoalProgress(studyGoals?.subjectWeeklyTargets, week.subjects, subjectDefinitions), dailyTargetSeconds, weeklyTargetSeconds, weeklyStudyDays, id: week.id, startAt: week.startAt, label: week.label, days, seconds: week.seconds, count: week.count, learningDays, subjectCount: week.subjectIds.size, subjects, highlights: highlights.slice(0,3), hints: hints.slice(0,3) };
   });
   return { status: 'ready', weeks: weeks.slice(0,4).map((week,index) => {
     const previous = weeks[index + 1];

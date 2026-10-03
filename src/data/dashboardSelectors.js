@@ -1,3 +1,4 @@
+import { deriveSubjectGoalProgress, prioritizeSubjectGoals } from '../subjectStudyGoals.js';
 import { getValidStudySessions } from '../data/studySessionSelectors.js';
 import { timestampForStudyDate } from '../rpg/achievementSelectors.js';
 import { personalStudyTargets, personalGoalProgress } from '../personalStudyGoals.js';
@@ -18,6 +19,7 @@ export function deriveDashboardSummary({ sessions = [], now, ready = false, rewa
   if (!ready || !Number.isFinite(now)) return { status: 'loading', actions: [] };
   const today = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Tokyo' }).format(new Date(now));
   const weekId = getWeeklyBossWeekId(now);
+  const weeklySubjects = new Map();
   const dates = new Set(), subjects = new Set(), todaySubjects = new Set(), seen = new Set();
   let todaySeconds = 0, weekSeconds = 0, todayCount = 0;
   // One pass over effective records; recordedSeconds already excludes pauses.
@@ -37,10 +39,13 @@ export function deriveDashboardSummary({ sessions = [], now, ready = false, rewa
     }
     if (getWeeklyBossWeekId(timestamp) === weekId) {
       weekSeconds += seconds; dates.add(session.date);
+      const aggregated = weeklySubjects.get(subject) || { seconds: 0 };
+      aggregated.seconds += seconds; weeklySubjects.set(subject, aggregated);
       if (knownSubject) subjects.add(subject);
     }
   }
   const { dailyTargetSeconds, weeklyTargetSeconds, weeklyStudyDays: daysTarget } = personalStudyTargets(playerProfile?.studyGoals);
+  const subjectGoals = prioritizeSubjectGoals(deriveSubjectGoalProgress(playerProfile?.studyGoals?.subjectWeeklyTargets, weeklySubjects));
   const subjectsTarget = ACHIEVEMENT_CATALOG.find(a => a.id === 'achievement_week_3subjects').target;
   const remaining = personalGoalProgress(todaySeconds, dailyTargetSeconds).remaining;
   const actions = [];
@@ -48,6 +53,8 @@ export function deriveDashboardSummary({ sessions = [], now, ready = false, rewa
   if (remaining) add('daily', `今日の目標まであと${dashboardDuration(remaining)}`, '今日の目標は未達成です。学習を積み重ねましょう', '学習項目を選ぶ', 'study');
   if (dates.size < daysTarget) add('days', `今週の自分の目標まであと${daysTarget - dates.size}日`, 'まだ学習していない日に取り組みましょう', '学習を記録する', 'study');
   if (dates.size >= daysTarget && weekSeconds < weeklyTargetSeconds) add('week-time', `今週の自分の目標時間まであと${dashboardDuration(weeklyTargetSeconds - weekSeconds)}`, '自分の週間目標時間を目指しましょう', '学習を記録する', 'study');
+  const nextSubject = subjectGoals.find(goal => !goal.achieved);
+  if (nextSubject) add(`subject-goal-${nextSubject.id}`, `${nextSubject.name} あと${dashboardDuration(nextSubject.remaining)}で今週の目標`, '自分の科目別週間目標に取り組みましょう', '学習項目を選ぶ', 'study');
   if (subjects.size < subjectsTarget) add('subjects', `週3教科まであと${subjectsTarget - subjects.size}教科`, '実績条件：週3教科。今週まだ取り組んでいない教科を選びましょう', '教科を選ぶ', 'study');
   const goals = rewardProgress.goals || [];
   if (rewardProgress.status === 'ready') {
@@ -73,5 +80,5 @@ export function deriveDashboardSummary({ sessions = [], now, ready = false, rewa
     }
   }
   const achievement = (rpgReady ? achievements : []).filter(a => !a.completed && Number.isFinite(a.current) && Number.isFinite(a.target) && a.target > 0 && a.current > 0).sort((a,b) => b.current / b.target - a.current / a.target)[0] || null;
-  return { status: 'ready', todaySeconds, todayCount, todaySubjects: todaySubjects.size, target: dailyTargetSeconds, weeklyTargetSeconds, weeklyStudyDays: daysTarget, remaining, percent: personalGoalProgress(todaySeconds, dailyTargetSeconds).percent, weekSeconds, weekDays: dates.size, weekSubjects: subjects.size, actions: actions.slice(0,3), rewardProgress, rpg, achievement, latestGrade: gradesReady ? grades.find(g => g.date) || null : undefined };
+  return { status: 'ready', subjectGoals, todaySeconds, todayCount, todaySubjects: todaySubjects.size, target: dailyTargetSeconds, weeklyTargetSeconds, weeklyStudyDays: daysTarget, remaining, percent: personalGoalProgress(todaySeconds, dailyTargetSeconds).percent, weekSeconds, weekDays: dates.size, weekSubjects: subjects.size, actions: actions.slice(0,3), rewardProgress, rpg, achievement, latestGrade: gradesReady ? grades.find(g => g.date) || null : undefined };
 }

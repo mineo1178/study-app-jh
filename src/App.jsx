@@ -1,3 +1,4 @@
+import { SUBJECT_DEFS } from './subjectCatalog';
 import { useState, useEffect, useMemo, useRef, useCallback, lazy } from 'react';
 import { Play, Pause, Trash2, X, Zap, History, TrendingUp, Calendar as CalendarIcon, PieChart as PieChartIcon, BarChart2, RefreshCw, FlaskConical, LogOut, ChevronRight, BookOpen, GraduationCap, Laptop, Trophy, Save, ChevronLeft, Search, PlusCircle, Edit3, Eye, EyeOff, CheckSquare, Square, ListFilter, Award, Smartphone, Monitor, Clock } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
@@ -103,7 +104,7 @@ const getTasksCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-
 const getTestsCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tests');
 const getStudySessionsCol = () => studySessionsCollection(db, FAMILY_ID);
 const getActiveTimerRef = () => activeTimerRef(db, FAMILY_ID);
-const APP_VERSION = 'v2.1.0';
+const APP_VERSION = 'v2.2.0';
 const isDocumentHidden = () => typeof document !== 'undefined' && document.hidden;
 // ==========================================
 // Constants & Master Data
@@ -113,32 +114,7 @@ const CATEGORIES = {
     JUKU: { id: 'juku', label: '塾', icon: BookOpen, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100', hex: '#10b981' },
     ETC: { id: 'etc', label: 'その他', icon: Laptop, color: 'text-purple-600', bg: 'bg-purple-50', border: 'border-purple-100', hex: '#a855f7' }
 };
-const SUBJECT_DEFS = {
-    school: [
-        { id: 's_math', label: '数学', hex: '#3b82f6', isMajor: true },
-        { id: 's_japanese', label: '国語', hex: '#f43f5e', isMajor: true },
-        { id: 's_social', label: '社会', hex: '#10b981', isMajor: true },
-        { id: 's_science', label: '理科', hex: '#f59e0b', isMajor: true },
-        { id: 's_english', label: '英語', hex: '#8b5cf6', isMajor: true },
-        { id: 's_pe', label: '体育', hex: '#fb923c', isMajor: false },
-        { id: 's_tech', label: '技術', hex: '#64748b', isMajor: false },
-        { id: 's_music', label: '音楽', hex: '#ec4899', isMajor: false },
-        { id: 's_home', label: '家庭科', hex: '#06b6d4', isMajor: false }
-    ],
-    juku: [
-        { id: 'j_math', label: '数学', hex: '#2563eb' },
-        { id: 'j_japanese', label: '国語', hex: '#e11d48' },
-        { id: 'j_science', label: '理科', hex: '#d97706' },
-        { id: 'j_social', label: '社会', hex: '#059669' },
-        { id: 'j_english', label: '英語', hex: '#7c3aed' }
-    ],
-    etc: [
-        { id: 'e_news', label: '新聞', hex: '#475569' },
-        { id: 'e_manga', label: '歴史マンガ', hex: '#ea580c' },
-        { id: 'e_duolingo', label: 'Duolingo', hex: '#84cc16' },
-        { id: 'e_programming', label: 'プログラミング', hex: '#0ea5e9' }
-    ]
-};
+
 // ==========================================
 // Helper Functions
 // ==========================================

@@ -1,3 +1,4 @@
+import SubjectGoalProgress from './SubjectGoalProgress.jsx';
 import StudyGoalEditor from './StudyGoalEditor.jsx';
 import { dashboardDuration as duration } from '../../data/dashboardSelectors.js';
 const box = 'min-w-0 rounded-[2rem] border border-slate-100 bg-white p-5 sm:p-6 text-left shadow-sm';
@@ -26,6 +27,7 @@ export default function LearningDashboard({ summary, onNavigate, studyGoals, onS
       <button type="button" className={link} onClick={() => onNavigate('rpg')}>報酬の詳細はRPGへ</button>
     </div>
     <div className={box}><h2 className="text-lg font-black">今週の進み具合</h2><p className="mt-3 text-sm font-bold">{s.weekDays} / {s.weeklyStudyDays}日 ・ {s.weekSubjects}教科 ・ {duration(s.weekSeconds)} / {duration(s.weeklyTargetSeconds)}（自分の目標）</p><button type="button" className={`${link} focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600`} aria-label="週間レポートを見る" onClick={() => onNavigate('weekly-report')}>週間レポートを見る</button>{s.achievement && <p className="mt-3 text-xs text-slate-500">もうすぐ達成できる実績：{s.achievement.name}（{s.achievement.progressText}）</p>}</div>
+    {s.subjectGoals?.length > 0 && <div className={box}><h2 className="text-lg font-black">科目別の今週の目標</h2><SubjectGoalProgress goals={s.subjectGoals.slice(0,3)}/><button type="button" className={link} onClick={() => onNavigate('weekly-report')}>科目別目標の詳細を見る</button></div>}
     <div className={box}><h2 className="text-lg font-black">RPG進行</h2>{s.rpg ? <div className="mt-3 space-y-2 text-sm font-bold"><p>{s.rpg.campaign}</p><p>{s.rpg.tower}</p><p>{s.rpg.weekly}</p></div> : <p role="status">RPGの進行を確認しています…</p>}<button type="button" className={link} onClick={() => onNavigate('rpg')}>RPGで次の挑戦を確認</button></div>
     <div className={box}><h2 className="text-lg font-black">最新成績</h2>{s.latestGrade === undefined ? <p role="status">成績を確認しています…</p> : s.latestGrade ? <p className="mt-3 break-words text-sm">{s.latestGrade.name || 'テスト'} ・ {s.latestGrade.date} ・ 総合偏差値 {Number.isFinite(s.latestGrade.average) ? s.latestGrade.average : '未登録'}</p> : <p className="mt-3 text-sm">まだ成績の記録がありません。</p>}<button type="button" className={link} onClick={() => onNavigate('tests')}>成績の詳細へ</button></div>
   </section>;
