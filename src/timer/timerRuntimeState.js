@@ -1,4 +1,4 @@
-import { isActiveTimer } from './timerEngine.js';
+import { isActiveTimer, isStaleActiveTimer } from './timerEngine.js';
 
 export function hasAnyRunningTimer({ isSampleMode, activeTimer, tasks = [] }) {
   return isSampleMode ? tasks.some((task) => task.isRunning) : isActiveTimer(activeTimer);
@@ -17,6 +17,7 @@ export function getTimerViewTask({ task, isSampleMode, activeTimer }) {
     return {
       ...task,
       isRunning: activeTimer.state === 'running',
+      observedStale: isStaleActiveTimer(activeTimer),
       sessionStartTime: activeTimer.segmentStartedAt,
       currentDuration: activeTimer.accumulatedSeconds || 0,
       lastHeartbeatAt: activeTimer.lastHeartbeatAt,

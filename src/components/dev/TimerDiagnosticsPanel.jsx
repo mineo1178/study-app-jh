@@ -1,6 +1,7 @@
 import { useState, useSyncExternalStore } from 'react';
 import { diagnosticTimerState, diagnosticUserActivity, timerDiagnostics } from '../../timer/timerDiagnostics.js';
 import { getTimerIdleDiagnostic, IDLE_AUTO_STOP_SECONDS } from '../../timer/timerIdle.js';
+import { timerStaleObserver } from '../../timer/timerStale.js';
 
 const time = (value) => typeof value === 'number' && Number.isFinite(value) ? new Date(value).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '—';
 
@@ -11,6 +12,7 @@ export default function TimerDiagnosticsPanel({ timer, authenticated, isOwner, c
   const [message, setMessage] = useState('');
   const state = diagnosticTimerState(timer, entries.at(-1)?.timestamp || 0);
   const activity = getTimerIdleDiagnostic() || diagnosticUserActivity(entries.at(-1)?.timestamp || 0);
+  const stale = timerStaleObserver.state();
   const lastStop = entries.findLast((entry) => entry.event === 'stop_control' || entry.event === 'session_finalized' || entry.event === 'idle_stop_committed');
   const copy = async () => {
     const text = timerDiagnostics.export();
@@ -34,6 +36,13 @@ export default function TimerDiagnosticsPanel({ timer, authenticated, isOwner, c
         <dt>無操作停止</dt><dd>{IDLE_AUTO_STOP_SECONDS}秒（5分・開始したタブのみ）</dd>
         <dt>idle deadline</dt><dd>{time(activity.idleDeadline)}</dd>
         <dt>通信停止判定</dt><dd>15分（ユーザー操作とは別）</dd>
+        <dt>heartbeat fingerprint</dt><dd>{stale.fingerprint || '—'}</dd>
+        <dt>最後の進行観測（単調時計ms）</dt><dd>{stale.observedAt ?? '—'}</dd>
+        <dt>進行なし / 閾値ms</dt><dd>{Math.floor(stale.elapsedMs)} / {stale.thresholdMs}</dd>
+        <dt>stale candidate</dt><dd>{String(stale.candidate)}</dd>
+        <dt>サーバー同期済み</dt><dd>{String(stale.synced)}</dd>
+        <dt>fromCache / hasPendingWrites</dt><dd>{String(stale.fromCache)} / {String(stale.hasPendingWrites)}</dd>
+        <dt>直近stale判定理由</dt><dd>{stale.lastReason}</dd>
         <dt>focus</dt><dd>{String(entries.at(-1)?.focus ?? 'unknown')}</dd>
         <dt>直近終了理由</dt><dd>{lastStop?.reason || '—'}</dd>
         <dt>visibility</dt><dd>{entries.at(-1)?.visibility || 'unknown'}</dd>

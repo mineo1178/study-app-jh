@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { findUndefinedPaths } from '../test/findUndefinedPaths.js';
+import { staleObservation } from '../test/staleObservation.js';
 const store = vi.hoisted(() => new Map());
 vi.mock('firebase/firestore', () => ({
   doc: (_db, ...parts) => parts.join('/'),
@@ -25,7 +26,7 @@ beforeEach(() => store.clear());
 describe('canonical STOP transaction', () => {
   it('invalidates stale STOP, caps seconds at heartbeat, deletes the timer, and remains idempotent', async () => {
     store.set(timerRef, { timerId: 't', taskId: 'math', state: 'running', startedAt: start, segmentStartedAt: start, lastHeartbeatAt: start + 60_000, segments: [] });
-    const result = await finish(start + 16 * 60_000, { validation: { status: 'valid' } });
+    const result = await finish(start + 16 * 60_000, { staleProof: staleObservation(store.get(timerRef)) });
     expect(result.session).toMatchObject({ recordedSeconds: 60, validation: { status: 'invalid', reasonCodes: ['stale_timer_forced_invalid'] } });
     expect(store.has(timerRef)).toBe(false);
     expect(store.get(sessionRef)).toEqual(result.session);

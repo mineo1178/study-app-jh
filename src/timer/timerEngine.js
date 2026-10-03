@@ -1,4 +1,5 @@
 import { READING_CONTINUOUS_LIMIT_SECONDS } from '../integrity/validationConfig.js';
+import { matchesStaleProof, timerStaleObserver } from './timerStale.js';
 
 const number = (value) => (Number.isFinite(Number(value)) ? Number(value) : 0);
 
@@ -10,10 +11,8 @@ export function isTimerOwner(timer, currentClientId) {
   return Boolean(timer?.ownerClientId && currentClientId && timer.ownerClientId === currentClientId);
 }
 
-export function isStaleActiveTimer(timer, now = Date.now(), thresholdMs = 15 * 60 * 1000) {
-  if (!timer || timer.state !== 'running') return false;
-  const heartbeat = number(timer.lastHeartbeatAt) || number(timer.segmentStartedAt);
-  return heartbeat > 0 && now - heartbeat >= thresholdMs;
+export function isStaleActiveTimer(timer, proof = timerStaleObserver.proof(timer)) {
+  return matchesStaleProof(timer, proof);
 }
 
 export function breakRemainingSeconds(timer, now = Date.now()) {
@@ -32,10 +31,10 @@ export function closeSegment(startedAt, endedAt) {
   return { startedAt: start, endedAt: end, durationSeconds: Math.floor((end - start) / 1000) };
 }
 
-export function timerRecordedSeconds(timer, now = Date.now()) {
+export function timerRecordedSeconds(timer, now = Date.now(), staleProof = timerStaleObserver.proof(timer)) {
   const accumulated = Math.max(0, number(timer?.accumulatedSeconds));
   if (!timer || timer.state !== 'running') return accumulated;
-  const end = isStaleActiveTimer(timer, now) ? number(timer.lastHeartbeatAt) : now;
+  const end = isStaleActiveTimer(timer, staleProof) ? number(timer.lastHeartbeatAt) : now;
   const open = closeSegment(timer.segmentStartedAt, end);
   return accumulated + (open?.durationSeconds || 0);
 }
@@ -51,7 +50,7 @@ export function timerSegmentsAtEnd(timer, endAt) {
 
 export function shouldAutoFinishReading(timer, activityType, now = Date.now()) {
   if (activityType !== 'reading' || timer?.state !== 'running') return false;
-  const end = isStaleActiveTimer(timer, now) ? number(timer.lastHeartbeatAt) : now;
+  const end = isStaleActiveTimer(timer) ? number(timer.lastHeartbeatAt) : now;
   const segment = closeSegment(timer.segmentStartedAt, end);
   return (segment?.durationSeconds || 0) >= READING_CONTINUOUS_LIMIT_SECONDS;
 }

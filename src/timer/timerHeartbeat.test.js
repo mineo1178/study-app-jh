@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { startTimerHeartbeat, TIMER_HEARTBEAT_MS } from './timerHeartbeat.js';
 import { buildActiveTimer, canForceInvalidateStaleTimer } from '../data/activeTimerRepository.js';
 import { isActiveTimer, isStaleActiveTimer, shouldAutoFinishReading, timerRecordedSeconds } from './timerEngine.js';
+import { staleObservation } from '../test/staleObservation.js';
 
 afterEach(() => vi.useRealTimers());
 describe('short-running timers', () => {
@@ -16,8 +17,8 @@ describe('short-running timers', () => {
   });
   it('retains the exact fifteen-minute stale boundary', () => {
     const timer = buildActiveTimer({ task: { id: 'math' }, timerId: 't', ownerClientId: 'owner', now: start });
-    expect(isStaleActiveTimer(timer, start + 900_000 - 1)).toBe(false);
-    expect(isStaleActiveTimer(timer, start + 900_000)).toBe(true);
+    expect(isStaleActiveTimer(timer, staleObservation(timer, 899_999))).toBe(false);
+    expect(isStaleActiveTimer(timer, staleObservation(timer, 900_000))).toBe(true);
   });
 });
 
@@ -30,13 +31,13 @@ describe('heartbeat clock', () => {
     const stop = startTimerHeartbeat({ send, visibilityTarget: target, onError: error });
     await vi.advanceTimersByTimeAsync(90_000);
     expect(error).toHaveBeenCalledTimes(3);
-    // Background throttling: advance wall time without executing interval callbacks.
+    // A wall-clock jump alone cannot advance the monotonic heartbeat cadence.
     vi.setSystemTime(1_000_000 + 240_000);
     target.dispatchEvent(new Event('visibilitychange'));
     await vi.advanceTimersByTimeAsync(0);
     expect(isActiveTimer(timer)).toBe(true);
     expect(canForceInvalidateStaleTimer(timer, Date.now())).toBe(false);
-    expect(send).toHaveBeenCalledTimes(4);
+    expect(send).toHaveBeenCalledTimes(3);
     stop();
   });
   it('keeps the cadence across frequent snapshot updates and visibility changes', async () => {

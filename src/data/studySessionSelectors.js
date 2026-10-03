@@ -113,7 +113,7 @@ export function getLiveStudySession(activeTimer, task, now = Date.now()) {
   // It must not be rendered as a live stopwatch or contribute live seconds.
   if (!activeTimer || activeTimer.state !== 'running' || !task || activeTimer.taskId !== task.id) return null;
   const recordedSeconds = timerRecordedSeconds(activeTimer, now);
-  const segments = timerSegmentsAtEnd(activeTimer, isStaleActiveTimer(activeTimer, now) ? activeTimer.lastHeartbeatAt : now);
+  const segments = timerSegmentsAtEnd(activeTimer, isStaleActiveTimer(activeTimer) ? activeTimer.lastHeartbeatAt : now);
   const base = {
     id: `live-${activeTimer.timerId}`,
     timerId: activeTimer.timerId,
@@ -129,7 +129,7 @@ export function getLiveStudySession(activeTimer, task, now = Date.now()) {
     segments,
     recordedSeconds,
     isLive: true,
-    isStale: isStaleActiveTimer(activeTimer, now),
+    isStale: isStaleActiveTimer(activeTimer),
   };
   return { ...base, validation: validateStudySession(base) };
 }

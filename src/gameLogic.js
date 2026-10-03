@@ -62,6 +62,7 @@ export function getLastHeartbeatTime(task) {
 }
 
 export function isStaleRunningTask(task, now = Date.now()) {
+  if (typeof task?.observedStale === 'boolean') return task.isRunning && task.observedStale;
   if (!task?.isRunning || !task?.sessionStartTime) return false;
   const lastHeartbeat = getLastHeartbeatTime(task);
   if (!lastHeartbeat) return false;

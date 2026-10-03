@@ -1,7 +1,7 @@
 export const TIMER_HEARTBEAT_MS = 30 * 1000;
 
 // A single clock for interval and visibility events keeps the existing write cadence.
-export function startTimerHeartbeat({ send, visibilityTarget = document, now = Date.now, onError = console.error }) {
+export function startTimerHeartbeat({ send, visibilityTarget = document, now = () => performance.now(), onError = console.error }) {
   let lastAttempt = now();
   let pending = false;
   let disposed = false;

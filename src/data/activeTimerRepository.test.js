@@ -4,6 +4,7 @@ import { getEffectiveStudySeconds } from './studySessionSelectors';
 import { gameProgress } from '../gameLogic';
 import { REWARD_POLICY_VERSION } from '../rpg/rewardConfig';
 import { findUndefinedPaths } from '../test/findUndefinedPaths.js';
+import { staleObservation } from '../test/staleObservation.js';
 
 const start = 1_000_000;
 const staleTimer = {
@@ -36,8 +37,9 @@ describe('forced stale timer invalidation', () => {
 
   it('transaction直前にheartbeatが更新されていれば強制invalid化しない', () => {
     const now = start + 16 * 60 * 1000;
-    expect(canForceInvalidateStaleTimer(staleTimer, now)).toBe(true);
-    expect(canForceInvalidateStaleTimer({ ...staleTimer, lastHeartbeatAt: now - 30 * 1000 }, now)).toBe(false);
+    const proof = staleObservation(staleTimer);
+    expect(canForceInvalidateStaleTimer(staleTimer, proof)).toBe(true);
+    expect(canForceInvalidateStaleTimer({ ...staleTimer, lastHeartbeatAt: now - 30 * 1000 }, proof)).toBe(false);
   });
 });
 
@@ -94,6 +96,7 @@ describe('cross-device timer finish', () => {
 
   it('stale timerをSTOPした場合もinvalid SessionとしてActiveTimer解消へ進める', () => {
     const session = buildFinishedTimerSession(staleTimer, task, {
+      staleProof: staleObservation(staleTimer),
       endAt: start + 16 * 60 * 1000,
       validation: { status: 'valid', reasonCodes: [] },
     });
@@ -134,7 +137,7 @@ describe('start or switch active timer', () => {
   });
 
   it('staleまたはorphan timerはinvalid化して新TaskをSTARTする', () => {
-    const stalePlan = buildTimerSwitchPlan({ existingTimer: staleTimer, existingTask: task, nextTask, nextTimerId: 'next', nextOwnerClientId: 'device-b', now: start + 16 * 60_000 });
+    const stalePlan = buildTimerSwitchPlan({ existingTimer: staleTimer, existingTask: task, nextTask, nextTimerId: 'next', nextOwnerClientId: 'device-b', now: start + 16 * 60_000, staleProof: staleObservation(staleTimer) });
     expect(stalePlan.previousSession.validation.reasonCodes).toEqual(['stale_timer_forced_invalid']);
     const orphanPlan = buildTimerSwitchPlan({ existingTimer: staleTimer, existingTask: null, nextTask, nextTimerId: 'next', nextOwnerClientId: 'device-b', now: start + 120_000 });
     expect(orphanPlan.previousSession.validation.reasonCodes).toEqual(['orphan_timer_forced_invalid']);

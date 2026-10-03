@@ -50,6 +50,7 @@ import LearningDashboard from './components/study/LearningDashboard';
 import { deriveDashboardSummary } from './data/dashboardSelectors';
 import { deriveRewardProgress } from './rpg/rewardProgress';
 import useTimerHeartbeat from './timer/useTimerHeartbeat';
+import useTimerStaleGuard from './timer/useTimerStaleGuard';
 import useTimerIdleStop from './timer/useTimerIdleStop';
 import { rememberTimerIdleStart } from './timer/timerIdle';
 import useTimerDiagnostics from './timer/useTimerDiagnostics';
@@ -100,7 +101,7 @@ const getTasksCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-
 const getTestsCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tests');
 const getStudySessionsCol = () => studySessionsCollection(db, FAMILY_ID);
 const getActiveTimerRef = () => activeTimerRef(db, FAMILY_ID);
-const APP_VERSION = 'v2.0.2';
+const APP_VERSION = 'v2.0.3';
 const isDocumentHidden = () => typeof document !== 'undefined' && document.hidden;
 // ==========================================
 // Constants & Master Data
@@ -975,8 +976,9 @@ export default function App() {
     const isAnyTaskRunning = useMemo(() => hasAnyRunningTimer({ isSampleMode, activeTimer, tasks }), [isSampleMode, activeTimer, tasks]);
     const runningTask = useMemo(() => getRunningTimerTask({ isSampleMode, activeTimerTask, tasks }), [isSampleMode, activeTimerTask, tasks]);
     useTimerDiagnostics({ timer: activeTimer, isOwner: activeTimerIsOwner, activeTab, sampleMode: isSampleMode, hasTimerTask: Boolean(activeTimerTask) });
-    useEffect(() => { recordTimerDiagnostic('stale_ui_check', { ...diagnosticTimerState(activeTimer, staleCheckNow), source: 'app.stale_effect' }); }, [activeTimer, staleCheckNow]);
-    const activeStaleTimer = useMemo(() => isStaleActiveTimer(activeTimer, staleCheckNow) ? activeTimer : null, [activeTimer, staleCheckNow]);
+    const staleGuard = useTimerStaleGuard(!isSampleMode && user?.uid);
+    useEffect(() => { staleGuard.check(); recordTimerDiagnostic('stale_ui_check', { ...diagnosticTimerState(activeTimer), source: 'app.stale_effect' }); }, [activeTimer, staleCheckNow, staleGuard]);
+    const activeStaleTimer = isStaleActiveTimer(activeTimer) ? activeTimer : null;
     const legacyAdventure = useMemo(() => shouldUseLegacyRpgUi(isSampleMode) ? gameProgress(tasks, getTodayStr(), unifiedSessions) : null, [isSampleMode, tasks, unifiedSessions]);
     const todayTaskSummaries = useMemo(() => {
         const todayStr = getTodayStr();
@@ -1009,7 +1011,7 @@ export default function App() {
     useEffect(() => {
         if (!isAnyTaskRunning)
             return;
-        const interval = setInterval(() => setStaleCheckNow(Date.now()), 30 * 1000);
+        const interval = setInterval(() => setStaleCheckNow(performance.now()), 30 * 1000);
         return () => clearInterval(interval);
     }, [isAnyTaskRunning]);
     useEffect(() => {
@@ -1063,7 +1065,12 @@ export default function App() {
     useTimerHeartbeat({
         timer: activeTimer,
         enabled: activeTimerIsOwner && !isSampleMode && Boolean(user),
-        onHeartbeat: (timerId) => heartbeatActiveTimer({ db, familyId: FAMILY_ID, timerId, ownerClientId: currentClientId }),
+        onHeartbeat: async (timerId) => {
+            const now = Date.now();
+            const succeeded = await heartbeatActiveTimer({ db, familyId: FAMILY_ID, timerId, ownerClientId: currentClientId, now });
+            if (succeeded) staleGuard.heartbeatSucceeded(activeTimer, now);
+            return succeeded;
+        },
     });
     const idleController = useTimerIdleStop({
         timer: activeTimer, ownerClientId: currentClientId,
@@ -1082,7 +1089,7 @@ export default function App() {
         recordTimerDiagnostic('stale_auto_request', { ...diagnosticTimerState(activeStaleTimer), source: 'app.stale_effect', reason: 'HEARTBEAT_15_MINUTES' });
         staleInvalidatingRef.current = true;
         const task = tasks.find((item) => item.id === activeStaleTimer.taskId) || {};
-        invalidateStaleActiveTimer({ db, familyId: FAMILY_ID, task, now: Date.now() })
+        invalidateStaleActiveTimer({ db, familyId: FAMILY_ID, task, now: Date.now(), staleProof: staleGuard.proof(activeStaleTimer) })
             .then((result) => {
                 if (result.invalidated) {
                     setStaleTimerNotice('長時間、計測の通信が途切れたため、この記録を無効にしました。学習実績には含まれません。もう一度計測を開始してください。');
@@ -1094,7 +1101,7 @@ export default function App() {
                 staleInvalidatingRef.current = false;
                 setStaleCheckNow(Date.now());
             });
-    }, [activeStaleTimer, activeTimerIsOwner, idleController, isSampleMode, tasks, user]);
+    }, [activeStaleTimer, activeTimerIsOwner, idleController, isSampleMode, tasks, user, staleGuard]);
     const openHistoryCorrection = (session, decision = 'valid') => {
         if (!canReview || !isCanonicalHistoryCorrectionTarget(session)) return;
         setReviewError(null);
@@ -1200,6 +1207,7 @@ export default function App() {
         });
         const unsubActiveTimer = onSnapshot(getActiveTimerRef(), { includeMetadataChanges: true }, (snap) => {
             const next = snap.exists() ? snap.data() : null;
+            staleGuard.observe(next, snap.metadata);
             recordTimerSnapshot(diagnosticTimerRef.current, next, snap.metadata, subscriptionId);
             diagnosticTimerRef.current = next;
             if (next?.timerId) {
@@ -1208,6 +1216,7 @@ export default function App() {
             }
             setActiveTimer(next);
         }, (err) => {
+            staleGuard.disconnect();
             recordTimerDiagnostic('subscription_error', { subscriptionId, errorCode: diagnosticErrorCode(err), source: 'app.timer_subscription' });
             console.error("Active timer realtime sync error:", err);
         });
@@ -1218,7 +1227,7 @@ export default function App() {
             unsubActiveTimer();
             recordTimerDiagnostic('subscription_end', { subscriptionId, reason: 'AUTH_SAMPLE_OR_UNMOUNT', source: 'app.timer_subscription' });
         };
-    }, [user, isSampleMode]);
+    }, [user, isSampleMode, staleGuard]);
     const handleLogin = async (e) => {
         e.preventDefault();
         const fd = new FormData(e.currentTarget);

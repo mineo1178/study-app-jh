@@ -20,10 +20,12 @@ vi.mock('firebase/firestore', () => ({
     }
   },
 }));
-import { buildFinishedTimerSession, finishActiveTimer, heartbeatActiveTimer, invalidateStaleActiveTimer, pauseActiveTimer, resumeActiveTimer, startActiveTimer } from './activeTimerRepository.js';
+import { buildFinishedTimerSession, finishActiveTimer, heartbeatActiveTimer, invalidateStaleActiveTimer, pauseActiveTimer, resumeActiveTimer, startActiveTimer, startOrSwitchActiveTimer } from './activeTimerRepository.js';
 import { startTimerIdle } from '../timer/timerIdle.js';
 import { applyStudySessionReward, prepareCanonicalStudySessionReward } from './rewardLedgerRepository.js';
 import { getEffectiveStudySecondsForTask } from './studySessionSelectors.js';
+import { staleObservation } from '../test/staleObservation.js';
+import { createTimerStaleObserver } from '../timer/timerStale.js';
 const start = 1_000_000;
 const ref = 'families/f/apps/junior-high/activeTimers/current';
 const task = { id: 'math', categoryId: 'school', subjectId: 's_math', title: '数学', activityType: 'problem_solving' };
@@ -44,13 +46,12 @@ describe('active timer transaction lifecycle', () => {
       expect(result.session).toMatchObject({ recordedSeconds: 3600, validation: { status: 'valid' }, segments: [{ startedAt: start, endedAt: start + 3600_000, durationSeconds: 3600 }] });
     } finally { vi.useRealTimers(); }
   });
-  it('reproduces early stale deletion when a different client clock is fifteen minutes ahead', async () => {
+  it('prevents early stale deletion when a different client clock is fifteen minutes ahead', async () => {
     await startActiveTimer({ ...args, now: start });
     const observerNow = start + 30_000 + 15 * 60_000;
     const result = await invalidateStaleActiveTimer({ ...args, now: observerNow });
-    expect(result.invalidated).toBe(true);
-    expect(result.session.validation.status).toBe('invalid');
-    expect(state.store.has(ref)).toBe(false);
+    expect(result.invalidated).toBe(false);
+    expect(state.store.has(ref)).toBe(true);
   });
   it.each([30, 60, 299, 301])('does not delete a STARTed timer after %s seconds with delayed heartbeats', async (seconds) => {
     await startActiveTimer({ ...args, now: start });
@@ -71,14 +72,15 @@ describe('active timer transaction lifecycle', () => {
   it('only invalidates when the existing stale threshold is reached', async () => {
     await startActiveTimer({ ...args, now: start });
     expect(await invalidateStaleActiveTimer({ ...args, now: start + 900_000 - 1 })).toMatchObject({ invalidated: false });
-    const result = await invalidateStaleActiveTimer({ ...args, now: start + 900_000 });
+    const result = await invalidateStaleActiveTimer({ ...args, now: start + 900_000, staleProof: staleObservation(state.store.get(ref)) });
     expect(result.session.validation.status).toBe('invalid'); expect(state.store.has(ref)).toBe(false);
+    expect(prepareCanonicalStudySessionReward(result.session).eligible).toBe(false);
   });
   it('rechecks a recovered heartbeat when stale invalidation retries', async () => {
     await startActiveTimer({ ...args, now: start });
     const now = start + 900_000;
     state.race = () => state.store.set(ref, { ...state.store.get(ref), lastHeartbeatAt: now });
-    expect(await invalidateStaleActiveTimer({ ...args, now })).toMatchObject({ invalidated: false });
+    expect(await invalidateStaleActiveTimer({ ...args, now, staleProof: staleObservation(state.store.get(ref)) })).toMatchObject({ invalidated: false });
     expect(state.store.get(ref).state).toBe('running');
   });
   it('does not revive a timer when heartbeat retries after a concurrent STOP', async () => {
@@ -86,6 +88,75 @@ describe('active timer transaction lifecycle', () => {
     state.race = () => state.store.delete(ref);
     expect(await heartbeatActiveTimer({ ...args, now: start + 60_000 })).toBe(false);
     expect(state.store.has(ref)).toBe(false); expect(state.attempts).toBe(3);
+  });
+});
+
+describe('clock-safe stale transaction races', () => {
+  const sessionRef = 'families/f/apps/junior-high/studySessions/t';
+  it.each([15, 30, -30, 60])('heartbeat on an owner with observer offset %s minutes stays active; manual STOP needs no observation wait', async (offset) => {
+    await startActiveTimer({ ...args, now: start });
+    let elapsed = 0;
+    const observer = createTimerStaleObserver({ monotonic: () => elapsed, online: () => true });
+    observer.observe(state.store.get(ref));
+    for (let tick = 1; tick <= 40; tick++) {
+      elapsed = tick * 30_000;
+      await heartbeatActiveTimer({ ...args, now: start + elapsed });
+      observer.observe(state.store.get(ref));
+      expect(await invalidateStaleActiveTimer({ ...args, now: start + elapsed + offset * 60_000, staleProof: observer.proof() })).toMatchObject({ invalidated: false });
+    }
+    const result = await finishActiveTimer({ ...args, endAt: start + elapsed + offset * 60_000, staleProof: observer.proof() });
+    expect(result.session.validation.reasonCodes).not.toContain('stale_timer_forced_invalid');
+    expect(state.store.has(ref)).toBe(false);
+  });
+  it('START switch on a clock thirty minutes ahead does not force a fresh timer invalid', async () => {
+    await startActiveTimer({ ...args, now: start });
+    const result = await startOrSwitchActiveTimer({ ...args, task: { ...task, id: 'other' }, tasks: [task], timerId: 'next', ownerClientId: 'observer', now: start + 1800_000 });
+    expect(result.invalidatedPrevious).toBe(false);
+    expect(state.store.get(sessionRef).validation.reasonCodes).not.toContain('stale_timer_forced_invalid');
+    expect(state.store.get(ref).timerId).toBe('next');
+  });
+  it.each(['heartbeat', 'pause', 'resume', 'owner', 'replace', 'offline'])('latest transaction cancels stale cleanup on concurrent %s', async (change) => {
+    await startActiveTimer({ ...args, now: start });
+    let elapsed = 0; let online = true;
+    const observer = createTimerStaleObserver({ monotonic: () => elapsed, online: () => online });
+    observer.observe(state.store.get(ref)); elapsed = 900_000;
+    const proof = observer.proof();
+    state.race = () => {
+      const current = state.store.get(ref);
+      if (change === 'offline') { online = false; return; }
+      const changes = { heartbeat: { lastHeartbeatAt: start + 900_000 }, pause: { state: 'paused' }, resume: { segmentStartedAt: start + 500_000 }, owner: { ownerClientId: 'new-owner' }, replace: { timerId: 'new-timer' } };
+      state.store.set(ref, { ...current, ...changes[change] });
+    };
+    expect(await invalidateStaleActiveTimer({ ...args, now: start + elapsed, staleProof: proof })).toMatchObject({ invalidated: false });
+    expect(state.store.has(ref)).toBe(true); expect(state.store.has(sessionRef)).toBe(false);
+  });
+  it.each(['manual', 'idle'])('a %s STOP racing stale cleanup commits only its existing session and rewards once', async (kind) => {
+    await startActiveTimer({ ...args, now: start });
+    const proof = staleObservation(state.store.get(ref));
+    state.race = () => {
+      state.store.set(sessionRef, buildFinishedTimerSession(state.store.get(ref), task, { endAt: start + 300_000, staleProof: null }));
+      state.store.delete(ref);
+    };
+    expect(await invalidateStaleActiveTimer({ ...args, now: start + 900_000, staleProof: proof })).toMatchObject({ invalidated: false });
+    const result = await finishActiveTimer({ ...args, endAt: start + 300_000,
+      idle: kind === 'idle' ? { ownerClientId: 'owner', segmentStartedAt: start, lastUserActivityAt: start } : null });
+    expect(result.alreadyFinished).toBe(true);
+    const session = { id: 't', ...result.session };
+    expect(await applyStudySessionReward({ ...args, session })).toMatchObject({ applied: true });
+    expect(await applyStudySessionReward({ ...args, session })).toEqual({ applied: false, reason: 'ALREADY_APPLIED' });
+    expect([...state.store.keys()].filter((key) => key.includes('/studySessions/'))).toEqual([sessionRef]);
+    expect([...state.store.keys()].filter((key) => key.includes('/rewardLedger/'))).toHaveLength(1);
+  });
+  it('stale-first cleanup prevents a following manual or idle STOP from creating a valid session or rewards', async () => {
+    await startActiveTimer({ ...args, now: start });
+    const result = await invalidateStaleActiveTimer({ ...args, now: start + 900_000, staleProof: staleObservation(state.store.get(ref)) });
+    expect(result.invalidated).toBe(true);
+    for (const idle of [null, { ownerClientId: 'owner', segmentStartedAt: start, lastUserActivityAt: start }]) {
+      expect(await finishActiveTimer({ ...args, endAt: start + 300_000, idle })).toMatchObject({ alreadyFinished: true, session: { validation: { status: 'invalid' } } });
+    }
+    expect(prepareCanonicalStudySessionReward(result.session).eligible).toBe(false);
+    expect([...state.store.keys()].filter((key) => key.includes('/studySessions/'))).toEqual([sessionRef]);
+    expect([...state.store.keys()].filter((key) => key.includes('/rewardLedger/'))).toHaveLength(0);
   });
 });
 

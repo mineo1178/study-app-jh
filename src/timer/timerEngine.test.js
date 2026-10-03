@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { breakRemainingSeconds, isBreakFinished, isStaleActiveTimer, isTimerOwner, timerRecordedSeconds, timerSegmentsAtEnd } from './timerEngine';
+import { staleObservation } from '../test/staleObservation.js';
 
 const start = 1_000_000;
 describe('active timer engine', () => {
@@ -11,8 +12,9 @@ describe('active timer engine', () => {
 
   it('stale timerは最後のheartbeatで時間を固定する', () => {
     const timer = { state: 'running', accumulatedSeconds: 0, segmentStartedAt: start, lastHeartbeatAt: start + 60 * 1000 };
-    expect(isStaleActiveTimer(timer, start + 16 * 60 * 1000)).toBe(true);
-    expect(timerRecordedSeconds(timer, start + 16 * 60 * 1000)).toBe(60);
+    const proof = staleObservation(timer);
+    expect(isStaleActiveTimer(timer, proof)).toBe(true);
+    expect(timerRecordedSeconds(timer, start + 16 * 60 * 1000, proof)).toBe(60);
   });
 
   it('observerはownerではない', () => {
