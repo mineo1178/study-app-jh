@@ -1,6 +1,6 @@
 import { getValidStudySessions } from '../data/studySessionSelectors.js';
 import { timestampForStudyDate } from '../rpg/achievementSelectors.js';
-import { DAILY_TARGET_SECONDS } from '../studyTargets.js';
+import { personalStudyTargets, personalGoalProgress } from '../personalStudyGoals.js';
 import { ACHIEVEMENT_CATALOG } from '../rpg/achievementCatalog.js';
 import { getWeeklyBossWeekId, isWeeklyBossCleared } from '../rpg/weeklyBossCatalog.js';
 import { getChapter } from '../rpg/chapterCatalog.js';
@@ -40,14 +40,15 @@ export function deriveDashboardSummary({ sessions = [], now, ready = false, rewa
       if (knownSubject) subjects.add(subject);
     }
   }
-  const daysTarget = ACHIEVEMENT_CATALOG.find(a => a.id === 'achievement_week_5days').target;
+  const { dailyTargetSeconds, weeklyTargetSeconds, weeklyStudyDays: daysTarget } = personalStudyTargets(playerProfile?.studyGoals);
   const subjectsTarget = ACHIEVEMENT_CATALOG.find(a => a.id === 'achievement_week_3subjects').target;
-  const remaining = Math.max(0, DAILY_TARGET_SECONDS - todaySeconds);
+  const remaining = personalGoalProgress(todaySeconds, dailyTargetSeconds).remaining;
   const actions = [];
   const add = (id, title, detail, action, tab) => actions.push({ id, title, detail, action, tab });
   if (remaining) add('daily', `今日の目標まであと${dashboardDuration(remaining)}`, '今日の目標は未達成です。学習を積み重ねましょう', '学習項目を選ぶ', 'study');
-  if (dates.size < daysTarget) add('days', `週5日学習まであと${daysTarget - dates.size}日`, 'まだ学習していない日に取り組みましょう', '学習を記録する', 'study');
-  if (subjects.size < subjectsTarget) add('subjects', `週3教科まであと${subjectsTarget - subjects.size}教科`, '今週まだ取り組んでいない教科を選びましょう', '教科を選ぶ', 'study');
+  if (dates.size < daysTarget) add('days', `今週の自分の目標まであと${daysTarget - dates.size}日`, 'まだ学習していない日に取り組みましょう', '学習を記録する', 'study');
+  if (dates.size >= daysTarget && weekSeconds < weeklyTargetSeconds) add('week-time', `今週の自分の目標時間まであと${dashboardDuration(weeklyTargetSeconds - weekSeconds)}`, '自分の週間目標時間を目指しましょう', '学習を記録する', 'study');
+  if (subjects.size < subjectsTarget) add('subjects', `週3教科まであと${subjectsTarget - subjects.size}教科`, '実績条件：週3教科。今週まだ取り組んでいない教科を選びましょう', '教科を選ぶ', 'study');
   const goals = rewardProgress.goals || [];
   if (rewardProgress.status === 'ready') {
     for (const goal of [...goals].sort((a, b) => Number(b.available) - Number(a.available))) {
@@ -72,5 +73,5 @@ export function deriveDashboardSummary({ sessions = [], now, ready = false, rewa
     }
   }
   const achievement = (rpgReady ? achievements : []).filter(a => !a.completed && Number.isFinite(a.current) && Number.isFinite(a.target) && a.target > 0 && a.current > 0).sort((a,b) => b.current / b.target - a.current / a.target)[0] || null;
-  return { status: 'ready', todaySeconds, todayCount, todaySubjects: todaySubjects.size, target: DAILY_TARGET_SECONDS, remaining, percent: Math.min(100, Math.round(todaySeconds / DAILY_TARGET_SECONDS * 100)), weekSeconds, weekDays: dates.size, weekSubjects: subjects.size, actions: actions.slice(0,3), rewardProgress, rpg, achievement, latestGrade: gradesReady ? grades.find(g => g.date) || null : undefined };
+  return { status: 'ready', todaySeconds, todayCount, todaySubjects: todaySubjects.size, target: dailyTargetSeconds, weeklyTargetSeconds, weeklyStudyDays: daysTarget, remaining, percent: personalGoalProgress(todaySeconds, dailyTargetSeconds).percent, weekSeconds, weekDays: dates.size, weekSubjects: subjects.size, actions: actions.slice(0,3), rewardProgress, rpg, achievement, latestGrade: gradesReady ? grades.find(g => g.date) || null : undefined };
 }

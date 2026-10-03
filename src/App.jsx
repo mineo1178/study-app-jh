@@ -35,7 +35,9 @@ import { isStudySessionRewardEligible } from './rpg/rewardCalculator';
 import { MATERIAL_DEFS } from './rpg/rewardConfig';
 import { shouldUseLegacyRpgUi } from './rpg/legacyRpgUi';
 import { deriveAchievements, deriveUnlockedTitles, getSelectedUnlockedTitle, isTitleUnlocked } from './rpg/achievementSelectors';
-import { DAILY_TARGET_SECONDS } from './studyTargets';
+import { personalStudyTargets, confirmedGoalProfile } from './personalStudyGoals';
+import { dashboardDuration } from './data/dashboardSelectors';
+import { saveStudyGoals } from './data/studyGoalsRepository';
 import RpgWalletPanel from './components/rpg/RpgWalletPanel';
 import FeedbackOverlay from './components/feedback/FeedbackOverlay';
 import { feedbackSession, idleStopFeedback, studyFeedback, progressFeedback, battleFeedback } from './feedback/feedbackEvents';
@@ -101,7 +103,7 @@ const getTasksCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-
 const getTestsCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tests');
 const getStudySessionsCol = () => studySessionsCollection(db, FAMILY_ID);
 const getActiveTimerRef = () => activeTimerRef(db, FAMILY_ID);
-const APP_VERSION = 'v2.0.3';
+const APP_VERSION = 'v2.1.0';
 const isDocumentHidden = () => typeof document !== 'undefined' && document.hidden;
 // ==========================================
 // Constants & Master Data
@@ -283,7 +285,7 @@ const generateSampleData = () => {
 // ==========================================
 // Component: TodayTimeline (当日の学習タイムライン)
 // ==========================================
-const TodayTimeline = ({ tasks, sessions = null, liveSession = null, isSampleMode = false }) => {
+const TodayTimeline = ({ tasks, sessions = null, liveSession = null, isSampleMode = false, studyGoals, goalsReady = true }) => {
     const [selectedHistory, setSelectedHistory] = useState(null);
     const [nowTick, setNowTick] = useState(() => Date.now());
 
@@ -393,14 +395,16 @@ const TodayTimeline = ({ tasks, sessions = null, liveSession = null, isSampleMod
         return completedSeconds + runningSeconds;
     }, [effectiveTodaySessions, isSampleMode, tasks, sessions, nowTick]);
 
-    const remainingSeconds = Math.max(0, DAILY_TARGET_SECONDS - totalTodaySeconds);
-    const goalPercent = Math.min(100, Math.round((totalTodaySeconds / DAILY_TARGET_SECONDS) * 100));
+    const { dailyTargetSeconds } = personalStudyTargets(studyGoals);
+    const goalLabel = dashboardDuration(dailyTargetSeconds);
+    const remainingSeconds = Math.max(0, dailyTargetSeconds - totalTodaySeconds);
+    const goalPercent = Math.min(100, Math.floor((totalTodaySeconds / dailyTargetSeconds) * 100));
     const runningTask = liveSession || (isSampleMode ? tasks.find(t => t.isRunning) : null);
     const goalMessage = remainingSeconds === 0
-        ? '今日の2時間目標は達成済みです。追加するなら苦手科目を短く積み増し。'
+        ? `今日の${goalLabel}目標は達成済みです。追加するなら苦手科目を短く積み増し。`
         : runningTask
-            ? `このまま継続すると、残り ${formatDuration(remainingSeconds)} で2時間に到達します。`
-            : `2時間まで残り ${formatDuration(remainingSeconds)}。30分単位ならあと${Math.ceil(remainingSeconds / 1800)}コマです。`;
+            ? `このまま継続すると、残り ${formatDuration(remainingSeconds)} で${goalLabel}に到達します。`
+            : `${goalLabel}まで残り ${formatDuration(remainingSeconds)}。30分単位ならあと${Math.ceil(remainingSeconds / 1800)}コマです。`;
 
     const minTime = todayHistories.length > 0 ? Math.min(...todayHistories.map(h => h.startedAt)) : nowTick - (60 * 60 * 1000);
     const maxTime = todayHistories.length > 0 ? Math.max(...todayHistories.map(h => h.endedAt)) : nowTick + (60 * 60 * 1000);
@@ -423,16 +427,17 @@ const TodayTimeline = ({ tasks, sessions = null, liveSession = null, isSampleMod
     }, {});
     const taskSummaryList = Object.values(taskSummary).sort((a, b) => b.latestAt - a.latestAt);
 
+    if (!goalsReady) return <div role="status">学習目標を読み込んでいます…</div>;
     return (<div className="bg-white p-4 sm:p-6 rounded-[2rem] border border-slate-100 shadow-sm relative overflow-hidden text-left mb-6">
       <div className="flex flex-col gap-4 mb-5 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h3 className="text-xs sm:text-sm font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
             <Clock size={16}/> Today's Timeline
           </h3>
-          <p className="mt-2 text-[10px] sm:text-xs font-bold text-slate-400">今日やったタスクと、2時間目標までの残りを表示</p>
+          <p className="mt-2 text-[10px] sm:text-xs font-bold text-slate-400">今日やったタスクと、{goalLabel}目標までの残りを表示</p>
         </div>
         <div className="text-xs sm:text-sm font-black font-mono text-blue-600 bg-blue-50 px-3 py-1.5 rounded-full shadow-sm flex items-center gap-1 self-start">
-          Total: {formatDuration(totalTodaySeconds)} / 2h
+          Total: {formatDuration(totalTodaySeconds)} / {formatDuration(dailyTargetSeconds)}
         </div>
       </div>
 
@@ -966,7 +971,7 @@ export default function App() {
     const dashboardDay = Math.floor((liveNow + 9 * 3600000) / 86400000) * 86400000 - 9 * 3600000;
     const dashboardSummary = useMemo(() => deriveDashboardSummary({
         sessions: unifiedSessions, now: dashboardDay,
-        ready: dashboardLoaded.tasks && dashboardLoaded.sessions,
+        ready: profileLoaded && dashboardLoaded.tasks && dashboardLoaded.sessions,
         rewardProgress, rpgProgress, towerProgress, playerProfile, achievements, grades: tests,
         rpgReady: profileLoaded && dashboardLoaded.campaign && dashboardLoaded.tower,
         gradesReady: dashboardLoaded.grades, battle: activeBattle, pendingBattle: Boolean(pendingBattleEnemyId),
@@ -1030,7 +1035,7 @@ export default function App() {
     }, [isSampleMode, studySessions, user]);
     useEffect(() => {
         if (isSampleMode || !user) return undefined;
-        return onSnapshot(playerProfileRef(db, FAMILY_ID), { includeMetadataChanges: true }, (snap) => { const next = normalizePlayerProfile(snap.exists() ? snap.data() : emptyPlayerProfile()); if (!snap.metadata.fromCache) { feedbackLoadedRef.current.add('profile'); setProfileLoaded(true); } setPlayerProfile(next); if (next.activeBattleId) setBattleWatchId(next.activeBattleId); }, (err) => console.error('PlayerProfile realtime sync error:', err));
+        return onSnapshot(playerProfileRef(db, FAMILY_ID), { includeMetadataChanges: true }, (snap) => { const next = normalizePlayerProfile(snap.exists() ? snap.data() : emptyPlayerProfile()); if (!snap.metadata.fromCache) { feedbackLoadedRef.current.add('profile'); setProfileLoaded(true); } setPlayerProfile(current => confirmedGoalProfile(next, current, snap.metadata.hasPendingWrites)); if (next.activeBattleId) setBattleWatchId(next.activeBattleId); }, (err) => console.error('PlayerProfile realtime sync error:', err));
     }, [isSampleMode, user]);
     useEffect(() => {
         if (isSampleMode || !user) return undefined;
@@ -1950,7 +1955,7 @@ export default function App() {
                </div>)}
 
             {activeTab === 'daily' && (<div className="space-y-8 animate-in fade-in duration-500">
-            {!isSampleMode && <LearningDashboard summary={dashboardSummary} onNavigate={tab => tab === 'study' ? document.getElementById('study-items')?.scrollIntoView({ behavior: 'smooth' }) : setActiveTab(tab)}/>}
+            {!isSampleMode && <LearningDashboard studyGoals={playerProfile.studyGoals} onSaveGoals={studyGoals => saveStudyGoals({ db, familyId: FAMILY_ID, studyGoals })} summary={dashboardSummary} onNavigate={tab => tab === 'study' ? document.getElementById('study-items')?.scrollIntoView({ behavior: 'smooth' }) : setActiveTab(tab)}/>}
             <div id="study-items" />
             <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-slate-950 via-blue-950 to-indigo-700 p-4 sm:p-5 shadow-2xl shadow-blue-200/40 ring-1 ring-white/20 lg:sticky lg:top-4 z-30">
               <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full bg-blue-400/25 blur-2xl"/>
@@ -2018,7 +2023,7 @@ export default function App() {
                   </div>)}
               </div>
               {/* 当日のタイムライン */}
-              <TodayTimeline tasks={tasks} sessions={unifiedSessions} liveSession={liveSession} isSampleMode={isSampleMode}/>
+              <TodayTimeline studyGoals={playerProfile.studyGoals} goalsReady={isSampleMode || profileLoaded} tasks={tasks} sessions={unifiedSessions} liveSession={liveSession} isSampleMode={isSampleMode}/>
 
               {liveSession ? (
                 <div className="rounded-[2rem] border border-blue-100 bg-white p-5 shadow-sm">
@@ -2083,11 +2088,11 @@ export default function App() {
                 </div>
               </div>)}
 
-            {activeTab === 'weekly-report' && <LazyPanel label="週間レポート"><WeeklyReport sessions={unifiedSessions} now={dashboardDay} ready={isSampleMode || (dashboardLoaded.tasks && dashboardLoaded.sessions)} subjectDefinitions={SUBJECT_DEFS} onBack={() => setActiveTab('daily')}/></LazyPanel>}
+            {activeTab === 'weekly-report' && <LazyPanel label="週間レポート"><WeeklyReport studyGoals={playerProfile.studyGoals} sessions={unifiedSessions} now={dashboardDay} ready={isSampleMode || (profileLoaded && dashboardLoaded.tasks && dashboardLoaded.sessions)} subjectDefinitions={SUBJECT_DEFS} onBack={() => setActiveTab('daily')}/></LazyPanel>}
             {activeTab === 'stats' && (<div className="space-y-8 sm:space-y-10 animate-in slide-in-from-bottom-5 duration-500 text-center">
                 
                 {/* 追加: 当日の学習タイムラインを実績分析画面にも表示 */}
-                 <TodayTimeline tasks={tasks} sessions={unifiedSessions} liveSession={liveSession} isSampleMode={isSampleMode}/>
+                 <TodayTimeline studyGoals={playerProfile.studyGoals} goalsReady={isSampleMode || profileLoaded} tasks={tasks} sessions={unifiedSessions} liveSession={liveSession} isSampleMode={isSampleMode}/>
 
                 <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden text-center text-left">
                    <h3 className="text-lg font-black mb-6 flex items-center justify-center gap-2 leading-none text-center"><BarChart2 className="text-blue-600" size={20}/> 学習推移 (分)</h3>

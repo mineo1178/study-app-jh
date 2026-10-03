@@ -1,7 +1,7 @@
 import { getValidStudySessions } from './studySessionSelectors.js';
 import { deriveWeeklyGoalProgress, timestampForStudyDate } from '../rpg/achievementSelectors.js';
 import { getNextWeeklyBossResetAt, getWeeklyBossWeekId } from '../rpg/weeklyBossCatalog.js';
-import { DAILY_TARGET_SECONDS } from '../studyTargets.js';
+import { personalStudyTargets } from '../personalStudyGoals.js';
 
 const DAY_MS = 86400000;
 const WEEK_MS = 7 * DAY_MS;
@@ -18,8 +18,9 @@ const createWeek = (startAt, today) => {
 };
 
 // Effective-record filtering once, followed by one aggregation for all displayed weeks.
-export function deriveWeeklyReport({ sessions = [], now, ready = false, subjectDefinitions = {} } = {}) {
+export function deriveWeeklyReport({ sessions = [], now, ready = false, subjectDefinitions = {}, studyGoals } = {}) {
   if (!ready || !Number.isFinite(now)) return { status: 'loading', weeks: [] };
+  const { dailyTargetSeconds, weeklyTargetSeconds, weeklyStudyDays } = personalStudyTargets(studyGoals);
   const today = studyDate(now);
   const monday = getNextWeeklyBossResetAt(now) - WEEK_MS;
   // The fifth week supplies the previous-week comparison for the oldest selectable week.
@@ -50,7 +51,7 @@ export function deriveWeeklyReport({ sessions = [], now, ready = false, subjectD
     week.subjects.set(id, subject);
   }
   const weeks = allWeeks.map(week => {
-    const days = week.days.map(day => ({ ...day, achieved: day.seconds >= DAILY_TARGET_SECONDS }));
+    const days = week.days.map(day => ({ ...day, achieved: day.seconds >= dailyTargetSeconds }));
     const learningDays = days.filter(day => day.count > 0).length;
     const goals = deriveWeeklyGoalProgress({ days: learningDays, subjects: week.subjectIds.size });
     const subjects = [...week.subjects.values()].map(subject => ({ ...subject, percent: week.seconds > 0 ? subject.seconds / week.seconds * 100 : 0 })).sort((a,b) => b.seconds - a.seconds);
@@ -59,12 +60,12 @@ export function deriveWeeklyReport({ sessions = [], now, ready = false, subjectD
     if (topDay.seconds > 0) highlights.push(`最も学習した日：${topDay.weekday}曜日（${reportDuration(topDay.seconds)}）`);
     if (subjects[0]?.seconds > 0) highlights.push(`最も学習した教科：${subjects[0].name}（${reportDuration(subjects[0].seconds)}）`);
     const achievedDays = days.filter(day => day.achieved).length;
-    if (achievedDays > 0) highlights.push(`${reportDuration(DAILY_TARGET_SECONDS)}を達成した日：${achievedDays}日`);
+    if (achievedDays > 0) highlights.push(`${reportDuration(dailyTargetSeconds)}を達成した日：${achievedDays}日`);
     for (const goal of goals) if (goal.completed) highlights.push(`${goal.name}達成`);
     const hints = goals.map((goal,index) => ({ id: goal.id, text: goal.completed ? `${goal.name}達成` : `あと${goal.target - goal.current}${index === 0 ? '日' : '教科'}で${goal.name}` }));
     const currentDay = days.find(day => day.date === today);
-    if (currentDay) hints.push({ id: 'daily', text: currentDay.achieved ? `今日の${reportDuration(DAILY_TARGET_SECONDS)}目標達成` : `今日あと${reportDuration(DAILY_TARGET_SECONDS - currentDay.seconds)}で${reportDuration(DAILY_TARGET_SECONDS)}目標` });
-    return { id: week.id, startAt: week.startAt, label: week.label, days, seconds: week.seconds, count: week.count, learningDays, subjectCount: week.subjectIds.size, subjects, highlights: highlights.slice(0,3), hints: hints.slice(0,3) };
+    if (currentDay) hints.push({ id: 'daily', text: currentDay.achieved ? `今日の${reportDuration(dailyTargetSeconds)}目標達成` : `今日あと${reportDuration(dailyTargetSeconds - currentDay.seconds)}で${reportDuration(dailyTargetSeconds)}目標` });
+    return { dailyTargetSeconds, weeklyTargetSeconds, weeklyStudyDays, id: week.id, startAt: week.startAt, label: week.label, days, seconds: week.seconds, count: week.count, learningDays, subjectCount: week.subjectIds.size, subjects, highlights: highlights.slice(0,3), hints: hints.slice(0,3) };
   });
   return { status: 'ready', weeks: weeks.slice(0,4).map((week,index) => {
     const previous = weeks[index + 1];

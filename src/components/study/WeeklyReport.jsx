@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react';
-import { DAILY_TARGET_SECONDS } from '../../studyTargets.js';
 import { deriveWeeklyReport, moveReportWeek, reportDuration as duration } from '../../data/weeklyReportSelectors.js';
 
 const card = 'min-w-0 rounded-[2rem] border border-slate-100 bg-white p-5 sm:p-6 shadow-sm';
@@ -7,11 +6,11 @@ const button = 'min-h-11 rounded-xl bg-blue-50 px-4 py-3 text-sm font-black text
 const signed = value => `${value > 0 ? '+' : value < 0 ? '−' : ''}${Math.abs(value)}`;
 const timeDifference = value => `${value > 0 ? '+' : value < 0 ? '−' : ''}${duration(Math.abs(value))}`;
 
-export default function WeeklyReport({ sessions, now, ready, subjectDefinitions, onBack }) {
-  const report = useMemo(() => deriveWeeklyReport({ sessions, now, ready, subjectDefinitions }), [sessions, now, ready, subjectDefinitions]);
+export default function WeeklyReport({ sessions, now, ready, subjectDefinitions, studyGoals, onBack }) {
+  const report = useMemo(() => deriveWeeklyReport({ sessions, now, ready, subjectDefinitions, studyGoals }), [sessions, now, ready, subjectDefinitions, studyGoals]);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const week = report.weeks[selectedIndex];
-  const dailyMax = Math.max(DAILY_TARGET_SECONDS, ...(week?.days.map(day => day.seconds) || []));
+  const dailyMax = Math.max(week?.dailyTargetSeconds || 7200, ...(week?.days.map(day => day.seconds) || []));
   const trendMax = Math.max(1, ...report.weeks.map(item => item.seconds));
   const metrics = [
     { key: 'seconds', name: '学習時間', format: duration, difference: timeDifference },
@@ -43,8 +42,14 @@ export default function WeeklyReport({ sessions, now, ready, subjectDefinitions,
         {!week.comparison && <p className="mt-2 text-xs text-slate-500">先週の記録なし</p>}
       </div>
       <div className={card}>
+        <h2 className="text-lg font-black">自分の目標</h2>
+        <p className="mt-2 break-words text-sm font-bold">{duration(week.seconds)} / {duration(week.weeklyTargetSeconds)}{week.seconds >= week.weeklyTargetSeconds ? ' ・ 達成' : ''}</p>
+        <p className="mt-2 text-sm font-bold">{week.learningDays} / {week.weeklyStudyDays}日{week.learningDays >= week.weeklyStudyDays ? ' ・ 達成' : ''}</p>
+        <p className="mt-2 text-xs text-slate-500">現在の目標を基準に表示。実績条件（週5日・週3教科）は固定です。</p>
+      </div>
+      <div className={card}>
         <h2 className="text-lg font-black">日別の学習</h2>
-        <ul className="mt-3 space-y-3">{week.days.map(day => <li key={day.date} className="min-w-0"><div className="flex flex-wrap justify-between gap-1 text-xs"><span className="font-bold">{day.weekday}（{day.date.slice(5).replace('-', '/')}）</span><span>{duration(day.seconds)}{day.achieved && ` ・ ${duration(DAILY_TARGET_SECONDS)}達成`}</span></div><progress aria-label={`${day.weekday}曜日の学習時間`} value={day.seconds} max={dailyMax} className="mt-1 block h-2 w-full max-w-full accent-blue-600"/></li>)}</ul>
+        <ul className="mt-3 space-y-3">{week.days.map(day => <li key={day.date} className="min-w-0"><div className="flex flex-wrap justify-between gap-1 text-xs"><span className="font-bold">{day.weekday}（{day.date.slice(5).replace('-', '/')}）</span><span>{duration(day.seconds)}{day.achieved && ` ・ ${duration(week.dailyTargetSeconds)}達成`}</span></div><progress aria-label={`${day.weekday}曜日の学習時間`} value={day.seconds} max={dailyMax} className="mt-1 block h-2 w-full max-w-full accent-blue-600"/></li>)}</ul>
       </div>
       <div className={card}>
         <h2 className="text-lg font-black">教科のバランス</h2>
@@ -54,7 +59,7 @@ export default function WeeklyReport({ sessions, now, ready, subjectDefinitions,
         <h2 className="text-lg font-black">この週のハイライト</h2>
         {week.highlights.length ? <ul className="mt-3 space-y-2 text-sm leading-relaxed">{week.highlights.map(text => <li key={text} className="break-words">{text}</li>)}</ul> : <p className="mt-3 text-sm text-slate-500">記録が増えると、この週の学習の特徴を確認できます。</p>}
         <h3 className="mt-5 font-black">次の学習へのヒント</h3>
-        <p className="mt-2 text-xs leading-relaxed text-slate-500">選択週の記録と、いつもの目標との差を表示します。週の目標は毎週リセットされます。今日の目標は今週を選んだときだけ表示します。</p>
+        <p className="mt-2 text-xs leading-relaxed text-slate-500">週5日・週3教科のヒントは固定の実績条件です。日々の目標は現在の自分の設定を使います。週の目標は毎週リセットされます。今日の目標は今週を選んだときだけ表示します。</p>
         <ul className="mt-3 space-y-2 text-sm font-bold text-blue-700">{week.hints.map(hint => <li key={hint.id} className="break-words">{hint.text}</li>)}</ul>
       </div>
       <div className={card}>
