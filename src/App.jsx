@@ -1,6 +1,5 @@
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback, lazy } from 'react';
 import { Play, Pause, Trash2, X, Zap, History, TrendingUp, Calendar as CalendarIcon, PieChart as PieChartIcon, BarChart2, RefreshCw, FlaskConical, LogOut, ChevronRight, BookOpen, GraduationCap, Laptop, Trophy, Save, ChevronLeft, Search, PlusCircle, Edit3, Eye, EyeOff, CheckSquare, Square, ListFilter, Award, Smartphone, Monitor, Clock } from 'lucide-react';
-import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from 'firebase/auth';
 import { getFirestore, collection, doc, getDoc, getDocs, updateDoc, deleteDoc, deleteField, enableIndexedDbPersistence, addDoc, onSnapshot } from 'firebase/firestore';
@@ -40,20 +39,26 @@ import { DAILY_TARGET_SECONDS } from './studyTargets';
 import RpgWalletPanel from './components/rpg/RpgWalletPanel';
 import FeedbackOverlay from './components/feedback/FeedbackOverlay';
 import { feedbackSession, studyFeedback, progressFeedback, battleFeedback } from './feedback/feedbackEvents';
-import RpgHub from './components/rpg/RpgHub';
+import LazyPanel from './components/common/LazyPanel';
 import PurchaseConfirmModal from './components/rpg/PurchaseConfirmModal';
 import MaterialExchangeConfirmModal from './components/rpg/MaterialExchangeConfirmModal';
 import BattleStartConfirmModal from './components/rpg/BattleStartConfirmModal';
 import QuestTreasureResult from './components/rpg/QuestTreasureResult';
 import { formatHms, getEffectiveSessionsForDate, getEffectiveStudySeconds, getEffectiveStudySecondsForTask, getLiveStudySession, getSessionsForDate, getSessionsForTask, getUnifiedStudySessions } from './data/studySessionSelectors';
 import LiveStudyStatus from './components/study/LiveStudyStatus';
+import RewardProgressCard from './components/study/RewardProgressCard';
+import { deriveRewardProgress } from './rpg/rewardProgress';
+import useTimerHeartbeat from './timer/useTimerHeartbeat';
+import { TIMER_HEARTBEAT_MS } from './timer/timerHeartbeat';
 import MigrationExportButton from './components/dev/MigrationExportButton';
 import LegacyStudySessionMigrationPanel from './components/dev/LegacyStudySessionMigrationPanel';
 import { DESKTOP_SIDEBAR_NAV_CLASS, DESKTOP_SIDEBAR_SCROLL_CLASS } from './layout/sidebarLayout';
 import ManualReviewPanel from './components/review/ManualReviewPanel';
 import HistoryCorrectionModal from './components/review/HistoryCorrectionModal';
 import { buildReviewQueue, isCanonicalHistoryCorrectionTarget, reviewErrorMessage } from './review/manualReviewUi';
-import { applyTestRecordUpdate, buildDeviationFieldPatch, buildDeviationUpdate, compareTestRecords, filterTestRecordsByDateRange, formatTestDateLabel, getCalendarMonthsAgoDateString, getDeviationDomain, isValidTestDate, normalizeTestRecord } from './tests/testRecord';
+import { applyTestRecordUpdate, buildDeviationFieldPatch, buildDeviationUpdate, compareTestRecords, filterTestRecordsByDateRange, getCalendarMonthsAgoDateString, getDeviationDomain, isValidTestDate, normalizeTestRecord } from './tests/testRecord';
+const RpgHub = lazy(() => import('./components/rpg/RpgHub'));
+const StudyCharts = lazy(() => import('./components/charts/StudyCharts'));
 // ==========================================
 // Firebase Initialization (Vite/Vercel Dedicated)
 // ==========================================
@@ -88,8 +93,7 @@ const getTasksCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-
 const getTestsCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tests');
 const getStudySessionsCol = () => studySessionsCollection(db, FAMILY_ID);
 const getActiveTimerRef = () => activeTimerRef(db, FAMILY_ID);
-const APP_VERSION = 'v1.97.0';
-const TIMER_HEARTBEAT_MS = 30 * 1000;
+const APP_VERSION = 'v1.98.0';
 const isDocumentHidden = () => typeof document !== 'undefined' && document.hidden;
 // ==========================================
 // Constants & Master Data
@@ -201,29 +205,6 @@ const getTaskMeta = (task) => {
         color: subjectInfo?.hex || categoryInfo?.hex || '#94a3b8',
         typeLabel: task?.type === 'homework' ? '宿題' : '自習'
     };
-};
-const TestChartTooltip = ({ active, payload }) => {
-    if (!active || !payload?.length)
-        return null;
-    const test = payload[0]?.payload;
-    if (!test)
-        return null;
-    const categoryLabel = test.category === CATEGORIES.SCHOOL.id
-        ? CATEGORIES.SCHOOL.label
-        : test.category === CATEGORIES.JUKU.id
-            ? CATEGORIES.JUKU.label
-            : 'カテゴリ不明';
-    const values = payload.filter(item => typeof item.value === 'number' && Number.isFinite(item.value));
-    return (<div className="min-w-44 rounded-2xl border border-slate-100 bg-white p-4 shadow-xl">
-      <p className="font-black text-slate-800">{test.name || '名称未設定'}</p>
-      <p className="mt-1 text-xs font-bold text-slate-400">{test.date} ・ {categoryLabel}</p>
-      <div className="mt-3 space-y-2">
-        {values.map(item => (<div key={item.dataKey} className="flex items-center justify-between gap-4 text-xs font-black">
-          <span style={{ color: item.color }}>{item.name}</span>
-          <span className="font-mono text-slate-700">偏差値 {item.value}</span>
-        </div>))}
-      </div>
-    </div>);
 };
 const generateSampleData = () => {
     const tasks = [];
@@ -532,7 +513,7 @@ const TodayTimeline = ({ tasks, sessions = null, liveSession = null, isSampleMod
             長時間または時刻の整合性を確認したい記録です。学習履歴は残し、RPG報酬だけ上限・除外で扱います。
           </div>}
           {selectedHistory.isStale && <div className="mt-3 rounded-2xl bg-amber-50 p-4 text-xs font-bold leading-relaxed text-amber-700">
-            長時間 heartbeat が止まっているため、現在までの時間はまだ確定していません。タスク詳細で計測内容を確認してください。
+            長時間、計測の通信が途切れていました。タスク詳細で記録した時間を確認してください。
           </div>}
         </div>
       </div>)}
@@ -877,6 +858,8 @@ export default function App() {
     const [tasks, setTasks] = useState([]);
     const [studySessions, setStudySessions] = useState([]);
     const [playerProfile, setPlayerProfile] = useState(emptyPlayerProfile());
+    const [profileLoaded, setProfileLoaded] = useState(false);
+    const [rewardIntegrityLoaded, setRewardIntegrityLoaded] = useState(false);
     const [rpgProgress, setRpgProgress] = useState(() => normalizeRpgProgress());
     const [towerProgress, setTowerProgress] = useState(() => normalizeTowerProgress());
     const [questState, setQuestState] = useState(() => normalizeQuestState());
@@ -962,6 +945,10 @@ export default function App() {
         feedbackSession.queue.enqueue(battleFeedback(before?.battle, battle, before?.highestFloor));
         feedbackSession.battles.set(battle.battleId, { battle, highestFloor: towerProgress.highestFloor });
     }, [activeBattle, lastBattle, towerProgress.highestFloor, isSampleMode, user]);
+    const rewardProgress = useMemo(() => deriveRewardProgress(
+        profileLoaded && rewardIntegrityLoaded ? playerProfile : null,
+        { blocked: reviewQueue.pendingCorrectionSessionIds.length > 0 }
+    ), [playerProfile, profileLoaded, rewardIntegrityLoaded, reviewQueue.pendingCorrectionSessionIds]);
     const selectedTitle = useMemo(() => getSelectedUnlockedTitle(playerProfile.selectedTitleId, unlockedTitles), [playerProfile.selectedTitleId, unlockedTitles]);
     const activeTimerIsOwner = useMemo(() => isTimerOwner(activeTimer, currentClientId), [activeTimer, currentClientId]);
     const isAnyTaskRunning = useMemo(() => hasAnyRunningTimer({ isSampleMode, activeTimer, tasks }), [isSampleMode, activeTimer, tasks]);
@@ -1018,11 +1005,11 @@ export default function App() {
     }, [isSampleMode, studySessions, user]);
     useEffect(() => {
         if (isSampleMode || !user) return undefined;
-        return onSnapshot(playerProfileRef(db, FAMILY_ID), { includeMetadataChanges: true }, (snap) => { const next = normalizePlayerProfile(snap.exists() ? snap.data() : emptyPlayerProfile()); if (!snap.metadata.fromCache) feedbackLoadedRef.current.add('profile'); setPlayerProfile(next); if (next.activeBattleId) setBattleWatchId(next.activeBattleId); }, (err) => console.error('PlayerProfile realtime sync error:', err));
+        return onSnapshot(playerProfileRef(db, FAMILY_ID), { includeMetadataChanges: true }, (snap) => { const next = normalizePlayerProfile(snap.exists() ? snap.data() : emptyPlayerProfile()); if (!snap.metadata.fromCache) { feedbackLoadedRef.current.add('profile'); setProfileLoaded(true); } setPlayerProfile(next); if (next.activeBattleId) setBattleWatchId(next.activeBattleId); }, (err) => console.error('PlayerProfile realtime sync error:', err));
     }, [isSampleMode, user]);
     useEffect(() => {
         if (isSampleMode || !user) return undefined;
-        return onSnapshot(rewardIntegrityRef(db, FAMILY_ID), (snap) => setRewardIntegrity(snap.exists() ? snap.data() : { pendingSessionIds: [] }), (err) => console.error('Reward integrity realtime sync error:', err));
+        return onSnapshot(rewardIntegrityRef(db, FAMILY_ID), { includeMetadataChanges: true }, (snap) => { if (!snap.metadata.fromCache) setRewardIntegrityLoaded(true); setRewardIntegrity(snap.exists() ? snap.data() : { pendingSessionIds: [] }); }, (err) => console.error('Reward integrity realtime sync error:', err));
     }, [isSampleMode, user]);
     useEffect(() => {
         if (isSampleMode || !user || !canReview) return undefined;
@@ -1050,17 +1037,11 @@ export default function App() {
         if (isSampleMode || !user || !battleWatchId) return undefined;
         return onSnapshot(rpgBattleRef(db, FAMILY_ID, battleWatchId), { includeMetadataChanges: true }, (snap) => { if (!snap.metadata.fromCache) feedbackBattleReadyRef.current.add(battleWatchId); else feedbackBattleReadyRef.current.delete(battleWatchId); const snapshot = resolveBattleWatchSnapshot(snap.exists() ? normalizeBattle(snap.data()) : null, battleWatchId); setActiveBattle(snapshot.activeBattle); setLastBattle(snapshot.lastBattle); setBattleWatchId(snapshot.battleWatchId); }, (err) => console.error('Battle realtime sync error:', err));
     }, [battleWatchId, isSampleMode, user]);
-    useEffect(() => {
-        if (!activeTimerIsOwner || activeTimer?.state !== 'running' || isSampleMode || !user) return;
-        const sendHeartbeat = () => heartbeatActiveTimer({
-            db,
-            familyId: FAMILY_ID,
-            timerId: activeTimer.timerId,
-            ownerClientId: currentClientId,
-        }).catch((err) => console.error('Timer heartbeat failed:', err));
-        const interval = setInterval(sendHeartbeat, TIMER_HEARTBEAT_MS);
-        return () => clearInterval(interval);
-    }, [activeTimer, activeTimerIsOwner, currentClientId, isSampleMode, user]);
+    useTimerHeartbeat({
+        timer: activeTimer,
+        enabled: activeTimerIsOwner && !isSampleMode && Boolean(user),
+        onHeartbeat: (timerId) => heartbeatActiveTimer({ db, familyId: FAMILY_ID, timerId, ownerClientId: currentClientId }),
+    });
     useEffect(() => {
         if (!activeStaleTimer || isSampleMode || !user || staleInvalidatingRef.current) return;
         staleInvalidatingRef.current = true;
@@ -1068,7 +1049,7 @@ export default function App() {
         invalidateStaleActiveTimer({ db, familyId: FAMILY_ID, task, now: Date.now() })
             .then((result) => {
                 if (result.invalidated) {
-                    setStaleTimerNotice('長時間停止していた計測を無効にしました。この時間は学習実績には含まれません。');
+                    setStaleTimerNotice('長時間、計測の通信が途切れたため、この記録を無効にしました。学習実績には含まれません。もう一度計測を開始してください。');
                     setSelectedTaskId(null);
                 }
             })
@@ -1533,7 +1514,7 @@ export default function App() {
             const completedFeedback = studyFeedback(result, task.title, reward)[0];
             if (completedFeedback) feedbackSession.queue.update(completedFeedback);
             if (!result.alreadyFinished && validation.status !== 'valid') {
-                setStaleTimerNotice('要確認セッションです。学習記録は保存済みですが、有効学習・成功報酬の対象にはなりません。');
+                setStaleTimerNotice('この学習時間は確認が必要なため、実績と報酬には含めていません。「確認」画面で記録内容を確認してください。');
             }
             setSelectedTaskId(null);
         }
@@ -1942,6 +1923,7 @@ export default function App() {
                   </div>)}
               </div>
 
+              {!isSampleMode && <RewardProgressCard progress={rewardProgress} onOpenRpg={() => setActiveTab('rpg')}/>}
               {/* 当日のタイムライン */}
               <TodayTimeline tasks={tasks} sessions={unifiedSessions} liveSession={liveSession} isSampleMode={isSampleMode}/>
 
@@ -2016,18 +1998,7 @@ export default function App() {
                 <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden text-center text-left">
                    <h3 className="text-lg font-black mb-6 flex items-center justify-center gap-2 leading-none text-center"><BarChart2 className="text-blue-600" size={20}/> 学習推移 (分)</h3>
                    <div className="h-64 sm:h-80 w-full text-center">
-                      <ResponsiveContainer width="100%" height="100%">
-                         <BarChart data={stats.dailyData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9"/>
-                            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 9, fontWeight: '900', fill: '#cbd5e1' }}/>
-                            <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 9, fontWeight: '900', fill: '#cbd5e1' }}/>
-                            <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', fontSize: '10px' }}/>
-                            <Legend iconType="circle" wrapperStyle={{ paddingTop: '10px', fontSize: '10px', fontWeight: '900' }}/>
-                            <Bar dataKey="school" name="中学校" stackId="a" fill="#3b82f6"/>
-                            <Bar dataKey="juku" name="塾" stackId="a" fill="#10b981"/>
-                            <Bar dataKey="etc" name="その他" stackId="a" fill="#8b5cf6"/>
-                         </BarChart>
-                      </ResponsiveContainer>
+                      <LazyPanel label="学習推移"><StudyCharts kind="study" stats={stats}/></LazyPanel>
                    </div>
                 </div>
 
@@ -2035,15 +2006,7 @@ export default function App() {
                    <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm text-center">
                   <h3 className="text-lg font-black mb-6 flex items-center justify-center gap-2 leading-none text-center text-center"><PieChartIcon className="text-indigo-600" size={20}/> 学習比率</h3>
                   <div className="h-56 sm:h-64 text-center">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie data={stats.breakdown} innerRadius="60%" outerRadius="85%" paddingAngle={5} dataKey="duration" nameKey="label">
-                          {stats.breakdown.map((e) => <Cell key={e.id} fill={e.hex} stroke="none"/>)}
-                        </Pie>
-                        <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', fontSize: '14px', fontWeight: 'bold' }}/>
-                        <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px', fontSize: '12px', fontWeight: '900' }}/>
-                      </PieChart>
-                    </ResponsiveContainer>
+                    <LazyPanel label="学習比率"><StudyCharts kind="ratio" stats={stats}/></LazyPanel>
                   </div>
                   <div className="flex justify-center gap-2 sm:gap-4 mt-2 sm:mt-4 flex-wrap leading-none">
                     {stats.breakdown.map(d => (<div key={d.id} className="flex flex-col items-center p-3 sm:p-4 bg-slate-50 rounded-xl sm:rounded-2xl min-w-[70px] sm:min-w-[90px] leading-none text-center">
@@ -2143,17 +2106,7 @@ export default function App() {
                    <div className="h-80 sm:h-[28rem] w-full text-center leading-none text-center">
                       {filteredTests.length === 0 ? (<div className="flex h-full items-center justify-center rounded-2xl bg-slate-50 px-6 text-sm font-black text-slate-400">
                         この期間の成績はありません
-                      </div>) : (<ResponsiveContainer width="100%" height="100%">
-                         <LineChart data={filteredTests} margin={{ top: 10, right: 14, left: -8, bottom: 0 }}>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9"/>
-                            <XAxis dataKey="date" tickFormatter={formatTestDateLabel} minTickGap={24} tickMargin={10} axisLine={false} tickLine={false} tick={{ fontSize: 12, fontWeight: '900', fill: '#94a3b8' }}/>
-                            <YAxis domain={deviationDomain} axisLine={false} tickLine={false} tick={{ fontSize: 12, fontWeight: '900', fill: '#94a3b8' }}/>
-                            <Tooltip content={<TestChartTooltip/>}/>
-                            
-                            {visibleSubjects.includes('average') && (<Line type="monotone" dataKey="average" name="総合偏差値" stroke="#0f172a" strokeWidth={4} dot={{ r: 5, fill: '#0f172a', strokeWidth: 2, stroke: '#fff' }} connectNulls/>)}
-                            {allChartSubjects.filter(s => s.id !== 'average').map(sub => (visibleSubjects.includes(sub.id) && (<Line key={sub.id} type="monotone" dataKey={`scores.${sub.id}`} name={sub.label} stroke={sub.hex} strokeWidth={3} dot={{ r: 4, fill: sub.hex, strokeWidth: 1, stroke: '#fff' }} connectNulls animationDuration={800}/>)))}
-                         </LineChart>
-                      </ResponsiveContainer>)}
+                      </div>) : (<LazyPanel label="成績グラフ"><StudyCharts kind="tests" filteredTests={filteredTests} visibleSubjects={visibleSubjects} allChartSubjects={allChartSubjects} deviationDomain={deviationDomain} categories={CATEGORIES}/></LazyPanel>)}
                    </div>
                 </div>
 
@@ -2204,7 +2157,7 @@ export default function App() {
                 </div>
               </div>)}
             {activeTab === 'rpg' && !isSampleMode && (
-              <RpgHub profile={playerProfile} progress={rpgProgress} towerProgress={towerProgress} achievements={achievements} unlockedTitles={unlockedTitles} selectedTitle={selectedTitle} onSelectTitle={handleSelectTitle} savingTitle={savingTitle} questState={questState} onClaimQuest={handleClaimQuest} pendingQuestId={pendingQuestId} onPurchaseRequest={handlePurchaseRequest} onMaterialExchangeRequest={handleMaterialExchangeRequest} pendingMaterialExchange={pendingMaterialExchange} onEquip={handleEquip} onUnequip={handleUnequip} pendingItemId={pendingPurchaseItemId} pendingAction={pendingEquipmentAction} status={rpgStatus} battle={activeBattle || lastBattle} onStartBattleRequest={handleBattleStartRequest} onAttackBattle={handleAttackBattle} onUseBattleSkill={handleUseBattleSkill} startingEnemyId={pendingBattleEnemyId} attacking={isAttackingBattle} onBattleBack={handleBattleResultClose} battleFeedback={battleTurnFeedback} onSaveParty={handleSaveParty} savingParty={savingParty} onGachaBuy={(type) => handleGacha('buy', type)} onGachaDraw={(type) => handleGacha('draw', type)} onGachaExchange={(kind, id) => handleGacha('exchange', kind, id)} onAlchemyCraft={handleAlchemyCraft} loadEncyclopediaLedgers={loadEncyclopediaLedgers} gachaPending={gachaPending} alchemyPending={alchemyPending}/>
+              <LazyPanel label="RPG"><RpgHub profile={playerProfile} progress={rpgProgress} towerProgress={towerProgress} achievements={achievements} unlockedTitles={unlockedTitles} selectedTitle={selectedTitle} onSelectTitle={handleSelectTitle} savingTitle={savingTitle} questState={questState} onClaimQuest={handleClaimQuest} pendingQuestId={pendingQuestId} onPurchaseRequest={handlePurchaseRequest} onMaterialExchangeRequest={handleMaterialExchangeRequest} pendingMaterialExchange={pendingMaterialExchange} onEquip={handleEquip} onUnequip={handleUnequip} pendingItemId={pendingPurchaseItemId} pendingAction={pendingEquipmentAction} status={rpgStatus} battle={activeBattle || lastBattle} onStartBattleRequest={handleBattleStartRequest} onAttackBattle={handleAttackBattle} onUseBattleSkill={handleUseBattleSkill} startingEnemyId={pendingBattleEnemyId} attacking={isAttackingBattle} onBattleBack={handleBattleResultClose} battleFeedback={battleTurnFeedback} onSaveParty={handleSaveParty} savingParty={savingParty} onGachaBuy={(type) => handleGacha('buy', type)} onGachaDraw={(type) => handleGacha('draw', type)} onGachaExchange={(kind, id) => handleGacha('exchange', kind, id)} onAlchemyCraft={handleAlchemyCraft} loadEncyclopediaLedgers={loadEncyclopediaLedgers} gachaPending={gachaPending} alchemyPending={alchemyPending}/></LazyPanel>
             )}
             {activeTab === 'review' && canReview && !isSampleMode && <ManualReviewPanel queue={reviewQueue} profile={playerProfile} studySessions={studySessions} ledgersBySessionId={pendingCorrectionLedgers} busySessionIds={reviewBusySessionIds} message={reviewError} onOpenCorrection={openHistoryCorrection} onRetry={handlePendingCorrectionRetry}/>}
           </main>
