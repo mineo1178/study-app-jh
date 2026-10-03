@@ -8,7 +8,7 @@ import { getWeeklyBossWeekId } from './weeklyBossCatalog.js';
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const chapterOneId = Object.values(CHAPTER_CATALOG).find((chapter) => chapter.number === 1)?.id || null;
 
-const timestampForStudyDate = (date) => {
+export const timestampForStudyDate = (date) => {
   if (!DATE_PATTERN.test(date || '')) return null;
   const utcTimestamp = Date.parse(`${date}T00:00:00Z`);
   return Number.isFinite(utcTimestamp) && new Date(utcTimestamp).toISOString().slice(0, 10) === date

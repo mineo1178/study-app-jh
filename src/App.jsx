@@ -46,7 +46,8 @@ import BattleStartConfirmModal from './components/rpg/BattleStartConfirmModal';
 import QuestTreasureResult from './components/rpg/QuestTreasureResult';
 import { formatHms, getEffectiveSessionsForDate, getEffectiveStudySeconds, getEffectiveStudySecondsForTask, getLiveStudySession, getSessionsForDate, getSessionsForTask, getUnifiedStudySessions } from './data/studySessionSelectors';
 import LiveStudyStatus from './components/study/LiveStudyStatus';
-import RewardProgressCard from './components/study/RewardProgressCard';
+import LearningDashboard from './components/study/LearningDashboard';
+import { deriveDashboardSummary } from './data/dashboardSelectors';
 import { deriveRewardProgress } from './rpg/rewardProgress';
 import useTimerHeartbeat from './timer/useTimerHeartbeat';
 import useTimerDiagnostics from './timer/useTimerDiagnostics';
@@ -96,7 +97,7 @@ const getTasksCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-
 const getTestsCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tests');
 const getStudySessionsCol = () => studySessionsCollection(db, FAMILY_ID);
 const getActiveTimerRef = () => activeTimerRef(db, FAMILY_ID);
-const APP_VERSION = 'v1.98.1';
+const APP_VERSION = 'v1.99.0';
 const isDocumentHidden = () => typeof document !== 'undefined' && document.hidden;
 // ==========================================
 // Constants & Master Data
@@ -861,6 +862,7 @@ export default function App() {
     const [tasks, setTasks] = useState([]);
     const [studySessions, setStudySessions] = useState([]);
     const [playerProfile, setPlayerProfile] = useState(emptyPlayerProfile());
+    const [dashboardLoaded, setDashboardLoaded] = useState({});
     const [profileLoaded, setProfileLoaded] = useState(false);
     const [rewardIntegrityLoaded, setRewardIntegrityLoaded] = useState(false);
     const [rpgProgress, setRpgProgress] = useState(() => normalizeRpgProgress());
@@ -957,6 +959,14 @@ export default function App() {
         profileLoaded && rewardIntegrityLoaded ? playerProfile : null,
         { blocked: reviewQueue.pendingCorrectionSessionIds.length > 0 }
     ), [playerProfile, profileLoaded, rewardIntegrityLoaded, reviewQueue.pendingCorrectionSessionIds]);
+    const dashboardDay = Math.floor((liveNow + 9 * 3600000) / 86400000) * 86400000 - 9 * 3600000;
+    const dashboardSummary = useMemo(() => deriveDashboardSummary({
+        sessions: unifiedSessions, now: dashboardDay,
+        ready: dashboardLoaded.tasks && dashboardLoaded.sessions,
+        rewardProgress, rpgProgress, towerProgress, playerProfile, achievements, grades: tests,
+        rpgReady: profileLoaded && dashboardLoaded.campaign && dashboardLoaded.tower,
+        gradesReady: dashboardLoaded.grades, battle: activeBattle, pendingBattle: Boolean(pendingBattleEnemyId),
+    }), [unifiedSessions, dashboardDay, dashboardLoaded, rewardProgress, rpgProgress, towerProgress, playerProfile, achievements, tests, profileLoaded, activeBattle, pendingBattleEnemyId]);
     const selectedTitle = useMemo(() => getSelectedUnlockedTitle(playerProfile.selectedTitleId, unlockedTitles), [playerProfile.selectedTitleId, unlockedTitles]);
     const activeTimerIsOwner = useMemo(() => isTimerOwner(activeTimer, currentClientId), [activeTimer, currentClientId]);
     const isAnyTaskRunning = useMemo(() => hasAnyRunningTimer({ isSampleMode, activeTimer, tasks }), [isSampleMode, activeTimer, tasks]);
@@ -1033,11 +1043,11 @@ export default function App() {
     }, [canReview, isSampleMode, reviewQueue.pendingCorrectionSessionIds, user]);
     useEffect(() => {
         if (isSampleMode || !user) return undefined;
-        return onSnapshot(rpgProgressRef(db, FAMILY_ID), { includeMetadataChanges: true }, (snap) => { if (!snap.metadata.fromCache) feedbackLoadedRef.current.add('campaign'); setRpgProgress(normalizeRpgProgress(snap.exists() ? snap.data() : {})); }, (err) => console.error('RpgProgress realtime sync error:', err));
+        return onSnapshot(rpgProgressRef(db, FAMILY_ID), { includeMetadataChanges: true }, (snap) => { if (!snap.metadata.fromCache) feedbackLoadedRef.current.add('campaign'); setRpgProgress(normalizeRpgProgress(snap.exists() ? snap.data() : {})); if (!snap.metadata.fromCache) setDashboardLoaded(prev => ({ ...prev, campaign: true })); }, (err) => console.error('RpgProgress realtime sync error:', err));
     }, [isSampleMode, user]);
     useEffect(() => {
         if (isSampleMode || !user) return undefined;
-        return onSnapshot(rpgTowerProgressRef(db, FAMILY_ID), { includeMetadataChanges: true }, (snap) => { if (!snap.metadata.fromCache) feedbackLoadedRef.current.add('tower'); setTowerProgress(normalizeTowerProgress(snap.exists() ? snap.data() : {})); }, (err) => console.error('Tower progress realtime sync error:', err));
+        return onSnapshot(rpgTowerProgressRef(db, FAMILY_ID), { includeMetadataChanges: true }, (snap) => { if (!snap.metadata.fromCache) feedbackLoadedRef.current.add('tower'); setTowerProgress(normalizeTowerProgress(snap.exists() ? snap.data() : {})); if (!snap.metadata.fromCache) setDashboardLoaded(prev => ({ ...prev, tower: true })); }, (err) => console.error('Tower progress realtime sync error:', err));
     }, [isSampleMode, user]);
     useEffect(() => {
         if (isSampleMode || !user) return undefined;
@@ -1133,6 +1143,7 @@ export default function App() {
             recordTimerDiagnostic('auth_state', { authenticated: Boolean(u), authChanged: diagnosticAuthRef.current !== undefined && diagnosticAuthRef.current !== (u?.uid || null), sampleMode: isSampleMode, source: 'app.auth_listener' });
             diagnosticAuthRef.current = u?.uid || null;
             if (!isSampleMode) {
+                setDashboardLoaded({});
                 setUser(u);
                 if (!u)
                     setLoading(false);
@@ -1148,7 +1159,7 @@ export default function App() {
         const subscriptionId = ++diagnosticSubscriptionRef.current;
         recordTimerDiagnostic('subscription_start', { subscriptionId, authenticated: Boolean(user), sampleMode: isSampleMode, source: 'app.timer_subscription' });
         const unsubTasks = onSnapshot(getTasksCol(), { includeMetadataChanges: true }, (snap) => {
-            if (!snap.metadata.fromCache) feedbackLoadedRef.current.add('tasks');
+            if (!snap.metadata.fromCache) { feedbackLoadedRef.current.add('tasks'); setDashboardLoaded(prev => ({ ...prev, tasks: true })); }
             setTasks(snap.docs.map(d => ({ id: d.id, ...d.data() })));
             setLoading(false);
         }, (err) => {
@@ -1157,11 +1168,12 @@ export default function App() {
         });
         const unsubTests = onSnapshot(getTestsCol(), (snap) => {
             setTests(snap.docs.map(d => normalizeTestRecord(d.id, d.data())).sort(compareTestRecords));
+            setDashboardLoaded(prev => ({ ...prev, grades: true }));
         }, (err) => {
             console.error("Test realtime sync error:", err);
         });
         const unsubSessions = onSnapshot(getStudySessionsCol(), { includeMetadataChanges: true }, (snap) => {
-            if (!snap.metadata.fromCache) feedbackLoadedRef.current.add('sessions');
+            if (!snap.metadata.fromCache) { feedbackLoadedRef.current.add('sessions'); setDashboardLoaded(prev => ({ ...prev, sessions: true })); }
             for (const change of snap.docChanges()) {
                 if (change.type === 'removed' || !diagnosticTimerIdsRef.current.has(change.doc.id)) continue;
                 const session = change.doc.data();
@@ -1892,6 +1904,8 @@ export default function App() {
                </div>)}
 
             {activeTab === 'daily' && (<div className="space-y-8 animate-in fade-in duration-500">
+            {!isSampleMode && <LearningDashboard summary={dashboardSummary} onNavigate={tab => tab === 'study' ? document.getElementById('study-items')?.scrollIntoView({ behavior: 'smooth' }) : setActiveTab(tab)}/>}
+            <div id="study-items" />
             <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-slate-950 via-blue-950 to-indigo-700 p-4 sm:p-5 shadow-2xl shadow-blue-200/40 ring-1 ring-white/20 lg:sticky lg:top-4 z-30">
               <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full bg-blue-400/25 blur-2xl"/>
               <div className="relative z-10 flex items-center justify-between">
@@ -1957,8 +1971,6 @@ export default function App() {
                       </button>))}
                   </div>)}
               </div>
-
-              {!isSampleMode && <RewardProgressCard progress={rewardProgress} onOpenRpg={() => setActiveTab('rpg')}/>}
               {/* 当日のタイムライン */}
               <TodayTimeline tasks={tasks} sessions={unifiedSessions} liveSession={liveSession} isSampleMode={isSampleMode}/>
 
@@ -1970,7 +1982,7 @@ export default function App() {
                 </div>
               ) : <ActiveTimerSummary task={runningTask} onHeartbeat={handleUpdateLocalTask}/>}
 
-              <div className="flex gap-2 bg-slate-100 p-1.5 rounded-[1.75rem] w-full max-w-md mx-auto shadow-inner overflow-hidden leading-none text-center">
+              <div id="study-items" className="flex gap-2 bg-slate-100 p-1.5 rounded-[1.75rem] w-full max-w-md mx-auto shadow-inner overflow-hidden leading-none text-center">
                     {Object.values(CATEGORIES).map(cat => (<button type="button" key={cat.id} onClick={() => handleCategoryChange(cat.id)} className={`flex-1 flex items-center justify-center gap-1.5 py-3 rounded-2xl text-[10px] font-black transition-all leading-none ${activeCategory === cat.id ? 'bg-white text-slate-900 shadow-md' : 'text-slate-400'}`}>
                         <cat.icon size={14}/> {cat.label}
                       </button>))}
