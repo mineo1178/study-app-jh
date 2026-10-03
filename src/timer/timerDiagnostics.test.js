@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createTimerDiagnostics, diagnosticErrorCode, diagnosticTimerState, listenTimerDiagnosticEnvironment, recordTimerSnapshot, timerDiagnostics, traceTimerOperation, TIMER_DIAGNOSTICS_KEY, TIMER_DIAGNOSTICS_LIMIT } from './timerDiagnostics.js';
+import { createTimerDiagnostics, diagnosticErrorCode, diagnosticTimerState, diagnosticUserActivity, listenTimerUserActivity, TIMER_ACTIVITY_EVENTS, listenTimerDiagnosticEnvironment, recordTimerSnapshot, timerDiagnostics, traceTimerOperation, TIMER_DIAGNOSTICS_KEY, TIMER_DIAGNOSTICS_LIMIT } from './timerDiagnostics.js';
 import { buildActiveTimer, canForceInvalidateStaleTimer } from '../data/activeTimerRepository.js';
 import { getTimerViewTask } from './timerRuntimeState.js';
 
@@ -9,6 +9,42 @@ const memory = () => {
 };
 const startedAt = 1_000_000;
 const timer = buildActiveTimer({ task: { id: 't' }, timerId: 'timer', ownerClientId: 'owner', now: startedAt });
+describe('user activity observation has no timer side effects', () => {
+  const target = () => {
+    const listeners = new Map();
+    return {
+      addEventListener: (event, listener) => listeners.set(event, listener),
+      removeEventListener: (event, listener) => { if (listeners.get(event) === listener) listeners.delete(event); },
+      emit: (type, isTrusted = true) => listeners.get(type)?.({ type, isTrusted }),
+      listeners,
+    };
+  };
+  it.each(TIMER_ACTIVITY_EVENTS)('observes trusted %s without changing the active timer', (event) => {
+    const surface = target(); const record = vi.fn();
+    const cleanup = listenTimerUserActivity(record, surface, () => startedAt);
+    surface.emit(event);
+    expect(diagnosticUserActivity(startedAt + 1000)).toEqual({ lastUserActivityAt: startedAt, elapsedIdleSeconds: 1 });
+    expect(record).toHaveBeenCalledWith('user_activity', { activityEvent: event, lastUserActivityAt: startedAt, elapsedIdleSeconds: 0 });
+    expect(timer.state).toBe('running'); cleanup(); expect(surface.listeners.size).toBe(0);
+  });
+  it('samples high frequency activity but retains the latest actual operation', () => {
+    const surface = target(); const record = vi.fn(); let now = startedAt;
+    const cleanup = listenTimerUserActivity(record, surface, () => now);
+    for (let index = 0; index < 60_000; index++) { now = startedAt + index; surface.emit('pointermove'); }
+    expect(record).toHaveBeenCalledTimes(1);
+    expect(diagnosticUserActivity(now).lastUserActivityAt).toBe(now);
+    now = startedAt + 60_000; surface.emit('click'); expect(record).toHaveBeenCalledTimes(2); cleanup();
+  });
+  it('internal, synthetic, visibility and focus events never count as user activity; remount cleans up', () => {
+    const surface = target(); const record = vi.fn();
+    const cleanup = listenTimerUserActivity(record, surface, () => startedAt);
+    surface.emit('click', false);
+    for (const event of ['heartbeat', 'snapshot', 'render', 'state_update', 'tick', 'feedback', 'lazy_load', 'network_response', 'visibilitychange', 'focus', 'poll']) surface.emit(event);
+    expect(diagnosticUserActivity().lastUserActivityAt).toBeNull(); expect(record).not.toHaveBeenCalled();
+    cleanup(); const cleanupAgain = listenTimerUserActivity(record, surface, () => startedAt);
+    expect(surface.listeners.size).toBe(TIMER_ACTIVITY_EVENTS.length); cleanupAgain();
+  });
+});
 afterEach(() => { vi.restoreAllMocks(); vi.useRealTimers(); });
 
 describe('local diagnostic ring', () => {

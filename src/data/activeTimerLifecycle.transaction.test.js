@@ -28,6 +28,19 @@ const args = { db: {}, familyId: 'f', task, timerId: 't', ownerClientId: 'owner'
 beforeEach(() => { state.store.clear(); state.race = null; state.attempts = 0; });
 
 describe('active timer transaction lifecycle', () => {
+  it('records all sixty minutes without user activity while owner heartbeats continue (no idle-stop policy)', async () => {
+    vi.useFakeTimers(); vi.setSystemTime(start);
+    try {
+      await startActiveTimer({ ...args, now: Date.now() });
+      for (let seconds = 30; seconds <= 3600; seconds += 30) {
+        vi.advanceTimersByTime(30_000);
+        await heartbeatActiveTimer({ ...args, now: Date.now() });
+        expect(await invalidateStaleActiveTimer({ ...args, now: Date.now() })).toMatchObject({ invalidated: false });
+      }
+      const result = await finishActiveTimer({ ...args, endAt: Date.now() });
+      expect(result.session).toMatchObject({ recordedSeconds: 3600, validation: { status: 'valid' }, segments: [{ startedAt: start, endedAt: start + 3600_000, durationSeconds: 3600 }] });
+    } finally { vi.useRealTimers(); }
+  });
   it('reproduces early stale deletion when a different client clock is fifteen minutes ahead', async () => {
     await startActiveTimer({ ...args, now: start });
     const observerNow = start + 30_000 + 15 * 60_000;

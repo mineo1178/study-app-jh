@@ -1,5 +1,5 @@
 import { useState, useSyncExternalStore } from 'react';
-import { diagnosticTimerState, timerDiagnostics } from '../../timer/timerDiagnostics.js';
+import { diagnosticTimerState, diagnosticUserActivity, timerDiagnostics } from '../../timer/timerDiagnostics.js';
 
 const time = (value) => typeof value === 'number' && Number.isFinite(value) ? new Date(value).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '—';
 
@@ -9,6 +9,8 @@ export default function TimerDiagnosticsPanel({ timer, authenticated, isOwner })
   const [exportText, setExportText] = useState('');
   const [message, setMessage] = useState('');
   const state = diagnosticTimerState(timer, entries.at(-1)?.timestamp || 0);
+  const activity = diagnosticUserActivity(entries.at(-1)?.timestamp || 0);
+  const lastStop = entries.findLast((entry) => entry.event === 'stop_control' || entry.event === 'session_finalized');
   const copy = async () => {
     const text = timerDiagnostics.export();
     setExportText(text);
@@ -24,6 +26,12 @@ export default function TimerDiagnosticsPanel({ timer, authenticated, isOwner })
         <dt>timerId</dt><dd className="break-all">{state.timerId || '—'}</dd>
         <dt>startedAt</dt><dd>{time(state.startedAt)}</dd>
         <dt>lastHeartbeatAt</dt><dd>{time(state.lastHeartbeatAt)}</dd>
+        <dt>lastUserActivityAt</dt><dd>{time(activity.lastUserActivityAt)}（このページで観測）</dd>
+        <dt>無操作秒数（ログ更新時）</dt><dd>{activity.elapsedIdleSeconds ?? '未観測'}</dd>
+        <dt>無操作停止 / deadline</dt><dd>未実装 / なし</dd>
+        <dt>通信停止判定</dt><dd>15分（ユーザー操作とは別）</dd>
+        <dt>focus</dt><dd>{String(entries.at(-1)?.focus ?? 'unknown')}</dd>
+        <dt>直近終了理由</dt><dd>{lastStop?.reason || '—'}</dd>
         <dt>visibility</dt><dd>{entries.at(-1)?.visibility || 'unknown'}</dd>
         <dt>online</dt><dd>{String(entries.at(-1)?.online ?? 'unknown')}</dd>
         <dt>認証 / 所有者</dt><dd>{String(authenticated)} / {String(isOwner)}</dd>

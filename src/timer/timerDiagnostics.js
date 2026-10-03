@@ -3,12 +3,14 @@ import { isActiveTimer, isStaleActiveTimer } from './timerEngine.js';
 export const TIMER_DIAGNOSTICS_KEY = 'study-jh-timer-diagnostics-v1';
 export const TIMER_DIAGNOSTICS_LIMIT = 300;
 const fields = new Set(['timerId', 'status', 'startedAt', 'segmentStartedAt', 'lastHeartbeatAt', 'heartbeatAgeMs', 'stale', 'exists', 'fromCache', 'hasPendingWrites', 'subscriptionId', 'reason', 'source', 'errorCode', 'authenticated', 'authChanged', 'sampleMode', 'activeTab', 'hasTimerTask', 'owner', 'alreadyFinished', 'invalidated', 'switched', 'resumed', 'validationStatus', 'recordedSeconds', 'hadActiveTimer', 'startedAtType', 'heartbeatType', 'caller', 'enabled']);
+for (const field of ['activityEvent', 'lastUserActivityAt', 'elapsedIdleSeconds', 'focus']) fields.add(field);
 const scalar = (value) => typeof value === 'boolean' || value === null ? value : typeof value === 'number' ? (Number.isFinite(value) ? value : null) : typeof value === 'string' ? value.slice(0, 96) : undefined;
 const typeOfTime = (value) => value?.toMillis ? 'firestore_timestamp' : typeof value;
 const timeValue = (value) => typeof value === 'number' && Number.isFinite(value) ? value : null;
 
 export function diagnosticTimerState(timer, now = Date.now()) {
   return {
+    ...diagnosticUserActivity(now),
     timerId: timer?.timerId || null, status: timer?.state || 'missing',
     startedAt: timeValue(timer?.startedAt), segmentStartedAt: timeValue(timer?.segmentStartedAt),
     lastHeartbeatAt: timeValue(timer?.lastHeartbeatAt), heartbeatAgeMs: timeValue(timer?.lastHeartbeatAt) === null ? null : now - timer.lastHeartbeatAt,
@@ -21,7 +23,7 @@ export function diagnosticErrorCode(error) {
   return typeof error?.code === 'string' ? error.code.slice(0, 64) : /^[A-Z_]+$/.test(error?.message || '') ? error.message : 'ERROR';
 }
 
-export function createTimerDiagnostics({ storage = () => typeof window === 'undefined' ? null : window.localStorage, now = Date.now, monotonic = () => globalThis.performance?.now?.() ?? 0, environment = () => ({ visibility: typeof document === 'undefined' ? 'unknown' : document.visibilityState, online: typeof navigator === 'undefined' ? null : navigator.onLine }) } = {}) {
+export function createTimerDiagnostics({ storage = () => typeof window === 'undefined' ? null : window.localStorage, now = Date.now, monotonic = () => globalThis.performance?.now?.() ?? 0, environment = () => ({ visibility: typeof document === 'undefined' ? 'unknown' : document.visibilityState, focus: typeof document === 'undefined' ? null : document.hasFocus(), online: typeof navigator === 'undefined' ? null : navigator.onLine }) } = {}) {
   const instance = globalThis.crypto?.randomUUID?.() || Math.random().toString(36).slice(2);
   let sequence = 0;
   let previousWall = null;
@@ -69,6 +71,27 @@ export function createTimerDiagnostics({ storage = () => typeof window === 'unde
 export const timerDiagnostics = createTimerDiagnostics();
 export const recordTimerDiagnostic = (event, details) => timerDiagnostics.record(event, details);
 
+// Observation only: the existing timer has no user-inactivity stop policy.
+export const TIMER_ACTIVITY_EVENTS = ['pointerdown', 'click', 'keydown', 'touchstart', 'pointermove', 'wheel', 'scroll'];
+let lastUserActivityAt = null;
+export function diagnosticUserActivity(now = Date.now()) {
+  return { lastUserActivityAt, elapsedIdleSeconds: lastUserActivityAt === null ? null : Math.max(0, Math.floor((now - lastUserActivityAt) / 1000)) };
+}
+export function listenTimerUserActivity(record, target = window, now = Date.now) {
+  lastUserActivityAt = null;
+  let lastLoggedAt = null;
+  const listener = (event) => {
+    if (!event.isTrusted) return;
+    lastUserActivityAt = now();
+    if (lastLoggedAt !== null && lastUserActivityAt - lastLoggedAt < 60_000) return;
+    lastLoggedAt = lastUserActivityAt;
+    record('user_activity', { ...diagnosticUserActivity(lastUserActivityAt), activityEvent: event.type });
+  };
+  const options = { passive: true, capture: true };
+  TIMER_ACTIVITY_EVENTS.forEach((event) => target.addEventListener(event, listener, options));
+  return () => TIMER_ACTIVITY_EVENTS.forEach((event) => target.removeEventListener(event, listener, options));
+}
+
 export function recordTimerSnapshot(previous, next, metadata, subscriptionId, record = recordTimerDiagnostic) {
   record('active_timer_snapshot', { ...diagnosticTimerState(next), exists: Boolean(next), fromCache: metadata.fromCache, hasPendingWrites: metadata.hasPendingWrites, subscriptionId, source: 'app.active_timer_snapshot' });
   if (!next) {
@@ -103,7 +126,7 @@ export async function traceTimerOperation(operation, details, run) {
 export function listenTimerDiagnosticEnvironment(record, windowTarget = window, documentTarget = document) {
   const callbacks = [];
   for (const [target, events] of [[documentTarget, ['visibilitychange']], [windowTarget, ['focus', 'blur', 'online', 'offline']]]) {
-    for (const event of events) { const listener = () => record(event); target.addEventListener(event, listener); callbacks.push(() => target.removeEventListener(event, listener)); }
+    for (const event of events) { const listener = () => record(event, { focus: documentTarget.hasFocus?.() ?? null }); target.addEventListener(event, listener); callbacks.push(() => target.removeEventListener(event, listener)); }
   }
   record('component_mount');
   return () => { callbacks.forEach((remove) => remove()); record('component_unmount'); };
