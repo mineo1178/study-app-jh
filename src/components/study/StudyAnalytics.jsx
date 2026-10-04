@@ -1,0 +1,28 @@
+import { useMemo, useState } from 'react';
+import { aggregateMonthlyStudy } from '../../data/monthlyStudySelectors.js';
+import { deriveStudyAnalytics } from '../../data/studyAnalyticsSelectors.js';
+import { reportDuration as duration } from '../../data/weeklyReportSelectors.js';
+
+const card = 'min-w-0 rounded-[2rem] border border-slate-100 bg-white p-4 sm:p-6 shadow-sm';
+const button = 'min-h-11 rounded-xl bg-blue-50 px-4 py-3 text-sm font-bold text-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2';
+const difference = seconds => `${seconds > 0 ? '+' : seconds < 0 ? '−' : ''}${duration(Math.abs(seconds))}`;
+
+export default function StudyAnalytics({ sessions, now, ready, studyGoals, subjectDefinitions, onBack }) {
+  const [period,setPeriod] = useState(4);
+  const index = useMemo(() => aggregateMonthlyStudy({ sessions, now, ready, subjectDefinitions }),[sessions,now,ready,subjectDefinitions]);
+  const data = useMemo(() => deriveStudyAnalytics(index,now,period,studyGoals),[index,now,period,studyGoals]);
+  const maxWeek = Math.max(1,...(data.weeks || []).map(week => week.seconds));
+  return <section aria-label="学習分析" className="mx-auto max-w-3xl min-w-0 space-y-4 text-left">
+    <header className={card}><h1 className="text-xl font-black">学習分析</h1><p className="mt-2 text-sm text-slate-500">確定した有効な学習記録から、数週間の学習時間と日数を確認できます。</p><button type="button" className={`${button} mt-3`} onClick={onBack}>ダッシュボードへ戻る</button></header>
+    {data.status === 'loading' ? <div role="status" className={card}>学習記録を読み込み中です…</div> : <>
+      <div className={card}><h2 className="text-lg font-black">分析する期間</h2><div className="mt-3 flex flex-wrap gap-2">{[4,8].map(weeks => <button type="button" key={weeks} aria-pressed={period === weeks} className={`${button} ${period === weeks ? 'ring-2 ring-blue-600' : ''}`} onClick={() => setPeriod(weeks)}>直近{weeks}週間</button>)}</div><p className="mt-3 text-xs text-slate-500">今週を含み、今日までの記録を表示します。履歴が短い場合は記録が始まった週から表示します。</p>{!data.recordWeeks && <p className="mt-3 text-sm">この期間の学習記録はありません。</p>}
+        <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">{[['総学習時間',duration(data.seconds)],['学習日数',`${data.studyDays}日`],['記録のある週',`${data.recordWeeks}週`],['1週間平均学習日数',`${data.averageWeekDays.toFixed(1)}日`],['1学習日あたり平均',duration(data.averageDaySeconds)],['1週間あたり平均',duration(data.averageWeekSeconds)]].map(([label,value]) => <div key={label} className="min-w-0 rounded-xl bg-slate-50 p-3"><dt>{label}</dt><dd className="mt-1 break-words font-bold">{value}</dd></div>)}</dl><p className="mt-3 text-xs text-slate-500">週平均は表示中の{data.weeks.length}週間が分母です（途中の今週・記録のない週を含む）。</p>
+      </div>
+      <div className={card}><h2 className="text-lg font-black">週間の推移</h2><ul className="mt-3 space-y-4">{data.weeks.map(week => <li key={week.id}><p className="flex flex-wrap justify-between gap-1 text-sm"><b>{week.label}{week.current ? '（今週・途中経過）' : ''}</b><span>{duration(week.seconds)} ・ {week.studyDays}日</span></p><progress aria-label={`${week.label}の学習時間`} value={week.seconds} max={maxWeek} className="mt-1 block h-3 w-full accent-blue-600"/></li>)}</ul><h3 className="mt-5 font-bold">今週と前週の比較</h3>{data.previous ? <><p className="mt-2 text-sm">今週 {duration(data.current.seconds)} ・ {data.current.studyDays}日</p><p className="mt-1 text-sm">前週 {duration(data.previous.seconds)} ・ {data.previous.studyDays}日</p><p className="mt-1 text-sm">差 {difference(data.difference.seconds)} ・ {data.difference.days > 0 ? '+' : ''}{data.difference.days}日</p><p className="mt-2 text-xs text-slate-500">今週は途中経過、前週は週全体です。</p></> : <p className="mt-2 text-sm">前週の記録なし</p>}</div>
+      <div className={card}><h2 className="text-lg font-black">曜日別の学習</h2><p className="mt-2 text-xs text-slate-500">平均は、その曜日に学習した日のみが分母です。</p><ul className="mt-3 space-y-3">{data.weekdays.map(day => <li key={day.label} className="break-words text-sm"><b>{day.label}曜日</b>：{duration(day.seconds)} ・ {day.studyDays}日 ・ 平均 {duration(day.averageSeconds)}</li>)}</ul></div>
+      <div className={card}><h2 className="text-lg font-black">科目別の学習</h2><p className="mt-2 text-xs text-slate-500">対象期間の学習時間が多い順に表示します。</p>{!data.subjects.length ? <p className="mt-3 text-sm">科目別の学習記録はありません。</p> : <ul className="mt-3 space-y-4">{data.subjects.map(subject => <li key={subject.id} className="min-w-0"><p className="break-words text-sm"><b>{subject.name}</b>：{duration(subject.seconds)} ・ {subject.percent.toFixed(1)}% ・ {subject.studyDays}日</p><progress aria-label={`${subject.name}の割合`} value={subject.percent} max="100" className="mt-1 block h-2 w-full accent-blue-600"/></li>)}</ul>}{data.comparisonAvailable && <><h3 className="mt-5 font-bold">直近4週と前4週の科目比較</h3><p className="mt-2 text-xs text-slate-500">直近4週には途中の今週を含みます。</p><ul className="mt-2 space-y-2 text-xs">{data.subjectComparison.map(subject => <li key={subject.id} className="break-words"><b>{subject.name}</b>：前4週 {duration(subject.previousSeconds)} → 直近4週 {duration(subject.recentSeconds)}（{difference(subject.recentSeconds-subject.previousSeconds)}）</li>)}</ul></>}{!data.comparisonAvailable && <p className="mt-3 text-xs text-slate-500">前4週との比較ができる記録がありません。</p>}</div>
+      <div className={card}><h2 className="text-lg font-black">連続学習</h2><p className="mt-3 text-sm">現在 {data.currentStreak}日 ・ 過去最高 {data.longestStreak}日</p><p className="mt-2 text-xs text-slate-500">全記録を基準に、実績と同じ連続日数の数え方を使用。現在の連続日数は今日または昨日まで続く記録です。</p></div>
+      <div className={card}><h2 className="text-lg font-black">1日の目標</h2><p className="mt-3 text-sm">学習した{data.studyDays}日のうち、目標達成 {data.achievedDays}日（{data.goalPercent.toFixed(1)}%）</p><p className="mt-2 text-xs text-slate-500">現在の1日目標（{duration(data.dailyTargetSeconds)}）を基準に表示。過去の目標履歴はありません。実績の固定条件は変わりません。</p></div>
+    </>}
+  </section>;
+}

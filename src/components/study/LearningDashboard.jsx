@@ -7,7 +7,7 @@ export default function LearningDashboard({ summary, onNavigate, studyGoals, onS
   if (summary.status === 'loading') return <section className={box} role="status">学習状況を読み込んでいます…</section>;
   const s = summary;
   return <section aria-label="学習ダッシュボード" className="min-w-0 space-y-4">
-    <button type="button" className={`${link} focus-visible:outline-2`} onClick={() => onNavigate('monthly-calendar')}>月間カレンダーを見る</button>
+    <div className="flex flex-wrap gap-2"><button type="button" className={`${link} focus-visible:outline-2`} onClick={() => onNavigate('monthly-calendar')}>月間カレンダーを見る</button><button type="button" className={`${link} focus-visible:outline-2`} onClick={() => onNavigate('study-analytics')}>学習分析を見る</button></div>
     <p className="text-xs font-bold leading-relaxed text-slate-500">今日と今週の学習状況、次に取り組む目標をまとめています。</p>
     <div className={box}>
       <h2 className="text-lg font-black text-slate-800">今日の学習（自分の目標）</h2>

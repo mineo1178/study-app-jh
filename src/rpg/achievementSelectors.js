@@ -23,7 +23,7 @@ const formatHours = (seconds) => {
   return minutes ? `${hours}時間${minutes}分` : `${hours}時間`;
 };
 
-const consecutiveDays = (dates) => {
+export const consecutiveDays = (dates) => {
   const sorted = [...dates].sort();
   let longest = 0;
   let current = 0;
