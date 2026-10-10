@@ -40,7 +40,7 @@ export function idleStopFeedback(result) {
   if (!result?.session || result.alreadyFinished) return [];
   const session = result.session;
   return [{ key: `idle:${session.timerId}`, type: 'idle_stop', title: 'タイマーを自動停止しました',
-    name: '5分間操作がなかったため、タイマーを停止しました。',
+    name: '15分間操作がなかったため、タイマーを停止しました。',
     details: [session.validation?.status === 'valid'
       ? `停止予定時刻までの学習時間 ${formatHms(session.recordedSeconds)}を記録しました。`
       : 'この記録は確認が必要なため、実績と報酬には含めていません。「確認」画面で確認してください。',

@@ -4,6 +4,7 @@ export const TIMER_DIAGNOSTICS_KEY = 'study-jh-timer-diagnostics-v1';
 export const TIMER_DIAGNOSTICS_LIMIT = 300;
 const fields = new Set(['timerId', 'status', 'startedAt', 'segmentStartedAt', 'lastHeartbeatAt', 'heartbeatAgeMs', 'stale', 'exists', 'fromCache', 'hasPendingWrites', 'subscriptionId', 'reason', 'source', 'errorCode', 'authenticated', 'authChanged', 'sampleMode', 'activeTab', 'hasTimerTask', 'owner', 'alreadyFinished', 'invalidated', 'switched', 'resumed', 'validationStatus', 'recordedSeconds', 'hadActiveTimer', 'startedAtType', 'heartbeatType', 'caller', 'enabled']);
 for (const field of ['activityEvent', 'lastUserActivityAt', 'elapsedIdleSeconds', 'focus', 'idleDeadline', 'idleThresholdSeconds', 'pending']) fields.add(field);
+for (const field of ['hiddenStartedAt', 'lastHiddenAt', 'lastVisibleAt', 'longestHiddenSeconds', 'reviewRequired']) fields.add(field);
 fields.add('heartbeatFingerprint');
 for (const field of ['progressObservedAtMs', 'staleElapsedMs', 'staleThresholdMs', 'synced']) fields.add(field);
 const scalar = (value) => typeof value === 'boolean' || value === null ? value : typeof value === 'number' ? (Number.isFinite(value) ? value : null) : typeof value === 'string' ? value.slice(0, 96) : undefined;

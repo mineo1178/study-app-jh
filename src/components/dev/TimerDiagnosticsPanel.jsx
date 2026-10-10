@@ -33,8 +33,11 @@ export default function TimerDiagnosticsPanel({ timer, authenticated, isOwner, c
         <dt>lastHeartbeatAt</dt><dd>{time(state.lastHeartbeatAt)}</dd>
         <dt>lastUserActivityAt</dt><dd>{time(activity.lastUserActivityAt)}（この端末・タブ）</dd>
         <dt>無操作秒数（ログ更新時）</dt><dd>{activity.elapsedIdleSeconds ?? '未観測'}</dd>
-        <dt>無操作停止</dt><dd>{IDLE_AUTO_STOP_SECONDS}秒（5分・開始したタブのみ）</dd>
+        <dt>無操作停止</dt><dd>{IDLE_AUTO_STOP_SECONDS}秒（15分・開始したタブのみ）</dd>
         <dt>idle deadline</dt><dd>{time(activity.idleDeadline)}</dd>
+        <dt>非表示開始 / 復帰</dt><dd>{time(activity.lastHiddenAt)} / {time(activity.lastVisibleAt)}</dd>
+        <dt>最長非表示秒数</dt><dd>{activity.longestHiddenSeconds ?? '未観測'}</dd>
+        <dt>学習時間確認対象</dt><dd>{String(activity.reviewRequired ?? false)}</dd>
         <dt>通信停止判定</dt><dd>15分（ユーザー操作とは別）</dd>
         <dt>heartbeat fingerprint</dt><dd>{stale.fingerprint || '—'}</dd>
         <dt>最後の進行観測（単調時計ms）</dt><dd>{stale.observedAt ?? '—'}</dd>

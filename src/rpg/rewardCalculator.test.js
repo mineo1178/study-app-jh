@@ -12,7 +12,7 @@ describe('study rewards', () => {
     expect(materialForSubject('s_japanese')).toBe('wisdom_scroll'); expect(materialForSubject('s_english')).toBe('mana_rune'); expect(materialForSubject('s_science')).toBe('mineral'); expect(materialForSubject('s_social')).toBe('history_seal'); expect(materialForSubject('s_tech')).toBe('logic_core'); expect(materialForSubject('e_programming')).toBe('logic_core'); expect(materialForSubject('e_duolingo')).toBe('mana_rune'); expect(materialForSubject('unknown')).toBe('general_essence');
   });
   it('excludes invalid, pending, legacy, and old sessions', () => {
-    expect(isStudySessionRewardEligible(valid(0))).toBe(true);
+    expect(isStudySessionRewardEligible(valid(0))).toBe(false);
     expect(isStudySessionRewardEligible({ ...valid(60), validation: { status: 'invalid' } })).toBe(false);
     expect(isStudySessionRewardEligible({ ...valid(60), validation: { status: 'pending_review' } })).toBe(false);
     expect(isStudySessionRewardEligible({ ...valid(60), validation: { status: 'valid' }, manualReview: { reviewed: true, decision: 'valid' } })).toBe(true);

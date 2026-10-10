@@ -10,7 +10,8 @@ describe('TimerDiagnosticsPanel', () => {
     expect(html).toContain('stale candidate');
     expect(html).toContain('running'); expect(html).toContain('startedAt'); expect(html).toContain('lastHeartbeatAt');
     expect(html).toContain('visibility'); expect(html).toContain('online'); expect(html).toContain('ログをコピー');
-    expect(html).toContain('lastUserActivityAt'); expect(html).toContain('5分・開始したタブのみ'); expect(html).toContain('idle deadline'); expect(html).toContain('focus'); expect(html).toContain('直近終了理由');
+    expect(html).toContain('lastUserActivityAt'); expect(html).toContain('15分・開始したタブのみ'); expect(html).toContain('idle deadline'); expect(html).toContain('focus'); expect(html).toContain('直近終了理由');
+    expect(html).toContain('非表示開始 / 復帰'); expect(html).toContain('学習時間確認対象');
     expect(html).not.toContain('private learning');
   });
   it('can render while auth, profile or the active timer have not loaded', () => {

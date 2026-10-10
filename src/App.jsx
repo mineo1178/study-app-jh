@@ -9,7 +9,7 @@ import { ACTIVITY_TYPES, inferLegacyActivityType, normalizeActivityType } from '
 import { getCurrentClientId, createTimerId } from './timer/timerClient';
 import { breakRemainingSeconds, isActiveTimer, isBreakFinished, isStaleActiveTimer, isTimerOwner, shouldAutoFinishReading, timerRecordedSeconds } from './timer/timerEngine';
 import { getRunningTimerTask, getTaskLiveSession, getTimerViewTask, hasAnyRunningTimer } from './timer/timerRuntimeState';
-import { activeTimerRef, finishActiveTimer, heartbeatActiveTimer, invalidateStaleActiveTimer, pauseActiveTimer, resumeActiveTimer, startBreakActiveTimer, startOrSwitchActiveTimer } from './data/activeTimerRepository';
+import { activeTimerRef, finishActiveTimer, heartbeatActiveTimer, invalidateStaleActiveTimer, observeActiveTimerBackground, pauseActiveTimer, resumeActiveTimer, startBreakActiveTimer, startOrSwitchActiveTimer } from './data/activeTimerRepository';
 import { studySessionsCollection } from './data/studySessionRepository';
 import { applyStudySessionReward, emptyPlayerProfile, playerProfileRef, rewardLedgerRef, updateSelectedTitle } from './data/rewardLedgerRepository';
 import { correctStudySessionReward, retryPendingRewardCorrection, rewardIntegrityRef } from './data/rewardCorrectionRepository';
@@ -65,6 +65,8 @@ import LegacyStudySessionMigrationPanel from './components/dev/LegacyStudySessio
 import { DESKTOP_SIDEBAR_NAV_CLASS, DESKTOP_SIDEBAR_SCROLL_CLASS } from './layout/sidebarLayout';
 import ManualReviewPanel from './components/review/ManualReviewPanel';
 import HistoryCorrectionModal from './components/review/HistoryCorrectionModal';
+import StudyTimeReviewModal from './components/review/StudyTimeReviewModal';
+import { confirmStudyTime, isPendingStudyTimeReview } from './data/studyTimeReviewRepository';
 import { buildReviewQueue, isCanonicalHistoryCorrectionTarget, reviewErrorMessage } from './review/manualReviewUi';
 import { applyTestRecordUpdate, buildDeviationFieldPatch, buildDeviationUpdate, compareTestRecords, filterTestRecordsByDateRange, getCalendarMonthsAgoDateString, getDeviationDomain, isValidTestDate, normalizeTestRecord } from './tests/testRecord';
 const RpgHub = lazy(() => import('./components/rpg/RpgHub'));
@@ -106,7 +108,7 @@ const getTasksCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-
 const getTestsCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tests');
 const getStudySessionsCol = () => studySessionsCollection(db, FAMILY_ID);
 const getActiveTimerRef = () => activeTimerRef(db, FAMILY_ID);
-const APP_VERSION = 'v2.5.0';
+const APP_VERSION = 'v2.5.1';
 const isDocumentHidden = () => typeof document !== 'undefined' && document.hidden;
 // ==========================================
 // Constants & Master Data
@@ -263,7 +265,7 @@ const generateSampleData = () => {
 // ==========================================
 // Component: TodayTimeline (当日の学習タイムライン)
 // ==========================================
-const TodayTimeline = ({ tasks, sessions = null, liveSession = null, isSampleMode = false, studyGoals, goalsReady = true }) => {
+const TodayTimeline = ({ tasks, sessions = null, liveSession = null, isSampleMode = false, studyGoals, goalsReady = true, onOpenTimeReview }) => {
     const [selectedHistory, setSelectedHistory] = useState(null);
     const [nowTick, setNowTick] = useState(() => Date.now());
 
@@ -430,6 +432,11 @@ const TodayTimeline = ({ tasks, sessions = null, liveSession = null, isSampleMod
         <div className={`mt-3 text-xs font-black ${remainingSeconds === 0 ? 'text-emerald-600' : 'text-slate-600'}`}>{goalMessage}</div>
       </div>
 
+      {(sessions || []).filter((session) => session.date === getTodayStr() && session.validation?.status === 'pending_review').map((session) => <div key={session.id} className="mb-3 rounded-2xl bg-amber-50 p-4 text-xs font-bold text-amber-800">
+        <p className="break-words">{session.taskSnapshot?.title || '学習記録'} ・ 計測 {formatDuration(session.recordedSeconds)} ・ 確認待ち</p>
+        <p className="mt-1">Total・学習実績・報酬にはまだ含まれません。</p>
+        {isPendingStudyTimeReview(session) && <button type="button" onClick={() => onOpenTimeReview?.(session)} className="mt-2 min-h-11 rounded-xl bg-amber-600 px-4 text-white">学習時間を確認</button>}
+      </div>)}
       {todayHistories.length === 0 ? (<div className="rounded-[1.5rem] border-2 border-dashed border-slate-200 py-8 text-center">
         <p className="text-sm font-black text-slate-300">今日はまだ保存済みの学習記録がありません</p>
         <p className="mt-2 text-[10px] font-bold text-slate-300">START後、FINISHで保存するとここにタスクが出ます。</p>
@@ -908,6 +915,8 @@ export default function App() {
     const [rewardIntegrity, setRewardIntegrity] = useState({ pendingSessionIds: [] });
     const [pendingCorrectionLedgers, setPendingCorrectionLedgers] = useState({});
     const [historyCorrectionSession, setHistoryCorrectionSession] = useState(null);
+    const [timeReviewSession, setTimeReviewSession] = useState(null);
+    const timeReviewSubmittingRef = useRef(new Set());
     const [historyCorrectionDecision, setHistoryCorrectionDecision] = useState('valid');
     const [reviewBusySessionIds, setReviewBusySessionIds] = useState({});
     const [reviewError, setReviewError] = useState(null);
@@ -1045,16 +1054,6 @@ export default function App() {
         if (isSampleMode || !user || !battleWatchId) return undefined;
         return onSnapshot(rpgBattleRef(db, FAMILY_ID, battleWatchId), { includeMetadataChanges: true }, (snap) => { if (!snap.metadata.fromCache) feedbackBattleReadyRef.current.add(battleWatchId); else feedbackBattleReadyRef.current.delete(battleWatchId); const snapshot = resolveBattleWatchSnapshot(snap.exists() ? normalizeBattle(snap.data()) : null, battleWatchId); setActiveBattle(snapshot.activeBattle); setLastBattle(snapshot.lastBattle); setBattleWatchId(snapshot.battleWatchId); }, (err) => console.error('Battle realtime sync error:', err));
     }, [battleWatchId, isSampleMode, user]);
-    useTimerHeartbeat({
-        timer: activeTimer,
-        enabled: activeTimerIsOwner && !isSampleMode && Boolean(user),
-        onHeartbeat: async (timerId) => {
-            const now = Date.now();
-            const succeeded = await heartbeatActiveTimer({ db, familyId: FAMILY_ID, timerId, ownerClientId: currentClientId, now });
-            if (succeeded) staleGuard.heartbeatSucceeded(activeTimer, now);
-            return succeeded;
-        },
-    });
     const idleController = useTimerIdleStop({
         timer: activeTimer, ownerClientId: currentClientId,
         enabled: activeTimerIsOwner && !isSampleMode && Boolean(user),
@@ -1062,8 +1061,19 @@ export default function App() {
             if (activeTimer?.timerId !== timerId) return { skipped: true, reason: 'IDLE_STATE_CHANGED' };
             if (!activeTimerTask) throw new Error('IDLE_TASK_NOT_READY');
             return autoFinishHandlerRef.current?.(activeTimerTask, 0, {
-                memoOverride: '', endAtOverride: endAt, reason: 'IDLE_5_MINUTES', idle,
+                memoOverride: '', endAtOverride: endAt, reason: 'IDLE_15_MINUTES', idle,
             });
+        },
+        onObservation: (observation) => observeActiveTimerBackground({ db, familyId: FAMILY_ID, observation }),
+    });
+    useTimerHeartbeat({
+        timer: activeTimer,
+        enabled: activeTimerIsOwner && !isSampleMode && Boolean(user),
+        onHeartbeat: async (timerId) => {
+            const now = Date.now();
+            const succeeded = await heartbeatActiveTimer({ db, familyId: FAMILY_ID, timerId, ownerClientId: currentClientId, now, observation: idleController.current?.getObservation() });
+            if (succeeded) staleGuard.heartbeatSucceeded(activeTimer, now);
+            return succeeded;
         },
     });
     useEffect(() => {
@@ -1087,9 +1097,32 @@ export default function App() {
     }, [activeStaleTimer, activeTimerIsOwner, idleController, isSampleMode, tasks, user, staleGuard]);
     const openHistoryCorrection = (session, decision = 'valid') => {
         if (!canReview || !isCanonicalHistoryCorrectionTarget(session)) return;
+        if (isPendingStudyTimeReview(session)) { openTimeReview(session); return; }
         setReviewError(null);
         setHistoryCorrectionDecision(decision);
         setHistoryCorrectionSession(session);
+    };
+    const openTimeReview = (session) => {
+        if (!canReview || !isPendingStudyTimeReview(session)) return;
+        setReviewError(null);
+        setTimeReviewSession(session);
+        recordTimerDiagnostic('review_pending', { timerId: session.timerId, recordedSeconds: session.recordedSeconds });
+    };
+    const handleTimeConfirmation = async ({ session, targetSeconds }) => {
+        if (!user || !canReview || timeReviewSubmittingRef.current.has(session.id)) return;
+        timeReviewSubmittingRef.current.add(session.id);
+        setReviewBusySessionIds((current) => ({ ...current, [session.id]: true }));
+        setReviewError(null);
+        try {
+            const result = await confirmStudyTime({ db, familyId: FAMILY_ID, sessionId: session.id, targetSeconds, confirmedBy: user.uid });
+            setTimeReviewSession(null);
+            if (result.session.recordedSeconds > 0) feedbackSession.queue.enqueue(studyFeedback({ session: result.session, alreadyFinished: result.alreadyConfirmed }, session.taskSnapshot?.title || '学習記録', result));
+        } catch (err) {
+            setReviewError(reviewErrorMessage(err?.code || err?.message));
+        } finally {
+            timeReviewSubmittingRef.current.delete(session.id);
+            setReviewBusySessionIds((current) => ({ ...current, [session.id]: false }));
+        }
     };
     const handleHistoryCorrection = async ({ session, targetSeconds, targetStatus, reason }) => {
         if (!user || !canReview || reviewBusySessionIds[session.id]) return;
@@ -1503,7 +1536,7 @@ export default function App() {
             if (updates.isRunning) {
                 const result = activeTimer?.taskId === taskId && activeTimer.state === 'paused'
                   ? await resumeActiveTimer({ db, familyId: FAMILY_ID, timerId: activeTimer.timerId, ownerClientId: currentClientId })
-                  : await startOrSwitchActiveTimer({ db, familyId: FAMILY_ID, task, tasks, timerId: createTimerId(), ownerClientId: currentClientId });
+                  : await startOrSwitchActiveTimer({ db, familyId: FAMILY_ID, task, tasks, timerId: createTimerId(), ownerClientId: currentClientId, observation: idleController.current?.getObservation() });
                 if (result.nextTimer || result.resumed || result.state === 'running') {
                     rememberTimerIdleStart(result.timer || result, currentClientId);
                 }
@@ -1515,7 +1548,7 @@ export default function App() {
                 }
             }
             else if (activeTimer?.taskId === taskId && activeTimer.state === 'running') {
-                await pauseActiveTimer({ db, familyId: FAMILY_ID, timerId: activeTimer.timerId, ownerClientId: currentClientId });
+                await pauseActiveTimer({ db, familyId: FAMILY_ID, timerId: activeTimer.timerId, ownerClientId: currentClientId, observation: idleController.current?.getObservation() });
             }
             else {
                 await handleUpdateLocalTask(taskId, updates, true);
@@ -1530,7 +1563,7 @@ export default function App() {
         if (idleController.current?.blocksStale()) return;
         try {
             recordTimerDiagnostic('break_control', { ...diagnosticTimerState(activeTimer), reason: 'USER_BREAK', source: 'app.handleBreak' });
-            await startBreakActiveTimer({ db, familyId: FAMILY_ID, timerId: activeTimer.timerId, ownerClientId: currentClientId, plannedSeconds, alarmEnabled });
+            await startBreakActiveTimer({ db, familyId: FAMILY_ID, timerId: activeTimer.timerId, ownerClientId: currentClientId, plannedSeconds, alarmEnabled, observation: idleController.current?.getObservation() });
         } catch (err) {
             alert(err.message === 'TIMER_NOT_OWNER' ? '休憩は開始した端末から開始してください。' : '休憩の開始に失敗しました。');
         }
@@ -1541,7 +1574,7 @@ export default function App() {
         if (!idle && idleController.current?.blocksStale()) {
             const state = idleController.current.getState();
             idle = { ownerClientId: currentClientId, segmentStartedAt: activeTimer.segmentStartedAt, lastUserActivityAt: state.lastUserActivityAt };
-            endAtOverride = state.idleDeadline; memoOverride = ''; reason = 'IDLE_5_MINUTES';
+            endAtOverride = state.idleDeadline; memoOverride = ''; reason = 'IDLE_15_MINUTES';
         }
         recordTimerDiagnostic('stop_control', { ...diagnosticTimerState(activeTimer), reason, sampleMode: isSampleMode, source: 'app.handleSaveRecord' });
         if (isSampleMode || !user || !activeTimer || activeTimer.taskId !== task.id) {
@@ -1570,9 +1603,11 @@ export default function App() {
                 endAt,
                 memo,
                 idle,
+                observation: idleController.current?.getObservation(),
             });
             if (result.skipped) return result;
             const validation = result.session.validation;
+            if (!result.alreadyFinished && isPendingStudyTimeReview(result.session)) openTimeReview({ ...result.session, id: activeTimer.timerId });
             if (idle) feedbackSession.queue.enqueue(idleStopFeedback(result));
             feedbackSession.queue.enqueue(studyFeedback(result, task.title));
             let reward = null;
@@ -2001,7 +2036,7 @@ export default function App() {
                   </div>)}
               </div>
               {/* 当日のタイムライン */}
-              <TodayTimeline studyGoals={playerProfile.studyGoals} goalsReady={isSampleMode || profileLoaded} tasks={tasks} sessions={unifiedSessions} liveSession={liveSession} isSampleMode={isSampleMode}/>
+              <TodayTimeline onOpenTimeReview={openTimeReview} studyGoals={playerProfile.studyGoals} goalsReady={isSampleMode || profileLoaded} tasks={tasks} sessions={unifiedSessions} liveSession={liveSession} isSampleMode={isSampleMode}/>
 
               {liveSession ? (
                 <div className="rounded-[2rem] border border-blue-100 bg-white p-5 shadow-sm">
@@ -2072,7 +2107,7 @@ export default function App() {
             {activeTab === 'stats' && (<div className="space-y-8 sm:space-y-10 animate-in slide-in-from-bottom-5 duration-500 text-center">
                 
                 {/* 追加: 当日の学習タイムラインを実績分析画面にも表示 */}
-                 <TodayTimeline studyGoals={playerProfile.studyGoals} goalsReady={isSampleMode || profileLoaded} tasks={tasks} sessions={unifiedSessions} liveSession={liveSession} isSampleMode={isSampleMode}/>
+                 <TodayTimeline onOpenTimeReview={openTimeReview} studyGoals={playerProfile.studyGoals} goalsReady={isSampleMode || profileLoaded} tasks={tasks} sessions={unifiedSessions} liveSession={liveSession} isSampleMode={isSampleMode}/>
 
                 <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden text-center text-left">
                    <h3 className="text-lg font-black mb-6 flex items-center justify-center gap-2 leading-none text-center"><BarChart2 className="text-blue-600" size={20}/> 学習推移 (分)</h3>
@@ -2238,7 +2273,7 @@ export default function App() {
             {activeTab === 'rpg' && !isSampleMode && (
               <LazyPanel label="RPG"><RpgHub profile={playerProfile} progress={rpgProgress} towerProgress={towerProgress} achievements={achievements} unlockedTitles={unlockedTitles} selectedTitle={selectedTitle} onSelectTitle={handleSelectTitle} savingTitle={savingTitle} questState={questState} onClaimQuest={handleClaimQuest} pendingQuestId={pendingQuestId} onPurchaseRequest={handlePurchaseRequest} onMaterialExchangeRequest={handleMaterialExchangeRequest} pendingMaterialExchange={pendingMaterialExchange} onEquip={handleEquip} onUnequip={handleUnequip} pendingItemId={pendingPurchaseItemId} pendingAction={pendingEquipmentAction} status={rpgStatus} battle={activeBattle || lastBattle} onStartBattleRequest={handleBattleStartRequest} onAttackBattle={handleAttackBattle} onUseBattleSkill={handleUseBattleSkill} startingEnemyId={pendingBattleEnemyId} attacking={isAttackingBattle} onBattleBack={handleBattleResultClose} battleFeedback={battleTurnFeedback} onSaveParty={handleSaveParty} savingParty={savingParty} onGachaBuy={(type) => handleGacha('buy', type)} onGachaDraw={(type) => handleGacha('draw', type)} onGachaExchange={(kind, id) => handleGacha('exchange', kind, id)} onAlchemyCraft={handleAlchemyCraft} loadEncyclopediaLedgers={loadEncyclopediaLedgers} gachaPending={gachaPending} alchemyPending={alchemyPending}/></LazyPanel>
             )}
-            {activeTab === 'review' && canReview && !isSampleMode && <ManualReviewPanel queue={reviewQueue} profile={playerProfile} studySessions={studySessions} ledgersBySessionId={pendingCorrectionLedgers} busySessionIds={reviewBusySessionIds} message={reviewError} onOpenCorrection={openHistoryCorrection} onRetry={handlePendingCorrectionRetry}/>}
+            {activeTab === 'review' && canReview && !isSampleMode && <ManualReviewPanel onOpenTimeReview={openTimeReview} subjectLabel={(session) => getTaskMeta(session.taskSnapshot).subjectLabel} queue={reviewQueue} profile={playerProfile} studySessions={studySessions} ledgersBySessionId={pendingCorrectionLedgers} busySessionIds={reviewBusySessionIds} message={reviewError} onOpenCorrection={openHistoryCorrection} onRetry={handlePendingCorrectionRetry}/>}
           </main>
         </div>
 
@@ -2265,6 +2300,7 @@ export default function App() {
         <PurchaseConfirmModal item={purchaseCandidate} profile={playerProfile} purchasing={Boolean(pendingPurchaseItemId)} onCancel={() => !pendingPurchaseItemId && setPurchaseCandidate(null)} onConfirm={handlePurchaseConfirm}/>
         <MaterialExchangeConfirmModal exchange={exchangeCandidate} profile={playerProfile} exchanging={pendingMaterialExchange} onCancel={() => !pendingMaterialExchange && setExchangeCandidate(null)} onConfirm={handleMaterialExchangeConfirm}/>
         <BattleStartConfirmModal enemy={battleCandidate} starting={Boolean(pendingBattleEnemyId)} onCancel={() => !pendingBattleEnemyId && setBattleCandidate(null)} onConfirm={handleBattleStartConfirm}/>
+        <StudyTimeReviewModal key={timeReviewSession?.id || 'none'} session={timeReviewSession} subjectLabel={timeReviewSession ? getTaskMeta(timeReviewSession.taskSnapshot).subjectLabel : ''} busy={Boolean(timeReviewSession && reviewBusySessionIds[timeReviewSession.id])} error={reviewError} onClose={() => { if (!timeReviewSession || !timeReviewSubmittingRef.current.has(timeReviewSession.id)) { setTimeReviewSession(null); setReviewError(null); } }} onSubmit={handleTimeConfirmation}/>
         <HistoryCorrectionModal key={`${historyCorrectionSession?.id || 'none'}-${historyCorrectionDecision}`} session={historyCorrectionSession} initialDecision={historyCorrectionDecision} busy={Boolean(historyCorrectionSession && reviewBusySessionIds[historyCorrectionSession.id])} error={reviewError} onClose={() => { if (!historyCorrectionSession || !reviewBusySessionIds[historyCorrectionSession.id]) { setHistoryCorrectionSession(null); setReviewError(null); } }} onSubmit={handleHistoryCorrection}/>
 
         {/* --- Modals --- */}

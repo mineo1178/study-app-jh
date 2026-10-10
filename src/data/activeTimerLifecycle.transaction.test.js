@@ -178,33 +178,33 @@ describe('idle scheduler + canonical transaction + rewards', () => {
     controllers.push(controller);
     return { controller, onStop, emit: (event) => listeners.get(event)?.({ type: event, isTrusted: true }) };
   }
-  it('Case B: five idle minutes save 300 valid seconds and flow through the common Timeline total', async () => {
+  it('Case B: fifteen idle minutes save 900 pending seconds and flow through the common Timeline total', async () => {
     await startActiveTimer({ ...args, now: start }); watch();
-    await vi.advanceTimersByTimeAsync(300_000);
+    await vi.advanceTimersByTimeAsync(900_000);
     const session = state.store.get(sessionRef);
-    expect(session).toMatchObject({ recordedSeconds: 300, validation: { status: 'valid' },
-      segments: [{ startedAt: start, endedAt: start + 300_000, durationSeconds: 300 }] });
+    expect(session).toMatchObject({ recordedSeconds: 900, validation: { status: 'pending_review' },
+      segments: [{ startedAt: start, endedAt: start + 900_000, durationSeconds: 900 }] });
     expect(state.store.has(ref)).toBe(false);
-    expect(getEffectiveStudySecondsForTask([{ ...session, id: 't' }], session.date, task.id)).toBe(300);
+    expect(getEffectiveStudySecondsForTask([{ ...session, id: 't' }], session.date, task.id)).toBe(0);
   });
-  it('Case C: last operation at two minutes saves seven minutes', async () => {
+  it('Case C: last operation at two minutes saves seventeen minutes', async () => {
     await startActiveTimer({ ...args, now: start }); const owner = watch();
     await vi.advanceTimersByTimeAsync(120_000); owner.emit('click');
-    await vi.advanceTimersByTimeAsync(300_000);
-    expect(state.store.get(sessionRef)).toMatchObject({ recordedSeconds: 420, validation: { status: 'valid' } });
+    await vi.advanceTimersByTimeAsync(900_000);
+    expect(state.store.get(sessionRef)).toMatchObject({ recordedSeconds: 1020, validation: { status: 'pending_review' } });
   });
-  it('Case D: PAUSE ten minutes is excluded and RESUME idle saves seven minutes', async () => {
+  it('Case D: PAUSE ten minutes is excluded and RESUME idle saves seventeen minutes', async () => {
     await startActiveTimer({ ...args, now: start }); const owner = watch();
     await vi.advanceTimersByTimeAsync(120_000); await pauseActiveTimer({ ...args, now: Date.now() });
     owner.controller.dispose();
     const paused = watch(); expect(paused.controller).toBeNull();
     await vi.advanceTimersByTimeAsync(600_000); expect(state.store.has(sessionRef)).toBe(false);
     await resumeActiveTimer({ ...args, now: Date.now() }); watch();
-    await vi.advanceTimersByTimeAsync(299_000); expect(state.store.has(sessionRef)).toBe(false);
+    await vi.advanceTimersByTimeAsync(899_000); expect(state.store.has(sessionRef)).toBe(false);
     await vi.advanceTimersByTimeAsync(1000);
-    expect(state.store.get(sessionRef)).toMatchObject({ recordedSeconds: 420, validation: { status: 'valid' },
+    expect(state.store.get(sessionRef)).toMatchObject({ recordedSeconds: 1020, validation: { status: 'pending_review' },
       segments: [{ startedAt: start, endedAt: start + 120_000, durationSeconds: 120 },
-        { startedAt: start + 720_000, endedAt: start + 1020_000, durationSeconds: 300 }] });
+        { startedAt: start + 720_000, endedAt: start + 1620_000, durationSeconds: 900 }] });
   });
   it('Case A: regular operation + heartbeats allow ten-minute manual STOP with the same reward rules', async () => {
     await startActiveTimer({ ...args, now: start }); const owner = watch();
@@ -218,20 +218,20 @@ describe('idle scheduler + canonical transaction + rewards', () => {
     const sameTimeIdle = await finishActiveTimer({ ...args, endAt: Date.now(), idle: { ownerClientId: 'owner', segmentStartedAt: start, lastUserActivityAt: start + 300_000 } });
     expect(prepareCanonicalStudySessionReward(sameTimeIdle.session)).toEqual(prepareCanonicalStudySessionReward(result.session));
   });
-  it.each([480_000, 1200_000])('JS delayed to %sms still saves the five-minute deadline ahead of stale', async (delay) => {
+  it.each([1000_000, 1200_000])('JS delayed to %sms still saves the fifteen-minute deadline ahead of stale', async (delay) => {
     await startActiveTimer({ ...args, now: start }); const owner = watch();
     vi.setSystemTime(start + delay); owner.emit('visibilitychange');
     expect(owner.controller.blocksStale()).toBe(true);
     await vi.advanceTimersByTimeAsync(0);
-    expect(state.store.get(sessionRef)).toMatchObject({ recordedSeconds: 300, validation: { status: 'valid' } });
+    expect(state.store.get(sessionRef)).toMatchObject({ recordedSeconds: 900, validation: { status: 'pending_review' } });
     expect(await invalidateStaleActiveTimer({ ...args, now: Date.now() })).toMatchObject({ invalidated: false });
   });
   it('secondary idle cannot STOP; secondary manual STOP remains allowed', async () => {
     await startActiveTimer({ ...args, now: start }); const secondary = watch({ ownerClientId: 'secondary' });
-    expect(secondary.controller).toBeNull(); await vi.advanceTimersByTimeAsync(300_000);
+    expect(secondary.controller).toBeNull(); await vi.advanceTimersByTimeAsync(900_000);
     expect(state.store.has(ref)).toBe(true); expect(secondary.onStop).not.toHaveBeenCalled();
     const result = await finishActiveTimer({ ...args, ownerClientId: 'secondary', endAt: Date.now() });
-    expect(result.session.recordedSeconds).toBe(300); expect(state.store.has(ref)).toBe(false);
+    expect(result.session.recordedSeconds).toBe(900); expect(state.store.has(ref)).toBe(false);
   });
   it.each(['paused', 'resumed', 'changed_owner', 'replaced'])('transaction recheck prevents overdue callbacks after %s', async (change) => {
     await startActiveTimer({ ...args, now: start });
@@ -241,7 +241,7 @@ describe('idle scheduler + canonical transaction + rewards', () => {
         : change === 'resumed' ? { ...latest, segmentStartedAt: start + 100_000 }
           : change === 'changed_owner' ? { ...latest, ownerClientId: 'other' } : { ...latest, timerId: 'new' });
     };
-    const result = await finishActiveTimer({ ...args, endAt: start + 300_000,
+    const result = await finishActiveTimer({ ...args, endAt: start + 900_000,
       idle: { ownerClientId: 'owner', segmentStartedAt: start, lastUserActivityAt: start } });
     expect(result).toEqual({ skipped: true, reason: 'IDLE_STATE_CHANGED' });
     expect(state.store.has(sessionRef)).toBe(false); expect(state.store.has(ref)).toBe(true);
@@ -249,10 +249,10 @@ describe('idle scheduler + canonical transaction + rewards', () => {
   it('idle/manual STOP transaction retry writes one session and rewards it only once', async () => {
     await startActiveTimer({ ...args, now: start });
     state.race = () => {
-      const session = buildFinishedTimerSession(state.store.get(ref), task, { endAt: start + 300_000 });
+      const session = buildFinishedTimerSession(state.store.get(ref), task, { endAt: start + 900_000 });
       state.store.set(sessionRef, session); state.store.delete(ref);
     };
-    const result = await finishActiveTimer({ ...args, endAt: start + 300_000,
+    const result = await finishActiveTimer({ ...args, endAt: start + 900_000,
       idle: { ownerClientId: 'owner', segmentStartedAt: start, lastUserActivityAt: start } });
     expect(result.alreadyFinished).toBe(true);
     expect([...state.store.keys()].filter((key) => key.includes('/studySessions/'))).toEqual([sessionRef]);
@@ -262,9 +262,9 @@ describe('idle scheduler + canonical transaction + rewards', () => {
     expect([...state.store.keys()].filter((key) => key.includes('/rewardLedger/'))).toHaveLength(1);
   });
   it('idle-first STOP cannot be counted again by a subsequent manual STOP', async () => {
-    await startActiveTimer({ ...args, now: start }); watch(); await vi.advanceTimersByTimeAsync(300_000);
+    await startActiveTimer({ ...args, now: start }); watch(); await vi.advanceTimersByTimeAsync(900_000);
     const session = state.store.get(sessionRef);
-    expect(await finishActiveTimer({ ...args, endAt: start + 301_000 })).toEqual({ alreadyFinished: true, session });
+    expect(await finishActiveTimer({ ...args, endAt: start + 901_000 })).toEqual({ alreadyFinished: true, session });
   });
   it.each([
     [180 * 60, 'problem_solving', 'pending_review'],
@@ -275,9 +275,9 @@ describe('idle scheduler + canonical transaction + rewards', () => {
       startedAt: start, segmentStartedAt: priorEnd + 600_000, lastHeartbeatAt: priorEnd + 600_000,
       segments: [{ startedAt: start, endedAt: priorEnd, durationSeconds: seconds }], accumulatedSeconds: seconds };
     state.store.set(ref, latest);
-    const result = await finishActiveTimer({ ...args, task: { ...task, activityType }, endAt: latest.segmentStartedAt + 300_000,
+    const result = await finishActiveTimer({ ...args, task: { ...task, activityType }, endAt: latest.segmentStartedAt + 900_000,
       idle: { ownerClientId: 'owner', segmentStartedAt: latest.segmentStartedAt, lastUserActivityAt: latest.segmentStartedAt } });
-    expect(result.session).toMatchObject({ recordedSeconds: seconds + 300, validation: { status } });
+    expect(result.session).toMatchObject({ recordedSeconds: seconds + 900, validation: { status } });
     expect(prepareCanonicalStudySessionReward(result.session).eligible).toBe(false);
   });
 });

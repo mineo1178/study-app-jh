@@ -68,6 +68,7 @@ const manualReviewValidation = (sourceStatus, targetStatus, requested = {}) => {
 export function prepareRewardCorrection({ session, ledger = null, profile = {}, integrity = {}, correction = {}, reviewerUid, now = Date.now() }) {
   const reviewerId = assertReviewerUid(reviewerUid);
   if (!session) throw correctionFailure('SESSION_NOT_FOUND');
+  if (session.timeReview?.status === 'pending') throw correctionFailure('STUDY_TIME_CONFIRMATION_REQUIRED');
   const correctionId = correctionIdFor(session.id, correction);
   if (ledger?.lastCorrectionId === correctionId) return { alreadyApplied: true, revision: number(ledger.revision) };
   const sourceStatus = session.validation?.status || 'valid';

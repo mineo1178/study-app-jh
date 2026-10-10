@@ -61,7 +61,7 @@ describe('STOP feedback', () => {
     queue.enqueue(studyFeedback(study(), '数学'));
     queue.enqueue(idleStopFeedback(study())); queue.enqueue(idleStopFeedback(study())); queue.release();
     expect(queue.getSnapshot().map((item) => item.type)).toEqual(['idle_stop', 'study_complete']);
-    expect(queue.getSnapshot()[0].name).toContain('5分間操作がなかった');
+    expect(queue.getSnapshot()[0].name).toContain('15分間操作がなかった');
     queue.close('idle:session-1'); expect(queue.getSnapshot()[0].type).toBe('study_complete');
     expect(idleStopFeedback({ ...study(), alreadyFinished: true })).toEqual([]);
   });

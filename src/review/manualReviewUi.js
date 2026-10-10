@@ -22,6 +22,11 @@ export const buildReviewQueue = ({ studySessions = [], integrity = {} } = {}) =>
 export const isDurationCorrectionAllowed = (currentSeconds, targetSeconds) => Number.isInteger(targetSeconds) && targetSeconds >= 0 && targetSeconds <= Math.max(0, Number(currentSeconds) || 0);
 
 export const reviewErrorMessage = (code) => ({
+  STUDY_TIME_OUT_OF_RANGE: '0秒から計測時間までの範囲で入力してください。',
+  STUDY_TIME_NOT_PENDING: 'この記録はすでに確認されています。画面を開き直してください。',
+  STUDY_TIME_VALIDATION_REQUIRED: 'この時間では確定できません。学習時間を短くして、もう一度確認してください。',
+  STUDY_TIME_REWARD_ALREADY_EXISTS: 'この記録の報酬を確認できませんでした。記録は確認待ちのままです。',
+  STUDY_TIME_CONFIRMATION_REQUIRED: '「学習時間の確認」から確定してください。',
   REVIEWER_NOT_AUTHORIZED: '確認操作の権限がありません。',
   CORRECTION_REWARD_INCREASE_NOT_ALLOWED: '学習時間を増やす訂正はできません。',
   CORRECTION_TRANSITION_NOT_SUPPORTED: 'この状態では選択した訂正を実行できません。',

@@ -1,7 +1,10 @@
 import { readFileSync } from 'node:fs';
-import { afterAll, beforeAll, beforeEach, describe, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { assertFails, assertSucceeds, initializeTestEnvironment } from '@firebase/rules-unit-testing';
 import { collection, deleteDoc, doc, getDoc, getDocs, query, setDoc, updateDoc, where } from 'firebase/firestore';
+import { buildFinishedTimerSession } from '../../src/data/activeTimerRepository.js';
+import { confirmStudyTime } from '../../src/data/studyTimeReviewRepository.js';
+import { applyStudySessionReward } from '../../src/data/rewardLedgerRepository.js';
 
 const projectId = 'demo-study-app-jh';
 const appFamilyId = 'oomine-study-2026';
@@ -17,6 +20,39 @@ beforeEach(async () => { await testEnv.clearFirestore(); });
 afterAll(async () => { await testEnv.cleanup(); });
 
 describe('Firestore Security Rules', () => {
+  const seedTimeReview = async () => {
+    const start = 1_000_000;
+    const session = buildFinishedTimerSession({ timerId: 'review-timer', taskId: 'math', ownerClientId: 'owner', state: 'running', startedAt: start, segmentStartedAt: start, lastHeartbeatAt: start, segments: [] },
+      { id: 'math', subjectId: 's_math', title: '数学', activityType: 'problem_solving' },
+      { endAt: start + 900_000, idle: { lastUserActivityAt: start }, staleProof: null });
+    await seedDoc(appPath(appFamilyId, 'studySessions', 'review-timer'), session);
+    return session;
+  };
+  it('atomically confirms study time across real concurrent clients and awards a single reward', async () => {
+    const session = await seedTimeReview();
+    const db = userDb('device-a');
+    expect(await applyStudySessionReward({ db, familyId: appFamilyId, session: { ...session, id: 'review-timer' } })).toMatchObject({ applied: false, reason: 'INELIGIBLE' });
+    const args = { familyId: appFamilyId, sessionId: 'review-timer' };
+    const results = await Promise.all([
+      confirmStudyTime({ ...args, db, targetSeconds: 600, confirmedBy: 'device-a' }),
+      confirmStudyTime({ ...args, db: userDb('device-b'), targetSeconds: 900, confirmedBy: 'device-b' }),
+    ]);
+    expect(results.filter((result) => !result.alreadyConfirmed)).toHaveLength(1);
+    const confirmed = (await getDoc(ref(db, appPath(appFamilyId, 'studySessions', 'review-timer')))).data();
+    const profile = (await getDoc(ref(db, appPath(appFamilyId, 'rpg', 'playerProfile')))).data();
+    const ledger = (await getDoc(ref(db, appPath(appFamilyId, 'rewardLedger', 'review-timer')))).data();
+    expect(confirmed.timeReview.status).toBe('confirmed');
+    expect(profile.gold).toBe(Math.floor(confirmed.recordedSeconds / 60));
+    expect(ledger.basis.recordedSeconds).toBe(confirmed.recordedSeconds);
+    expect((await applyStudySessionReward({ db, familyId: appFamilyId, session: { ...confirmed, id: 'review-timer' } })).applied).toBe(false);
+  });
+  it('rejects an unauthenticated confirmation without changing pending time or awarding rewards', async () => {
+    await seedTimeReview();
+    await assertFails(confirmStudyTime({ db: anonymousDb(), familyId: appFamilyId, sessionId: 'review-timer', targetSeconds: 600, confirmedBy: 'unknown' }));
+    const db = userDb();
+    expect((await getDoc(ref(db, appPath(appFamilyId, 'studySessions', 'review-timer')))).data().timeReview.status).toBe('pending');
+    expect((await getDoc(ref(db, appPath(appFamilyId, 'rewardLedger', 'review-timer')))).exists()).toBe(false);
+  });
   it('allows authenticated users to use fixed-family tasks, tests, and timers while isolating other families', async () => {
     const db = userDb();
     for (const [collection, id] of [['tasks', 'task-1'], ['tests', 'test-1'], ['activeTimers', 'current']]) {
