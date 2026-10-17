@@ -121,15 +121,15 @@ describe('battle transaction logic', () => {
     expect(orcStart.battle).toMatchObject({ schemaVersion: 7, enemySnapshot: { actionPattern: [{ id: 'normal_attack' }, { id: 'normal_attack' }, { id: 'orc_heavy_strike', powerPercent: 150 }] } });
     const healSkill = orcStart.battle.playerSnapshot.skills.healing_light;
     const heal = prepareBattleAttack({ battle: { ...orcStart.battle, attackCount: 2, playerHp: 20 }, profile: orcStart.profile, actionId: 'orc-heal', now, action: { kind: 'skill', healing: { playerHpBefore: 20, calculatedHeal: 14, actualHeal: 14, playerHpAfterHeal: 34 }, skill: { ...healSkill, useNumber: 1 } } });
-    expect(heal.attackLedger.enemyCounter).toMatchObject({ actionId: 'orc_heavy_strike', actionName: '豪腕撃', poweredAttack: 7, damage: 3, playerHpBefore: 34, playerHpAfter: 31 });
+    expect(heal.attackLedger.enemyCounter).toMatchObject({ actionId: 'orc_heavy_strike', actionName: '豪腕撃', poweredAttack: 12, damage: 8, playerHpBefore: 34, playerHpAfter: 26 });
 
     const golemStart = prepareBattleStart({ profile: defensiveProfile, enemy: BOSS_CATALOG.ancient_golem, battleId: 'golem-actions', now, battleKind: 'boss', bossId: 'ancient_golem', chapter: getChapter('chapter_2') });
     const rockCrush = prepareBattleAttack({ battle: { ...golemStart.battle, attackCount: 1 }, profile: golemStart.profile, actionId: 'golem-rock', now });
-    expect(rockCrush.attackLedger.enemyCounter).toMatchObject({ actionId: 'golem_rock_crush', actionName: '岩砕き', poweredAttack: 10, damage: 6 });
+    expect(rockCrush.attackLedger.enemyCounter).toMatchObject({ actionId: 'golem_rock_crush', actionName: '岩砕き', poweredAttack: 16, damage: 12 });
     const guardSkill = golemStart.battle.playerSnapshot.skills.guard_stance;
     const earthquakeGuard = prepareBattleAttack({ battle: { ...golemStart.battle, attackCount: 3 }, profile: golemStart.profile, actionId: 'golem-guard', now, action: { kind: 'skill', skill: { ...guardSkill, useNumber: 1 } } });
-    expect(earthquakeGuard.attackLedger.enemyCounter).toMatchObject({ actionId: 'golem_earthquake', actionName: '大地震', poweredAttack: 12, damage: 4 });
-    expect(earthquakeGuard.attackLedger.guard).toMatchObject({ baseDamage: 8, reductionPercent: 50, finalDamage: 4 });
+    expect(earthquakeGuard.attackLedger.enemyCounter).toMatchObject({ actionId: 'golem_earthquake', actionName: '大地震', poweredAttack: 19, damage: 7 });
+    expect(earthquakeGuard.attackLedger.guard).toMatchObject({ baseDamage: 15, reductionPercent: 50, finalDamage: 7 });
 
     const victory = prepareBattleAttack({ battle: { ...orcStart.battle, enemyHp: 1, attackCount: 2 }, profile: orcStart.profile, progress: { currentChapterId: 'chapter_1', normalWins: 3 }, actionId: 'orc-victory', now });
     expect(victory.attackLedger.enemyCounter).toBeNull();
@@ -139,8 +139,8 @@ describe('battle transaction logic', () => {
     expect(defeat.bossClearLedger).toBeUndefined();
     [normalStart.battle, normalStart.ledger, normal.attackLedger, orcStart.battle, orcStart.ledger, heal.attackLedger, golemStart.battle, golemStart.ledger, rockCrush.attackLedger, earthquakeGuard.attackLedger, victory.attackLedger, victory.victoryLedger, defeat.attackLedger, defeat.defeatLedger, defeat.profile].forEach((payload) => expect(findUndefinedPaths(payload)).toEqual([]));
   });
-  it('keeps the bare Orc Chief beatable with the existing two Heals and deterministic skill sequence', () => {
-    const start = prepareBattleStart({ profile: { battleEnergy: 3 }, enemy: BOSS_CATALOG.orc_chief, battleId: 'bare-orc', now, battleKind: 'boss', bossId: 'orc_chief' });
+  it('keeps the legacy Orc Chief snapshot beatable with the existing two Heals and deterministic skill sequence', () => {
+    const start = prepareBattleStart({ profile: { battleEnergy: 3 }, enemy: { ...BOSS_CATALOG.orc_chief, maxHp: 58, attack: 5 }, battleId: 'bare-orc', now, battleKind: 'boss', bossId: 'orc_chief' });
     let battle = start.battle;
     const skillTurn = (skillId, useNumber, actionId) => {
       const skill = battle.playerSnapshot.skills[skillId];

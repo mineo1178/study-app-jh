@@ -28,19 +28,19 @@ export function createPartyBattle({ battleId, floor = null, encounter, members, 
 const memberFor = (battle, id) => battle.partySnapshot.members.find((member) => member.memberId === id);
 const enemyFor = (battle, id) => battle.enemySnapshots.find((enemy) => enemy.enemyInstanceId === id);
 function nextActor(battle, states, acted) { return states.find((state) => alive(state) && !acted.includes(state.memberId))?.memberId || null; }
-function resolveEnemyPhase(battle, partyStates, round) {
+function resolveEnemyPhase(battle, partyStates, enemyStates, round) {
   let states = partyStates.map((state) => ({ ...state })); const events = [];
-  battle.enemyStates.filter(alive).forEach((enemyState, enemyIndex) => {
+  enemyStates.filter(alive).forEach((enemyState, enemyIndex) => {
     const living = states.filter(alive); if (!living.length) return;
     const target = living[(round + enemyIndex) % living.length]; const member = memberFor(battle, target.memberId); const enemy = enemyFor(battle, enemyState.enemyInstanceId);
     const actionEntry = enemyActionForTurn(enemy.actionPattern, round); const action = typeof actionEntry === 'string' ? getEnemyAction(actionEntry) : actionEntry;
     if (!action?.id) fail('ENEMY_ACTION_NOT_FOUND');
     const base = calculateEnemyActionDamage({ enemyAttack: enemy.attack, powerPercent: action.powerPercent, playerDefense: member.defense }).damage;
     const damage = target.guardPercent > 0 ? Math.max(1, Math.floor(base * (100 - target.guardPercent) / 100)) : base;
-    const hp = Math.max(0, target.hp - damage); states = states.map((state) => state.memberId === target.memberId ? { ...state, hp, status: status(hp), guardPercent: 0 } : { ...state, guardPercent: 0 });
+    const hp = Math.max(0, target.hp - damage); states = states.map((state) => state.memberId === target.memberId ? { ...state, hp, status: status(hp) } : state);
     events.push({ enemyInstanceId: enemyState.enemyInstanceId, targetMemberId: target.memberId, actionId: action.id, damage });
   });
-  return { partyStates: states, events };
+  return { partyStates: states.map(state => ({ ...state, guardPercent: 0 })), events };
 }
 export function preparePartyBattleAction({ battle, action, now }) {
   if (battle.status !== 'active') fail('BATTLE_ALREADY_COMPLETED');
@@ -71,6 +71,6 @@ export function preparePartyBattleAction({ battle, action, now }) {
   const skillUses = skill ? { ...battle.skillUses, [usesKey]: n(battle.skillUses?.[usesKey]) + 1 } : battle.skillUses;
   if (enemyStates.every((state) => !alive(state))) return { battle: { ...battle, partyStates, enemyStates, skillUses, status: 'won', activePartyMemberId: null, updatedAt: now, victory: { actionId: action.actionId, grantedAt: now } }, event, enemyEvents: [] };
   const acted = [...battle.actedMemberIds, actorId]; let next = nextActor(battle, partyStates, acted); let round = battle.roundNumber; let enemyEvents = [];
-  if (!next) { const phase = resolveEnemyPhase(battle, partyStates, round); partyStates = phase.partyStates; enemyEvents = phase.events; if (partyStates.every((state) => !alive(state))) return { battle: { ...battle, partyStates, enemyStates, skillUses, actedMemberIds: acted, activePartyMemberId: null, status: 'lost', updatedAt: now, defeat: { actionId: action.actionId, defeatedAt: now } }, event, enemyEvents }; round += 1; next = nextActor(battle, partyStates, []); return { battle: { ...battle, partyStates, enemyStates, skillUses, roundNumber: round, actedMemberIds: [], activePartyMemberId: next, updatedAt: now }, event, enemyEvents }; }
+  if (!next) { const phase = resolveEnemyPhase(battle, partyStates, enemyStates, round); partyStates = phase.partyStates; enemyEvents = phase.events; if (partyStates.every((state) => !alive(state))) return { battle: { ...battle, partyStates, enemyStates, skillUses, actedMemberIds: acted, activePartyMemberId: null, status: 'lost', updatedAt: now, defeat: { actionId: action.actionId, defeatedAt: now } }, event, enemyEvents }; round += 1; next = nextActor(battle, partyStates, []); return { battle: { ...battle, partyStates, enemyStates, skillUses, roundNumber: round, actedMemberIds: [], activePartyMemberId: next, updatedAt: now }, event, enemyEvents }; }
   return { battle: { ...battle, partyStates, enemyStates, skillUses, actedMemberIds: acted, activePartyMemberId: next, updatedAt: now }, event, enemyEvents };
 }

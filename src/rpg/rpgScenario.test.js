@@ -120,7 +120,7 @@ describe('RPG campaign scenario', () => {
     payloads.forEach((payload) => expect(findUndefinedPaths(payload)).toEqual([]));
   });
 
-  it('keeps representative battle values within a solvable range using the existing skills and defense', () => {
+  it('keeps early enemies accessible and makes boss stats require stronger equipment and skills', () => {
     const bare = createEmptyPlayerProfile();
     const equipped = {
       ...bare,
@@ -131,14 +131,14 @@ describe('RPG campaign scenario', () => {
       bare: Math.ceil(enemy.maxHp / calculatePlayerAttack(bare)),
       equipped: Math.ceil(enemy.maxHp / calculatePlayerAttack(equipped)),
     }]));
-    expect(attackCounts).toEqual({ slime: { bare: 4, equipped: 2 }, goblin: { bare: 8, equipped: 4 }, stone_golem: { bare: 16, equipped: 7 }, orc_chief: { bare: 12, equipped: 5 }, ancient_golem: { bare: 18, equipped: 8 } });
+    expect(attackCounts).toEqual({ slime: { bare: 4, equipped: 2 }, goblin: { bare: 8, equipped: 4 }, stone_golem: { bare: 16, equipped: 7 }, orc_chief: { bare: 19, equipped: 8 }, ancient_golem: { bare: 26, equipped: 11 } });
     expect(attackCounts.orc_chief.bare).toBeGreaterThan(1);
-    expect(attackCounts.ancient_golem.equipped).toBeLessThan(10);
-    expect(calculateEnemyCounterDamage(BOSS_CATALOG.ancient_golem.attack, calculatePlayerDefense(equipped))).toBe(3);
+    expect(attackCounts.ancient_golem.equipped).toBeGreaterThan(attackCounts.stone_golem.equipped);
+    expect(calculateEnemyCounterDamage(BOSS_CATALOG.ancient_golem.attack, calculatePlayerDefense(equipped))).toBe(7);
     expect(calculateSkillDamage({ playerAttack: calculatePlayerAttack(bare), powerPercent: 125, elementPercent: 150 }).damage).toBe(9);
     const ancientCounterDamage = [1, 2, 3, 4, 5, 6, 7].map((turn) => calculateEnemyActionDamage({ enemyAttack: BOSS_CATALOG.ancient_golem.attack, powerPercent: enemyActionForTurn(snapshotEnemyActionPattern(BOSS_CATALOG.ancient_golem.actionPattern), turn).powerPercent, playerDefense: calculatePlayerDefense(equipped) }).damage);
-    expect(ancientCounterDamage).toEqual([3, 6, 3, 8, 3, 6, 3]);
-    expect(ancientCounterDamage.reduce((total, damage) => total + damage, 0)).toBe(32);
+    expect(ancientCounterDamage).toEqual([7, 12, 7, 15, 7, 12, 7]);
+    expect(ancientCounterDamage.reduce((total, damage) => total + damage, 0)).toBe(67);
   });
 
   it('normalizes Battle v1 through v5 without applying campaign progress to legacy victories', () => {

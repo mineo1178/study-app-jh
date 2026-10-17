@@ -7,7 +7,7 @@ describe('tower battle progress', () => {
   it('snapshots a floor and advances EXP and tower progress exactly once on victory', () => {
     const start = prepareBattleStart({ profile, enemy: buildTowerEnemy({ floor: 10 }), battleId: 'tower-10', now: 1, battleKind: 'boss', battleMode: 'tower', towerFloor: 10 });
     const win = prepareBattleAttack({ battle: { ...start.battle, enemyHp: 1 }, profile: start.profile, towerProgress: { currentFloor: 10, highestFloor: 9, totalWins: 9 }, actionId: 'tower-win', now: 2 });
-    expect(start.battle).toMatchObject({ battleMode: 'tower', towerFloor: 10, towerRulesVersion: 1 });
+    expect(start.battle).toMatchObject({ battleMode: 'tower', towerFloor: 10, towerRulesVersion: 2 });
     expect(win.profile.totalExp).toBeGreaterThan(0); expect(win.towerProgress).toMatchObject({ currentFloor: 11, highestFloor: 10, totalWins: 10, bossWins: 1 });
     expect(() => prepareBattleAttack({ battle: win.battle, profile: win.profile, towerProgress: win.towerProgress, actionId: 'again', now: 3 })).toThrow('BATTLE_ALREADY_COMPLETED');
   });

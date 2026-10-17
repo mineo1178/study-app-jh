@@ -1,7 +1,7 @@
 import { ENEMY_CATALOG } from './enemyCatalog.js';
 import { BOSS_CATALOG } from './bossCatalog.js';
 
-export const TOWER_RULES_VERSION = 1;
+export const TOWER_RULES_VERSION = 2;
 export const TOWER_BOSS_INTERVAL = 10;
 const number = (value) => Math.max(0, Number(value) || 0);
 export const isTowerBossFloor = (floor) => Number.isInteger(Number(floor)) && Number(floor) > 0 && Number(floor) % TOWER_BOSS_INTERVAL === 0;
@@ -15,8 +15,13 @@ export function buildTowerEnemy({ floor, baseEnemy }) {
   const base = baseEnemy || (boss
     ? (safeFloor / TOWER_BOSS_INTERVAL % 2 === 1 ? BOSS_CATALOG.orc_chief : BOSS_CATALOG.ancient_golem)
     : [ENEMY_CATALOG.slime, ENEMY_CATALOG.goblin, ENEMY_CATALOG.stone_golem][(safeFloor - 1) % 3]);
-  const hpMultiplier = 1 + tier * 0.20;
-  const attackMultiplier = 1 + tier * 0.10;
+  // Party battles need their own baseline: all living allies act before enemies.
+  // Floor growth also applies within each decade; later tiers add pressure.
+  const hpMultiplier = 1 + (safeFloor - 1) * 0.06 + tier * tier * 0.025;
+  const attackMultiplier = 1 + (safeFloor - 1) * 0.045 + tier * tier * 0.02;
+  const bossBase = base.id === 'orc_chief' || base.id === 'ancient_golem';
+  const baseHp = bossBase ? base.maxHp * 0.7 : 20 + base.maxHp * 0.5;
+  const baseAttack = bossBase ? Math.max(10, base.attack) : base.attack + 4;
   const expMultiplier = 1 + tier * 0.15;
   return {
     id: `tower-${boss ? 'boss' : 'normal'}-${safeFloor}-${base.id}`,
@@ -24,8 +29,8 @@ export function buildTowerEnemy({ floor, baseEnemy }) {
     element: base.element,
     weaknesses: [...(base.weaknesses || [])],
     resistances: [...(base.resistances || [])],
-    maxHp: scaled(base.maxHp, hpMultiplier),
-    attack: scaled(base.attack, attackMultiplier),
+    maxHp: scaled(baseHp, hpMultiplier),
+    attack: scaled(baseAttack, attackMultiplier * (bossBase ? 0.9 : 1)),
     expReward: scaled(base.expReward, expMultiplier),
     energyCost: boss ? 3 : 1,
     actionPattern: [...(base.actionPattern || [])],
