@@ -26,8 +26,8 @@ export default function BattlePanel({ profile, progress, towerProgress, battle, 
     return () => window.clearInterval(id);
   }, []);
 
-  if (battle?.status === 'won') return <VictoryResult battle={battle} onBack={onBack}/>;
-  if (battle?.status === 'lost') return <DefeatResult battle={battle} onBack={onBack}/>;
+  if (battle?.status === 'won') return <VictoryResult feedback={feedback} battle={battle} onBack={onBack}/>;
+  if (battle?.status === 'lost') return <DefeatResult feedback={feedback} battle={battle} onBack={onBack}/>;
   if (battle?.status === 'active') return Number(battle.schemaVersion) >= 8 ? <PartyBattleArena battle={battle} onAttack={onAttack} onSkill={onSkill} attacking={attacking} feedback={feedback}/> : <BattleArena battle={battle} onAttack={onAttack} onSkill={onSkill} attacking={attacking} feedback={feedback}/>;
 
   const safe = normalizeRpgProgress(progress);

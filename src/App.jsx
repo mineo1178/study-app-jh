@@ -25,7 +25,7 @@ import { claimQuestReward, rpgQuestStateRef } from './data/rpgQuestRepository';
 import { loadRpgEncyclopediaLedgers } from './data/rpgEncyclopediaRepository';
 import { normalizeRpgProgress } from './rpg/rpgProgress';
 import { normalizeTowerProgress } from './rpg/towerProgress';
-import { buildBattleTurnFeedback } from './rpg/battleUiLogic';
+import { buildBattleActionFeedback } from './rpg/battleUiLogic';
 import { getEquipmentCatalogItem } from './rpg/equipmentCatalog';
 import { normalizeBattle } from './rpg/battleState';
 import { resolveBattleWatchSnapshot } from './rpg/battleLifecycle';
@@ -108,7 +108,7 @@ const getTasksCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-
 const getTestsCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tests');
 const getStudySessionsCol = () => studySessionsCollection(db, FAMILY_ID);
 const getActiveTimerRef = () => activeTimerRef(db, FAMILY_ID);
-const APP_VERSION = 'v2.6.1';
+const APP_VERSION = 'v2.7.0';
 const isDocumentHidden = () => typeof document !== 'undefined' && document.hidden;
 // ==========================================
 // Constants & Master Data
@@ -876,6 +876,7 @@ export default function App() {
     const [battleCandidate, setBattleCandidate] = useState(null);
     const [pendingBattleEnemyId, setPendingBattleEnemyId] = useState(null);
     const [isAttackingBattle, setIsAttackingBattle] = useState(false);
+    const battleActionPendingRef = useRef(false);
     const [battleTurnFeedback, setBattleTurnFeedback] = useState(null);
     const [savingParty, setSavingParty] = useState(false);
     const [savingTitle, setSavingTitle] = useState(false);
@@ -1415,7 +1416,7 @@ export default function App() {
         if (!battleCandidate || isSampleMode || !user || pendingBattleEnemyId) return;
         const enemy = battleCandidate; setPendingBattleEnemyId(enemy.id);
         try {
-            setLastBattle(null);
+            setLastBattle(null); setBattleTurnFeedback(null);
             const result = enemy.isWeekly ? await startWeeklyBossBattle({ db, familyId: FAMILY_ID, battleId: createBattleId() }) : enemy.isTower ? await startTowerBattle({ db, familyId: FAMILY_ID, battleId: createBattleId() }) : enemy.isBoss ? await startBossBattle({ db, familyId: FAMILY_ID, bossId: enemy.id, battleId: createBattleId() }) : await startBattle({ db, familyId: FAMILY_ID, enemyId: enemy.id, battleId: createBattleId() });
             setBattleCandidate(null);
             setRpgStatus(result.applied ? { kind: 'success', message: `${enemy.name}との戦闘を開始しました` } : { kind: 'error', message: battleErrorMessage({ code: result.reason }) });
@@ -1423,28 +1424,30 @@ export default function App() {
         finally { setPendingBattleEnemyId(null); }
     };
     const handleAttackBattle = async (targetEnemyInstanceId = null) => {
-        if (!activeBattle?.battleId || isSampleMode || !user || isAttackingBattle) return;
+        if (!activeBattle?.battleId || isSampleMode || !user || battleActionPendingRef.current) return;
+        battleActionPendingRef.current = true;
         setIsAttackingBattle(true);
         feedbackSession.queue.hold();
         try {
             const result = await attackBattle({ db, familyId: FAMILY_ID, battleId: activeBattle.battleId, actionId: createBattleActionId(), targetEnemyInstanceId });
-            setBattleTurnFeedback(buildBattleTurnFeedback({ ...result, skill: null }, activeBattle.enemySnapshot?.name));
+            setBattleTurnFeedback(buildBattleActionFeedback(result, activeBattle));
             if (result.applied && result.battle) feedbackSession.queue.enqueue(battleFeedback(activeBattle, result.battle, towerProgress.highestFloor));
             if (result.victory) setRpgStatus({ kind: 'success', message: `${activeBattle.enemySnapshot?.name || '敵'}に勝利しました` });
         } catch (error) { setRpgStatus({ kind: 'error', message: battleErrorMessage(error) }); }
-        finally { feedbackSession.queue.release(); setIsAttackingBattle(false); }
+        finally { feedbackSession.queue.release(); battleActionPendingRef.current = false; setIsAttackingBattle(false); }
     };
     const handleUseBattleSkill = async (skillId, targetEnemyInstanceId = null, targetMemberId = null) => {
-        if (!activeBattle?.battleId || isSampleMode || !user || isAttackingBattle) return;
+        if (!activeBattle?.battleId || isSampleMode || !user || battleActionPendingRef.current) return;
+        battleActionPendingRef.current = true;
         setIsAttackingBattle(true);
         feedbackSession.queue.hold();
         try {
             const result = await runBattleSkill({ db, familyId: FAMILY_ID, battleId: activeBattle.battleId, skillId, actionId: `skill-${createBattleActionId()}`, targetEnemyInstanceId, targetMemberId });
-            setBattleTurnFeedback(buildBattleTurnFeedback(result, activeBattle.enemySnapshot?.name));
+            setBattleTurnFeedback(buildBattleActionFeedback(result, activeBattle));
             if (result.applied && result.battle) feedbackSession.queue.enqueue(battleFeedback(activeBattle, result.battle, towerProgress.highestFloor));
             if (result.victory) setRpgStatus({ kind: 'success', message: `${activeBattle.enemySnapshot?.name || '敵'}に勝利しました` });
         } catch (error) { setRpgStatus({ kind: 'error', message: error.code === 'SKILL_NOT_AVAILABLE' ? 'このスキルは現在の戦闘では使用できません' : error.code === 'SKILL_NO_USES' ? 'このスキルの使用回数を使い切りました' : battleErrorMessage(error) }); }
-        finally { feedbackSession.queue.release(); setIsAttackingBattle(false); }
+        finally { feedbackSession.queue.release(); battleActionPendingRef.current = false; setIsAttackingBattle(false); }
     };
     const handleSaveParty = async (partyMemberIds) => {
         if (isSampleMode || !user || savingParty) return;
