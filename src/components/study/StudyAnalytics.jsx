@@ -1,20 +1,23 @@
 import { useMemo, useState } from 'react';
 import { aggregateMonthlyStudy } from '../../data/monthlyStudySelectors.js';
 import { deriveStudyAnalytics } from '../../data/studyAnalyticsSelectors.js';
+import { deriveStudyGuidance } from '../../data/studyGuidanceSelectors.js';
 import { reportDuration as duration } from '../../data/weeklyReportSelectors.js';
 
 const card = 'min-w-0 rounded-[2rem] border border-slate-100 bg-white p-4 sm:p-6 shadow-sm';
 const button = 'min-h-11 rounded-xl bg-blue-50 px-4 py-3 text-sm font-bold text-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2';
 const difference = seconds => `${seconds > 0 ? '+' : seconds < 0 ? '−' : ''}${duration(Math.abs(seconds))}`;
 
-export default function StudyAnalytics({ sessions, now, ready, studyGoals, subjectDefinitions, onBack }) {
+export default function StudyAnalytics({ sessions, now, ready, studyGoals, subjectDefinitions, onBack, onNavigate }) {
   const [period,setPeriod] = useState(4);
   const index = useMemo(() => aggregateMonthlyStudy({ sessions, now, ready, subjectDefinitions }),[sessions,now,ready,subjectDefinitions]);
   const data = useMemo(() => deriveStudyAnalytics(index,now,period,studyGoals),[index,now,period,studyGoals]);
+  const guidance = useMemo(() => deriveStudyGuidance(index,data,studyGoals,subjectDefinitions),[index,data,studyGoals,subjectDefinitions]);
   const maxWeek = Math.max(1,...(data.weeks || []).map(week => week.seconds));
   return <section aria-label="学習分析" className="mx-auto max-w-3xl min-w-0 space-y-4 text-left">
     <header className={card}><h1 className="text-xl font-black">学習分析</h1><p className="mt-2 text-sm text-slate-500">確定した有効な学習記録から、数週間の学習時間と日数を確認できます。</p><button type="button" className={`${button} mt-3`} onClick={onBack}>ダッシュボードへ戻る</button></header>
     {data.status === 'loading' ? <div role="status" className={card}>学習記録を読み込み中です…</div> : <>
+      <div className={card}><h2 className="text-lg font-black">次の一歩</h2><p className="mt-2 text-xs text-slate-500">目標までの残りと、確定した学習記録から見えるヒントです。</p>{guidance.length ? <ul className="mt-3 space-y-3">{guidance.map(item => <li key={item.id} className="min-w-0 rounded-xl bg-slate-50 p-3"><p className="break-words text-sm font-bold [overflow-wrap:anywhere]">{item.title}</p>{item.tab && onNavigate && <button type="button" className={`${button} mt-2 max-w-full`} onClick={() => onNavigate(item.tab)}>{item.tab === 'daily' ? 'ダッシュボードで確認' : '週間レポートで確認'}</button>}</li>)}</ul> : <p className="mt-3 text-sm">今は追加のヒントはありません。目標や学習記録が更新されると、ここに表示されます。</p>}</div>
       <div className={card}><h2 className="text-lg font-black">分析する期間</h2><div className="mt-3 flex flex-wrap gap-2">{[4,8].map(weeks => <button type="button" key={weeks} aria-pressed={period === weeks} className={`${button} ${period === weeks ? 'ring-2 ring-blue-600' : ''}`} onClick={() => setPeriod(weeks)}>直近{weeks}週間</button>)}</div><p className="mt-3 text-xs text-slate-500">今週を含み、今日までの記録を表示します。履歴が短い場合は記録が始まった週から表示します。</p>{!data.recordWeeks && <p className="mt-3 text-sm">この期間の学習記録はありません。</p>}
         <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">{[['総学習時間',duration(data.seconds)],['学習日数',`${data.studyDays}日`],['記録のある週',`${data.recordWeeks}週`],['1週間平均学習日数',`${data.averageWeekDays.toFixed(1)}日`],['1学習日あたり平均',duration(data.averageDaySeconds)],['1週間あたり平均',duration(data.averageWeekSeconds)]].map(([label,value]) => <div key={label} className="min-w-0 rounded-xl bg-slate-50 p-3"><dt>{label}</dt><dd className="mt-1 break-words font-bold">{value}</dd></div>)}</dl><p className="mt-3 text-xs text-slate-500">週平均は表示中の{data.weeks.length}週間が分母です（途中の今週・記録のない週を含む）。</p>
       </div>

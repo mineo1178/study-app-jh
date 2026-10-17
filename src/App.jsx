@@ -108,7 +108,7 @@ const getTasksCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-
 const getTestsCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tests');
 const getStudySessionsCol = () => studySessionsCollection(db, FAMILY_ID);
 const getActiveTimerRef = () => activeTimerRef(db, FAMILY_ID);
-const APP_VERSION = 'v2.5.1';
+const APP_VERSION = 'v2.6.0';
 const isDocumentHidden = () => typeof document !== 'undefined' && document.hidden;
 // ==========================================
 // Constants & Master Data
@@ -2101,7 +2101,7 @@ export default function App() {
                 </div>
               </div>)}
 
-            {activeTab === 'study-analytics' && <LazyPanel label="学習分析"><StudyAnalytics studyGoals={playerProfile.studyGoals} sessions={unifiedSessions} now={dashboardDay} ready={isSampleMode || (profileLoaded && dashboardLoaded.tasks && dashboardLoaded.sessions)} subjectDefinitions={SUBJECT_DEFS} onBack={() => setActiveTab('daily')}/></LazyPanel>}
+            {activeTab === 'study-analytics' && <LazyPanel label="学習分析"><StudyAnalytics studyGoals={playerProfile.studyGoals} sessions={unifiedSessions} now={dashboardDay} ready={isSampleMode || (profileLoaded && dashboardLoaded.tasks && dashboardLoaded.sessions)} subjectDefinitions={SUBJECT_DEFS} onBack={() => setActiveTab('daily')} onNavigate={setActiveTab}/></LazyPanel>}
             {activeTab === 'monthly-calendar' && <LazyPanel label="月間カレンダー"><MonthlyStudyCalendar studyGoals={playerProfile.studyGoals} sessions={unifiedSessions} now={dashboardDay} ready={isSampleMode || (profileLoaded && dashboardLoaded.tasks && dashboardLoaded.sessions)} subjectDefinitions={SUBJECT_DEFS} onBack={() => setActiveTab('daily')}/></LazyPanel>}
             {activeTab === 'weekly-report' && <LazyPanel label="週間レポート"><WeeklyReport studyGoals={playerProfile.studyGoals} sessions={unifiedSessions} now={dashboardDay} ready={isSampleMode || (profileLoaded && dashboardLoaded.tasks && dashboardLoaded.sessions)} subjectDefinitions={SUBJECT_DEFS} onBack={() => setActiveTab('daily')}/></LazyPanel>}
             {activeTab === 'stats' && (<div className="space-y-8 sm:space-y-10 animate-in slide-in-from-bottom-5 duration-500 text-center">

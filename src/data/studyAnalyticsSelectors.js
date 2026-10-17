@@ -19,7 +19,7 @@ export function deriveStudyAnalytics(index, now, period = 4, studyGoals) {
   });
   const weekById = new Map(allWeeks.map(week => [week.id,week]));
   const weekdays = ['月','火','水','木','金','土','日'].map(label => ({ label, seconds: 0, studyDays: 0, averageSeconds: 0 }));
-  const subjects = new Map(), recentSubjects = new Map(), previousSubjects = new Map(), comparisonDefinitions = new Map();
+  const subjects = new Map(), recentSubjects = new Map(), previousSubjects = new Map(), comparisonDefinitions = new Map(), weeklySubjects = new Map();
   const dates = [...index.days.keys()].sort();
   const earliest = dates.length ? timestampForStudyDate(dates[0]) : null;
   const oldestWeek = earliest === null ? null : getNextWeeklyBossResetAt(earliest) - WEEK;
@@ -36,6 +36,7 @@ export function deriveStudyAnalytics(index, now, period = 4, studyGoals) {
     for (const subject of day.subjects.values()) {
       comparisonSubjects.set(subject.id,(comparisonSubjects.get(subject.id) || 0) + subject.seconds);
       comparisonDefinitions.set(subject.id,subject);
+      if (week.current) weeklySubjects.set(subject.id, { seconds: (weeklySubjects.get(subject.id)?.seconds || 0) + subject.seconds });
     }
     if (timestamp < periodStart) continue;
     seconds += day.seconds;
@@ -69,7 +70,8 @@ export function deriveStudyAnalytics(index, now, period = 4, studyGoals) {
     averageWeekDays: weeks.length ? studyDays / weeks.length : 0,
     achievedDays, goalPercent: studyDays ? achievedDays / studyDays * 100 : 0, dailyTargetSeconds,
     current, previous: previous.records ? previous : null, difference: previous.records ? { seconds: current.seconds - previous.seconds, days: current.studyDays - previous.studyDays } : null,
-    currentStreak, longestStreak: consecutiveDays(dates), comparisonAvailable,
+    currentStreak, longestStreak: consecutiveDays(dates), comparisonAvailable, weeklySubjects,
+    recentSubjects: [...recentSubjects].map(([id,seconds]) => ({ ...comparisonDefinitions.get(id), seconds })).filter(subject => subject.seconds > 0).sort((a,b) => b.seconds - a.seconds || a.order - b.order),
     subjectComparison: comparisonAvailable ? [...comparisonDefinitions.values()].map(subject => ({ id: subject.id, name: subject.name, order: subject.order, recentSeconds: recentSubjects.get(subject.id) || 0, previousSeconds: previousSubjects.get(subject.id) || 0 })).filter(subject => subject.recentSeconds || subject.previousSeconds).sort((a,b) => b.recentSeconds - a.recentSeconds || a.order - b.order) : [],
   };
 }
