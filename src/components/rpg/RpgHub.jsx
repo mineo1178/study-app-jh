@@ -7,14 +7,29 @@ import QuestBoard from './QuestBoard.jsx';
 import MaterialCatalog from './MaterialCatalog.jsx';
 import MaterialExchange from './MaterialExchange.jsx';
 import PartyPanel from './PartyPanel.jsx';
+import BattleStartConfirmModal from './BattleStartConfirmModal.jsx';
+import { refreshWeeklyBattleCandidate } from '../../rpg/battlePreparation.js';
 import GachaPanel from './GachaPanel.jsx';
 import AlchemyPanel from './AlchemyPanel.jsx';
 import EncyclopediaPanel from './EncyclopediaPanel.jsx';
 import AchievementPanel from './AchievementPanel.jsx';
 import { createCachedEncyclopediaLedgerLoader } from '../../data/rpgEncyclopediaRepository.js';
 
-export default function RpgHub({ profile, progress, towerProgress, achievements, unlockedTitles, selectedTitle, onSelectTitle, savingTitle, questState, onClaimQuest, pendingQuestId, onPurchaseRequest, onMaterialExchangeRequest, pendingMaterialExchange, onEquip, onUnequip, pendingItemId, pendingAction, status, battle, onStartBattleRequest, onAttackBattle, onUseBattleSkill, startingEnemyId, attacking, onBattleBack, battleFeedback, onSaveParty, savingParty, onGachaBuy, onGachaDraw, onGachaExchange, onAlchemyCraft, loadEncyclopediaLedgers, gachaPending, alchemyPending }) {
+export default function RpgHub({ profile, progress, towerProgress, battleCandidate, onCancelBattleStart, onConfirmBattleStart, achievements, unlockedTitles, selectedTitle, onSelectTitle, savingTitle, questState, onClaimQuest, pendingQuestId, onPurchaseRequest, onMaterialExchangeRequest, pendingMaterialExchange, onEquip, onUnequip, pendingItemId, pendingAction, status, battle, onStartBattleRequest, onAttackBattle, onUseBattleSkill, startingEnemyId, attacking, onBattleBack, battleFeedback, onSaveParty, savingParty, onGachaBuy, onGachaDraw, onGachaExchange, onAlchemyCraft, loadEncyclopediaLedgers, gachaPending, alchemyPending }) {
   const [section, setSection] = useState('battle');
+  const [reviewing, setReviewing] = useState(false);
+  const battleLocked = Boolean(profile?.activeBattleId || battle?.status === 'active' || startingEnemyId);
+  const reviewPreparation = nextSection => {
+    if (battleLocked) return;
+    onCancelBattleStart?.();
+    setReviewing(true);
+    setSection(nextSection);
+  };
+  const confirmPreparation = () => {
+    const latest = refreshWeeklyBattleCandidate(battleCandidate, Date.now());
+    if (latest !== battleCandidate) onStartBattleRequest?.(latest);
+    else onConfirmBattleStart?.();
+  };
   const loaderRef = useRef(null);
   const loadStartedRef = useRef(false);
   const mountedRef = useRef(true);
@@ -42,14 +57,16 @@ export default function RpgHub({ profile, progress, towerProgress, achievements,
       {sections.map(([id, label]) => <button type="button" key={id} onClick={() => selectSection(id)} className={`rounded-xl py-3 text-sm font-black ${section === id ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500'}`}>{label}</button>)}
     </div>
     {status && <div className={`rounded-xl px-4 py-3 text-sm font-bold ${status.kind === 'error' ? 'bg-rose-50 text-rose-700' : 'text-emerald-700'}`}>{status.message}</div>}
+    {reviewing && <button type="button" disabled={Boolean(pendingAction || savingParty)} onClick={() => { setSection('battle'); setReviewing(false); }} className="rounded-xl bg-violet-100 px-4 py-3 text-sm font-black text-violet-800 disabled:opacity-50">準備を終えて戦闘画面へ戻る</button>}
+    <BattleStartConfirmModal enemy={battleCandidate} profile={profile} towerProgress={towerProgress} starting={Boolean(startingEnemyId)} onCancel={onCancelBattleStart} onConfirm={confirmPreparation} onReview={reviewPreparation}/>
     {section === 'battle' ? <BattlePanel profile={profile} progress={progress} towerProgress={towerProgress} battle={battle} onStartRequest={onStartBattleRequest} onAttack={onAttackBattle} onSkill={onUseBattleSkill} startingEnemyId={startingEnemyId} attacking={attacking} onBack={onBattleBack} feedback={battleFeedback}/>
-      : section === 'party' ? <PartyPanel profile={profile} onSave={onSaveParty} pending={savingParty}/>
+      : section === 'party' ? <PartyPanel key={JSON.stringify([profile?.partyMemberIds, profile?.unlockedPartyMemberIds, battleLocked])} profile={profile} onSave={onSaveParty} pending={savingParty} locked={battleLocked}/>
         : section === 'gacha' ? <GachaPanel profile={profile} onBuy={onGachaBuy} onDraw={onGachaDraw} onExchange={onGachaExchange} pending={gachaPending}/>
           : section === 'alchemy' ? <AlchemyPanel profile={profile} onCraft={onAlchemyCraft} pending={alchemyPending}/>
             : section === 'quest' ? <QuestBoard profile={profile} progress={progress} questState={questState} onClaim={onClaimQuest} pendingQuestId={pendingQuestId}/>
               : section === 'achievements' ? <AchievementPanel achievements={achievements} unlockedTitles={unlockedTitles} selectedTitle={selectedTitle} onSelectTitle={onSelectTitle} savingTitle={savingTitle}/>
                 : section === 'shop' ? <RpgShop profile={profile} onPurchaseRequest={onPurchaseRequest} pendingItemId={pendingItemId}/>
-                  : section === 'equipment' ? <EquipmentPanel profile={profile} onEquip={onEquip} onUnequip={onUnequip} pendingAction={pendingAction}/>
+                  : section === 'equipment' ? <EquipmentPanel profile={profile} onEquip={onEquip} onUnequip={onUnequip} pendingAction={pendingAction} locked={battleLocked}/>
                     : section === 'encyclopedia' ? <EncyclopediaPanel profile={profile} ledgers={encyclopediaLedgers} loading={encyclopediaLoading} error={encyclopediaError}/>
                       : <div className="space-y-8"><MaterialCatalog materials={profile?.materials}/><MaterialExchange profile={profile} onExchangeRequest={onMaterialExchangeRequest} pending={pendingMaterialExchange}/></div>}
   </section>;

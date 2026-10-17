@@ -45,7 +45,6 @@ import { feedbackSession, idleStopFeedback, studyFeedback, progressFeedback, bat
 import LazyPanel from './components/common/LazyPanel';
 import PurchaseConfirmModal from './components/rpg/PurchaseConfirmModal';
 import MaterialExchangeConfirmModal from './components/rpg/MaterialExchangeConfirmModal';
-import BattleStartConfirmModal from './components/rpg/BattleStartConfirmModal';
 import QuestTreasureResult from './components/rpg/QuestTreasureResult';
 import { formatHms, getEffectiveSessionsForDate, getEffectiveStudySeconds, getEffectiveStudySecondsForTask, getLiveStudySession, getSessionsForDate, getSessionsForTask, getUnifiedStudySessions } from './data/studySessionSelectors';
 import LiveStudyStatus from './components/study/LiveStudyStatus';
@@ -108,7 +107,7 @@ const getTasksCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-
 const getTestsCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tests');
 const getStudySessionsCol = () => studySessionsCollection(db, FAMILY_ID);
 const getActiveTimerRef = () => activeTimerRef(db, FAMILY_ID);
-const APP_VERSION = 'v2.7.0';
+const APP_VERSION = 'v2.8.0';
 const isDocumentHidden = () => typeof document !== 'undefined' && document.hidden;
 // ==========================================
 // Constants & Master Data
@@ -874,6 +873,7 @@ export default function App() {
     const [lastBattle, setLastBattle] = useState(null);
     const [battleWatchId, setBattleWatchId] = useState(null);
     const [battleCandidate, setBattleCandidate] = useState(null);
+    const battleStartPendingRef = useRef(false);
     const [pendingBattleEnemyId, setPendingBattleEnemyId] = useState(null);
     const [isAttackingBattle, setIsAttackingBattle] = useState(false);
     const battleActionPendingRef = useRef(false);
@@ -1179,6 +1179,7 @@ export default function App() {
     }, [isSampleMode]);
     useEffect(() => {
         const unsub = onAuthStateChanged(auth, (u) => {
+            if (diagnosticAuthRef.current !== (u?.uid || null)) setBattleCandidate(null);
             recordTimerDiagnostic('auth_state', { authenticated: Boolean(u), authChanged: diagnosticAuthRef.current !== undefined && diagnosticAuthRef.current !== (u?.uid || null), sampleMode: isSampleMode, source: 'app.auth_listener' });
             diagnosticAuthRef.current = u?.uid || null;
             if (!isSampleMode) {
@@ -1409,11 +1410,12 @@ export default function App() {
     }[error?.code || error?.message] || '戦闘処理に失敗しました。もう一度お試しください。');
     const handleBattleStartRequest = (enemy) => {
         if (isSampleMode || !user || playerProfile.activeBattleId || pendingBattleEnemyId) return;
-        setRpgStatus(null); setBattleCandidate(enemy);
+        setRpgStatus(null); setBattleCandidate({ ...enemy, requestedByUid: user.uid });
     };
     const handleBattleResultClose = () => { setActiveBattle(null); setLastBattle(null); setBattleWatchId(null); setBattleTurnFeedback(null); setRpgStatus(null); };
     const handleBattleStartConfirm = async () => {
-        if (!battleCandidate || isSampleMode || !user || pendingBattleEnemyId) return;
+        if (!battleCandidate || isSampleMode || !user || battleCandidate.requestedByUid !== user.uid || playerProfile.activeBattleId || battleStartPendingRef.current) return;
+        battleStartPendingRef.current = true;
         const enemy = battleCandidate; setPendingBattleEnemyId(enemy.id);
         try {
             setLastBattle(null); setBattleTurnFeedback(null);
@@ -1421,7 +1423,7 @@ export default function App() {
             setBattleCandidate(null);
             setRpgStatus(result.applied ? { kind: 'success', message: `${enemy.name}との戦闘を開始しました` } : { kind: 'error', message: battleErrorMessage({ code: result.reason }) });
         } catch (error) { setRpgStatus({ kind: 'error', message: battleErrorMessage(error) }); }
-        finally { setPendingBattleEnemyId(null); }
+        finally { battleStartPendingRef.current = false; setPendingBattleEnemyId(null); }
     };
     const handleAttackBattle = async (targetEnemyInstanceId = null) => {
         if (!activeBattle?.battleId || isSampleMode || !user || battleActionPendingRef.current) return;
@@ -2274,7 +2276,7 @@ export default function App() {
                 </div>
               </div>)}
             {activeTab === 'rpg' && !isSampleMode && (
-              <LazyPanel label="RPG"><RpgHub profile={playerProfile} progress={rpgProgress} towerProgress={towerProgress} achievements={achievements} unlockedTitles={unlockedTitles} selectedTitle={selectedTitle} onSelectTitle={handleSelectTitle} savingTitle={savingTitle} questState={questState} onClaimQuest={handleClaimQuest} pendingQuestId={pendingQuestId} onPurchaseRequest={handlePurchaseRequest} onMaterialExchangeRequest={handleMaterialExchangeRequest} pendingMaterialExchange={pendingMaterialExchange} onEquip={handleEquip} onUnequip={handleUnequip} pendingItemId={pendingPurchaseItemId} pendingAction={pendingEquipmentAction} status={rpgStatus} battle={activeBattle || lastBattle} onStartBattleRequest={handleBattleStartRequest} onAttackBattle={handleAttackBattle} onUseBattleSkill={handleUseBattleSkill} startingEnemyId={pendingBattleEnemyId} attacking={isAttackingBattle} onBattleBack={handleBattleResultClose} battleFeedback={battleTurnFeedback} onSaveParty={handleSaveParty} savingParty={savingParty} onGachaBuy={(type) => handleGacha('buy', type)} onGachaDraw={(type) => handleGacha('draw', type)} onGachaExchange={(kind, id) => handleGacha('exchange', kind, id)} onAlchemyCraft={handleAlchemyCraft} loadEncyclopediaLedgers={loadEncyclopediaLedgers} gachaPending={gachaPending} alchemyPending={alchemyPending}/></LazyPanel>
+              <LazyPanel label="RPG"><RpgHub key={user?.uid || 'sample'} battleCandidate={battleCandidate?.requestedByUid === user?.uid ? battleCandidate : null} onCancelBattleStart={() => !battleStartPendingRef.current && setBattleCandidate(null)} onConfirmBattleStart={handleBattleStartConfirm} profile={playerProfile} progress={rpgProgress} towerProgress={towerProgress} achievements={achievements} unlockedTitles={unlockedTitles} selectedTitle={selectedTitle} onSelectTitle={handleSelectTitle} savingTitle={savingTitle} questState={questState} onClaimQuest={handleClaimQuest} pendingQuestId={pendingQuestId} onPurchaseRequest={handlePurchaseRequest} onMaterialExchangeRequest={handleMaterialExchangeRequest} pendingMaterialExchange={pendingMaterialExchange} onEquip={handleEquip} onUnequip={handleUnequip} pendingItemId={pendingPurchaseItemId} pendingAction={pendingEquipmentAction} status={rpgStatus} battle={activeBattle || lastBattle} onStartBattleRequest={handleBattleStartRequest} onAttackBattle={handleAttackBattle} onUseBattleSkill={handleUseBattleSkill} startingEnemyId={pendingBattleEnemyId} attacking={isAttackingBattle} onBattleBack={handleBattleResultClose} battleFeedback={battleTurnFeedback} onSaveParty={handleSaveParty} savingParty={savingParty} onGachaBuy={(type) => handleGacha('buy', type)} onGachaDraw={(type) => handleGacha('draw', type)} onGachaExchange={(kind, id) => handleGacha('exchange', kind, id)} onAlchemyCraft={handleAlchemyCraft} loadEncyclopediaLedgers={loadEncyclopediaLedgers} gachaPending={gachaPending} alchemyPending={alchemyPending}/></LazyPanel>
             )}
             {activeTab === 'review' && canReview && !isSampleMode && <ManualReviewPanel onOpenTimeReview={openTimeReview} subjectLabel={(session) => getTaskMeta(session.taskSnapshot).subjectLabel} queue={reviewQueue} profile={playerProfile} studySessions={studySessions} ledgersBySessionId={pendingCorrectionLedgers} busySessionIds={reviewBusySessionIds} message={reviewError} onOpenCorrection={openHistoryCorrection} onRetry={handlePendingCorrectionRetry}/>}
           </main>
@@ -2302,7 +2304,6 @@ export default function App() {
         {!isSampleMode && <FeedbackOverlay />}
         <PurchaseConfirmModal item={purchaseCandidate} profile={playerProfile} purchasing={Boolean(pendingPurchaseItemId)} onCancel={() => !pendingPurchaseItemId && setPurchaseCandidate(null)} onConfirm={handlePurchaseConfirm}/>
         <MaterialExchangeConfirmModal exchange={exchangeCandidate} profile={playerProfile} exchanging={pendingMaterialExchange} onCancel={() => !pendingMaterialExchange && setExchangeCandidate(null)} onConfirm={handleMaterialExchangeConfirm}/>
-        <BattleStartConfirmModal enemy={battleCandidate} starting={Boolean(pendingBattleEnemyId)} onCancel={() => !pendingBattleEnemyId && setBattleCandidate(null)} onConfirm={handleBattleStartConfirm}/>
         <StudyTimeReviewModal key={timeReviewSession?.id || 'none'} session={timeReviewSession} subjectLabel={timeReviewSession ? getTaskMeta(timeReviewSession.taskSnapshot).subjectLabel : ''} busy={Boolean(timeReviewSession && reviewBusySessionIds[timeReviewSession.id])} error={reviewError} onClose={() => { if (!timeReviewSession || !timeReviewSubmittingRef.current.has(timeReviewSession.id)) { setTimeReviewSession(null); setReviewError(null); } }} onSubmit={handleTimeConfirmation}/>
         <HistoryCorrectionModal key={`${historyCorrectionSession?.id || 'none'}-${historyCorrectionDecision}`} session={historyCorrectionSession} initialDecision={historyCorrectionDecision} busy={Boolean(historyCorrectionSession && reviewBusySessionIds[historyCorrectionSession.id])} error={reviewError} onClose={() => { if (!historyCorrectionSession || !reviewBusySessionIds[historyCorrectionSession.id]) { setHistoryCorrectionSession(null); setReviewError(null); } }} onSubmit={handleHistoryCorrection}/>
 
