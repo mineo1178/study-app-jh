@@ -8,7 +8,7 @@ vi.mock('firebase/firestore', () => ({
   deleteField: () => 'DELETE_FIELD',
   setDoc: vi.fn(async (_ref, value, options) => {
     if (mock.fail) throw new Error('offline');
-    expect(options.mergeFields.slice(0,2)).toEqual(['studyGoals.dailyTargetMinutes', 'studyGoals.weeklyStudyDays']);
+    expect(options.mergeFields.length).toBeGreaterThan(0);
     mock.writes++;
     for (const field of options.mergeFields) {
       const keys = field.split('.');
@@ -82,4 +82,16 @@ it('preserves plans on basic-only save and failed plan write', async () => {
   const before = structuredClone(mock.profile); mock.fail = true;
   await expect(saveStudyGoals({ db: {}, familyId: 'family', studyGoals: { ...DEFAULT_STUDY_GOALS, weeklyPlan: {} } })).rejects.toThrow('offline');
   expect(mock.profile).toEqual(before);
+});
+
+it('plan-only saves retain basic goals, subject goals, unknown IDs, and future fields', async () => {
+  mock.profile.studyGoals = { dailyTargetMinutes: 90, weeklyStudyDays: 3, future: true, subjectWeeklyTargets: { s_math: 120, orphan: 60 }, weeklyPlan: { mon: { s_math: 15, orphan: 45 }, future: { s_math: 60 } } };
+  await saveStudyGoals({ db: {}, familyId: 'family', studyGoals: { weeklyPlan: { mon: { s_math: 360 } } } });
+  expect(mock.writes).toBe(1);
+  expect(mock.profile.studyGoals).toEqual({ dailyTargetMinutes: 90, weeklyStudyDays: 3, future: true, subjectWeeklyTargets: { s_math: 120, orphan: 60 }, weeklyPlan: expect.objectContaining({ mon: { s_math: 360, orphan: 45 }, future: { s_math: 60 } }) });
+});
+
+it('skips empty patches without a write', async () => {
+  await saveStudyGoals({ db: {}, familyId: 'family', studyGoals: {} });
+  expect(mock.writes).toBe(0);
 });

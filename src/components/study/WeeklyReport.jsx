@@ -1,4 +1,5 @@
 import SubjectGoalProgress from './SubjectGoalProgress.jsx';
+import StudyPlanReview from './StudyPlanReview.jsx';
 import { useMemo, useState } from 'react';
 import { deriveWeeklyReport, moveReportWeek, reportDuration as duration } from '../../data/weeklyReportSelectors.js';
 
@@ -7,7 +8,7 @@ const button = 'min-h-11 rounded-xl bg-blue-50 px-4 py-3 text-sm font-black text
 const signed = value => `${value > 0 ? '+' : value < 0 ? '−' : ''}${Math.abs(value)}`;
 const timeDifference = value => `${value > 0 ? '+' : value < 0 ? '−' : ''}${duration(Math.abs(value))}`;
 
-export default function WeeklyReport({ sessions, now, ready, subjectDefinitions, studyGoals, onBack }) {
+export default function WeeklyReport({ sessions, now, ready, subjectDefinitions, studyGoals, onBack, onSaveGoals }) {
   const report = useMemo(() => deriveWeeklyReport({ sessions, now, ready, subjectDefinitions, studyGoals }), [sessions, now, ready, subjectDefinitions, studyGoals]);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const week = report.weeks[selectedIndex];
@@ -26,6 +27,7 @@ export default function WeeklyReport({ sessions, now, ready, subjectDefinitions,
       <button type="button" className={`${button} mt-3`} aria-label="ダッシュボードへ戻る" onClick={onBack}>ダッシュボードへ戻る</button>
     </header>
     {report.status === 'loading' ? <div className={card} role="status">学習記録を読み込み中です…</div> : <>
+      <StudyPlanReview completedWeek={report.weeks[1]} studyGoals={studyGoals} subjectDefinitions={subjectDefinitions} onSave={onSaveGoals}/>
       <div className={card}>
         <p className="text-xs font-bold text-blue-700">{selectedIndex === 0 ? '今週' : `${selectedIndex}週前`}</p>
         <h2 className="mt-1 break-words text-lg font-black" aria-live="polite">{week.label}</h2>

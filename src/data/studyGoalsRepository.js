@@ -6,8 +6,14 @@ import { goalSubjects } from '../subjectCatalog.js';
 import { normalizeSubjectWeeklyTargets } from '../subjectStudyGoals.js';
 
 export function saveStudyGoals({ db, familyId, studyGoals }) {
-  const goals = normalizeStudyGoals(studyGoals);
-  const mergeFields = ['studyGoals.dailyTargetMinutes', 'studyGoals.weeklyStudyDays'];
+  const normalized = normalizeStudyGoals(studyGoals);
+  const goals = {}, mergeFields = [];
+  for (const field of ['dailyTargetMinutes', 'weeklyStudyDays']) {
+    if (Object.hasOwn(studyGoals || {}, field)) {
+      goals[field] = normalized[field];
+      mergeFields.push(`studyGoals.${field}`);
+    }
+  }
   if (Object.hasOwn(studyGoals || {}, 'subjectWeeklyTargets')) {
     const targets = normalizeSubjectWeeklyTargets(studyGoals.subjectWeeklyTargets);
     // Merge individual known IDs so orphan entries survive catalog changes.
@@ -23,6 +29,7 @@ export function saveStudyGoals({ db, familyId, studyGoals }) {
       return [subject.id, plan[day]?.[subject.id] || deleteField()];
     }))]));
   }
+  if (!mergeFields.length) return Promise.resolve();
   return setDoc(playerProfileRef(db, familyId), { studyGoals: goals }, {
     mergeFields,
   });
