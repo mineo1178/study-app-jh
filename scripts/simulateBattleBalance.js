@@ -28,7 +28,7 @@ export const BALANCE_PLAYERS = {
 export const BALANCE_SCENARIOS = [
   ...Object.values(ENEMY_CATALOG).map(enemy => ({ id: `campaign-${enemy.id}`, enemy })),
   ...Object.values(BOSS_CATALOG).map(enemy => ({ id: `campaign-${enemy.id}`, enemy, boss: true })),
-  ...[1, 4, 7, 10, 24, 27, 30, 54, 57, 60].map(floor => ({ id: `tower-${floor}`, floor, encounter: buildTowerEncounter({ floor }) })),
+  ...[1, 4, 7, 10, 20, 24, 27, 30, 54, 57, 60].map(floor => ({ id: `tower-${floor}`, floor, encounter: buildTowerEncounter({ floor }) })),
   ...[1, 2, 3, 4].map(week => { const enemy = getWeeklyBossDefinition(`2026-W0${week}`); return { id: enemy.id, encounter: { rulesVersion: enemy.rulesVersion, energyCost: enemy.energyCost, expReward: enemy.expReward, enemies: [{ ...enemy, enemyInstanceId: enemy.id }] } }; }),
 ];
 const attackDamage = (actor, skill, enemy) => skill ? calculateSkillDamage({ playerAttack: actor.attack, powerPercent: skill.powerPercent, elementPercent: getElementMultiplier({ attackElement: skill.element, weaknesses: enemy.weaknesses, resistances: enemy.resistances }).percent }).damage : actor.attack;

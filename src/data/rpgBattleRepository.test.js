@@ -118,18 +118,18 @@ describe('battle transaction logic', () => {
     expect(normal.attackLedger.enemyCounter).toMatchObject({ actionId: 'normal_attack', actionName: '通常攻撃', powerPercent: 100, attack: 3, poweredAttack: 3, playerDefense: 4, damage: 1 });
 
     const orcStart = prepareBattleStart({ profile: defensiveProfile, enemy: BOSS_CATALOG.orc_chief, battleId: 'orc-actions', now, battleKind: 'boss', bossId: 'orc_chief', chapter: getChapter('chapter_1') });
-    expect(orcStart.battle).toMatchObject({ schemaVersion: 7, enemySnapshot: { actionPattern: [{ id: 'normal_attack' }, { id: 'normal_attack' }, { id: 'orc_heavy_strike', powerPercent: 150 }] } });
+    expect(orcStart.battle).toMatchObject({ schemaVersion: 7, enemySnapshot: { maxHp: 80, attack: 7, actionPattern: [{ id: 'normal_attack' }, { id: 'normal_attack' }, { id: 'orc_heavy_strike', powerPercent: 150 }] } });
     const healSkill = orcStart.battle.playerSnapshot.skills.healing_light;
     const heal = prepareBattleAttack({ battle: { ...orcStart.battle, attackCount: 2, playerHp: 20 }, profile: orcStart.profile, actionId: 'orc-heal', now, action: { kind: 'skill', healing: { playerHpBefore: 20, calculatedHeal: 14, actualHeal: 14, playerHpAfterHeal: 34 }, skill: { ...healSkill, useNumber: 1 } } });
-    expect(heal.attackLedger.enemyCounter).toMatchObject({ actionId: 'orc_heavy_strike', actionName: '豪腕撃', poweredAttack: 12, damage: 8, playerHpBefore: 34, playerHpAfter: 26 });
+    expect(heal.attackLedger.enemyCounter).toMatchObject({ actionId: 'orc_heavy_strike', actionName: '豪腕撃', attack: 7, powerPercent: 150, playerDefense: 4, poweredAttack: 10, damage: 6, playerHpBefore: 34, playerHpAfter: 28 });
 
     const golemStart = prepareBattleStart({ profile: defensiveProfile, enemy: BOSS_CATALOG.ancient_golem, battleId: 'golem-actions', now, battleKind: 'boss', bossId: 'ancient_golem', chapter: getChapter('chapter_2') });
     const rockCrush = prepareBattleAttack({ battle: { ...golemStart.battle, attackCount: 1 }, profile: golemStart.profile, actionId: 'golem-rock', now });
-    expect(rockCrush.attackLedger.enemyCounter).toMatchObject({ actionId: 'golem_rock_crush', actionName: '岩砕き', poweredAttack: 16, damage: 12 });
+    expect(rockCrush.attackLedger.enemyCounter).toMatchObject({ actionId: 'golem_rock_crush', actionName: '岩砕き', poweredAttack: 13, damage: 9 });
     const guardSkill = golemStart.battle.playerSnapshot.skills.guard_stance;
     const earthquakeGuard = prepareBattleAttack({ battle: { ...golemStart.battle, attackCount: 3 }, profile: golemStart.profile, actionId: 'golem-guard', now, action: { kind: 'skill', skill: { ...guardSkill, useNumber: 1 } } });
-    expect(earthquakeGuard.attackLedger.enemyCounter).toMatchObject({ actionId: 'golem_earthquake', actionName: '大地震', poweredAttack: 19, damage: 7 });
-    expect(earthquakeGuard.attackLedger.guard).toMatchObject({ baseDamage: 15, reductionPercent: 50, finalDamage: 7 });
+    expect(earthquakeGuard.attackLedger.enemyCounter).toMatchObject({ actionId: 'golem_earthquake', actionName: '大地震', poweredAttack: 15, damage: 5 });
+    expect(earthquakeGuard.attackLedger.guard).toMatchObject({ baseDamage: 11, reductionPercent: 50, finalDamage: 5 });
 
     const victory = prepareBattleAttack({ battle: { ...orcStart.battle, enemyHp: 1, attackCount: 2 }, profile: orcStart.profile, progress: { currentChapterId: 'chapter_1', normalWins: 3 }, actionId: 'orc-victory', now });
     expect(victory.attackLedger.enemyCounter).toBeNull();
@@ -138,6 +138,21 @@ describe('battle transaction logic', () => {
     expect(defeat.progress).toBeUndefined();
     expect(defeat.bossClearLedger).toBeUndefined();
     [normalStart.battle, normalStart.ledger, normal.attackLedger, orcStart.battle, orcStart.ledger, heal.attackLedger, golemStart.battle, golemStart.ledger, rockCrush.attackLedger, earthquakeGuard.attackLedger, victory.attackLedger, victory.victoryLedger, defeat.attackLedger, defeat.defeatLedger, defeat.profile].forEach((payload) => expect(findUndefinedPaths(payload)).toEqual([]));
+  });
+  it('resumes a v2.9.0 Orc snapshot with attack 8 and its original rewards after reload', () => {
+    const start = prepareBattleStart({ profile: { ...profile, equipped: { weapon: 'iron_sword', armor: 'mineral_armor', accessory: 'history_charm' }, ownedEquipment: { iron_sword: {}, mineral_armor: {}, history_charm: {} } }, enemy: { ...BOSS_CATALOG.orc_chief, maxHp: 92, attack: 8 }, battleId: 'old-orc', now, battleKind: 'boss', bossId: 'orc_chief', chapter: getChapter('chapter_1') });
+    const saved = JSON.parse(JSON.stringify({ ...start.battle, attackCount: 2 }));
+    saved.enemySnapshot.catalogVersion = 3;
+    const before = structuredClone(saved);
+    const next = prepareBattleAttack({ battle: saved, profile: start.profile, actionId: 'old-heavy', now });
+    expect(next.attackLedger.enemyCounter).toMatchObject({ attack: 8, powerPercent: 150, poweredAttack: 12, playerDefense: 4, damage: 8 });
+    expect(next.battle.enemySnapshot).toEqual(before.enemySnapshot);
+    expect(next.battle.playerSnapshot).toEqual(before.playerSnapshot);
+    expect(saved).toEqual(before);
+    const win = prepareBattleAttack({ battle: { ...next.battle, enemyHp: 1 }, profile: start.profile, progress: { currentChapterId: 'chapter_1', normalWins: 3 }, actionId: 'old-win', now });
+    expect(win.bossClearLedger.firstClearReward).toEqual(before.enemySnapshot.firstClearReward);
+    expect(win.victoryLedger.expGranted).toBe(120);
+    expect(() => prepareBattleAttack({ battle: win.battle, profile: win.profile, actionId: 'old-retry', now })).toThrow('BATTLE_ALREADY_COMPLETED');
   });
   it('keeps the legacy Orc Chief snapshot beatable with the existing two Heals and deterministic skill sequence', () => {
     const start = prepareBattleStart({ profile: { battleEnergy: 3 }, enemy: { ...BOSS_CATALOG.orc_chief, maxHp: 58, attack: 5 }, battleId: 'bare-orc', now, battleKind: 'boss', bossId: 'orc_chief' });

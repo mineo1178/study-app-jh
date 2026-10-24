@@ -51,12 +51,14 @@ describe('measured balance acceptance', () => {
     const boss = simulate('intermediate', 'campaign-orc_chief');
     expect(boss.status).toBe('won');
     expect(boss.turns).toBeGreaterThan(simulate('intermediate', 'campaign-goblin').turns);
-    expect(boss.turns).toBeGreaterThanOrEqual(5);
+    expect(boss.turns).toBeGreaterThanOrEqual(4);
+    expect(boss.turns).toBeLessThanOrEqual(7);
     expect(boss.hpPercent).toBeLessThan(80);
   });
   it('lets preparation and recovery change the final Campaign boss outcome', () => {
-    expect(simulate('intermediate', 'campaign-ancient_golem').status).toBe('lost');
-    expect(simulate('prepared', 'campaign-ancient_golem', 'normal').status).toBe('lost');
+    expect(simulate('intermediate', 'campaign-ancient_golem')).toMatchObject({ status: 'won', turns: 9 });
+    expect(simulate('intermediate', 'campaign-ancient_golem', 'normal').status).toBe('lost');
+    expect(simulate('prepared', 'campaign-ancient_golem', 'normal').hp).toBeLessThan(simulate('prepared', 'campaign-ancient_golem').hp);
     const strategy = simulate('prepared', 'campaign-ancient_golem');
     expect(strategy.status).toBe('won');
     expect(strategy.heals).toBeGreaterThan(0);
@@ -68,19 +70,20 @@ describe('measured balance acceptance', () => {
     expect(simulate('intermediate', 'tower-27').status).toBe('lost');
     expect(simulate('prepared', 'tower-27').status).toBe('won');
     expect(simulate('prepared', 'tower-30').turns).toBeGreaterThan(simulate('prepared', 'tower-24').turns);
-    expect(simulate('trained', 'tower-60', 'normal').status).toBe('lost');
+    expect(simulate('trained', 'tower-60', 'normal').hp).toBeLessThan(simulate('trained', 'tower-60').hp);
     const strategy = simulate('trained', 'tower-60');
     expect(strategy.status).toBe('won');
     expect(strategy.turns).toBeGreaterThanOrEqual(5);
     expect(strategy.turns).toBeLessThanOrEqual(10);
     expect(strategy.heals).toBeGreaterThan(0);
   });
-  it.each(['weekly_ignis', 'weekly_leviathan', 'weekly_volt', 'weekly_gaia'])('makes %s a 5–10 round challenge with real damage', id => {
-    const result = simulate('trained', id);
+  it.each(['weekly_ignis', 'weekly_leviathan', 'weekly_volt', 'weekly_gaia'])('makes %s accessible at level 12 with recovery still valuable', id => {
+    const result = simulate('prepared', id);
     expect(result.status).toBe('won');
-    expect(result.turns).toBeGreaterThanOrEqual(5);
-    expect(result.turns).toBeLessThanOrEqual(10);
-    expect(result.hpPercent).toBeLessThan(70);
+    expect(result.turns).toBeGreaterThanOrEqual(8);
+    expect(result.turns).toBeLessThanOrEqual(9);
+    expect(result.hp).toBeGreaterThan(simulate('prepared', id, 'normal').hp);
+    expect(result.damage).toBeGreaterThan(0);
     expect(result.enemyActions).toBeGreaterThanOrEqual(4);
     expect(result.heals).toBeGreaterThan(0);
     expect(simulate('intermediate', id).status).toBe('lost');
@@ -111,8 +114,8 @@ describe('new-start balance and existing snapshot compatibility', () => {
     const boss = BOSS_CATALOG.ancient_golem;
     const normal = calculateEnemyActionDamage({ enemyAttack: boss.attack, playerDefense: 4 });
     const special = calculateEnemyActionDamage({ enemyAttack: boss.attack, powerPercent: 175, playerDefense: 4 });
-    expect(normal.damage).toBe(7);
-    expect(special.damage).toBe(15);
+    expect(normal.damage).toBe(5);
+    expect(special.damage).toBe(11);
   });
   it('continues a saved Campaign battle using captured HP, attack, skills and rewards', () => {
     const oldEnemy = { ...BOSS_CATALOG.orc_chief, maxHp: 58, attack: 5 };
@@ -123,25 +126,26 @@ describe('new-start balance and existing snapshot compatibility', () => {
     expect(next.battle.playerSnapshot).toEqual(before.playerSnapshot);
     expect(next.battle.enemyHp).toBe(58 - before.playerSnapshot.attack);
     expect(next.result.enemyCounter.damage).toBe(1);
-    expect(prepareBattleStart({ profile: BALANCE_PLAYERS.intermediate, enemy: BOSS_CATALOG.orc_chief, battleId: 'new', now: 1 }).battle.enemyHp).toBe(92);
+    expect(prepareBattleStart({ profile: BALANCE_PLAYERS.intermediate, enemy: BOSS_CATALOG.orc_chief, battleId: 'new', now: 1 }).battle.enemyHp).toBe(80);
   });
-  it('keeps Weekly rewards and party stats captured at start when resuming', () => {
+  it.each([{ rulesVersion: 1, maxHp: 220, attack: 11 }, { rulesVersion: 2, maxHp: 850, attack: 52 }])('keeps Weekly rules $rulesVersion rewards and stats captured at start when resuming', legacyStats => {
     const boss = getWeeklyBossDefinition('2026-W01');
-    const oldBoss = { ...boss, maxHp: 220, attack: 11, rulesVersion: 1 };
+    const oldBoss = { ...boss, ...legacyStats };
     const start = prepareWeeklyBossStart({ profile: BALANCE_PLAYERS.trained, boss: oldBoss, battleId: 'saved-week', now: 1 });
     const snapshots = structuredClone(start.battle);
     const next = preparePartyBattleAction({ battle: start.battle, action: { actionId: 'next', targetEnemyInstanceId: start.battle.enemyStates[0].enemyInstanceId }, now: 2 });
     expect(next.battle.weeklyBossSnapshot).toEqual(snapshots.weeklyBossSnapshot);
     expect(next.battle.enemySnapshots).toEqual(snapshots.enemySnapshots);
     expect(next.battle.partySnapshot).toEqual(snapshots.partySnapshot);
-    expect(start.battle.enemyStates[0].hp).toBe(220);
+    expect(start.battle.enemyStates[0].hp).toBe(legacyStats.maxHp);
+    expect(boss.rulesVersion).toBe(3);
     expect(boss.reward).toEqual(oldBoss.reward);
   });
-  it('preserves costs and XP scaling while generating stronger new Tower encounters', () => {
+  it('preserves costs and XP scaling while generating new Tower encounters', () => {
     const tenth = buildTowerEncounter({ floor: 10 });
     expect(tenth.energyCost).toBe(3);
     expect(tenth.expReward).toBe(tenth.enemies.reduce((sum, enemy) => sum + enemy.expReward, 0));
-    expect(tenth.rulesVersion).toBe(2);
+    expect(tenth.rulesVersion).toBe(3);
     expect(buildTowerEncounter({ floor: 60 }).enemies[0].attack).toBeGreaterThan(tenth.enemies[0].attack);
   });
 });
