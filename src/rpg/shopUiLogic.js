@@ -1,3 +1,4 @@
+import { hasEquipmentPrice } from './resourceShopCatalog.js';
 import { EQUIPMENT_SLOTS } from './equipmentCatalog.js';
 import { normalizePlayerProfile } from './playerProfile.js';
 
@@ -15,9 +16,10 @@ export function getShopItemState(profile, item) {
   const owned = Boolean(item?.id && safe.ownedEquipment[item.id]);
   return {
     owned,
+    alchemyOnly: !hasEquipmentPrice(item),
     insufficientGold: !owned && goldCurrent < goldRequired,
     insufficientMaterials: !owned && materialShortages.length > 0,
-    purchasable: Boolean(item?.id) && !owned && goldCurrent >= goldRequired && materialShortages.length === 0,
+    purchasable: hasEquipmentPrice(item) && Boolean(item?.id) && !owned && goldCurrent >= goldRequired && materialShortages.length === 0,
     goldCurrent,
     goldRequired,
     goldShortage: Math.max(0, goldRequired - goldCurrent),

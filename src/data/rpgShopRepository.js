@@ -1,4 +1,6 @@
 import { doc, runTransaction } from 'firebase/firestore';
+import { getResourceShopItem, hasEquipmentPrice, RESOURCE_SHOP_CATALOG_VERSION } from '../rpg/resourceShopCatalog.js';
+import { prepareResourceTransaction, validateResourceQuantity } from '../rpg/resourceTransactions.js';
 import { EQUIPMENT_CATALOG_VERSION, EQUIPMENT_SLOTS, getEquipmentCatalogItem } from '../rpg/equipmentCatalog.js';
 import { normalizePlayerProfile } from '../rpg/playerProfile.js';
 import { playerProfileRef } from './rewardLedgerRepository.js';
@@ -14,7 +16,11 @@ const failure = (code, details = {}) => Object.assign(new Error(code), { code, d
 const number = (value) => Number(value) || 0;
 const actionBase = (actionId, type, now) => ({ schemaVersion: RPG_ACTION_LEDGER_SCHEMA_VERSION, actionId, type, status: 'applied', appliedAt: now });
 
-export function preparePurchase({ profile, item, actionId, now }) {
+export function preparePurchase({ profile, item, quantity = 1, actionId, now }) {
+  validateResourceQuantity(quantity);
+  item = getEquipmentCatalogItem(item?.id);
+  if (!item) throw failure('ITEM_NOT_FOUND');
+  if (!hasEquipmentPrice(item)) throw failure('ITEM_NOT_FOR_SALE');
   const current = normalizePlayerProfile(profile);
   if (current.ownedEquipment[item.id]) throw failure('ALREADY_OWNED');
   if (number(current.gold) < number(item.cost.gold)) throw failure('INSUFFICIENT_GOLD');
@@ -31,6 +37,7 @@ export function preparePurchase({ profile, item, actionId, now }) {
   const cost = { gold: number(item.cost.gold), materials: { ...(item.cost.materials || {}) } };
   const nextProfile = {
     ...current,
+    ...profile,
     gold: number(current.gold) - cost.gold,
     materials,
     ownedEquipment: {
@@ -45,6 +52,8 @@ export function preparePurchase({ profile, item, actionId, now }) {
     catalogVersion: EQUIPMENT_CATALOG_VERSION,
     itemSnapshot: { name: item.name, slot: item.slot, rarity: item.rarity },
     cost,
+    quantity: 1,
+    receive: { equipment: { [item.id]: 1 } },
   };
   return { profile: nextProfile, ledger };
 }
@@ -72,6 +81,7 @@ export function prepareUnequip({ profile, slot, actionId, now }) {
 }
 
 async function applyAction({ db, familyId, actionId, makeChange, requiresClearRewardIntegrity = false }) {
+  if (typeof actionId !== 'string' || !actionId || actionId.includes('/')) throw failure('INVALID_ACTION_ID');
   const profile = playerProfileRef(db, familyId);
   const ledger = rpgActionLedgerRef(db, familyId, actionId);
   const integrity = rewardIntegrityRef(db, familyId);
@@ -86,9 +96,11 @@ async function applyAction({ db, familyId, actionId, makeChange, requiresClearRe
   });
 }
 
-export async function purchaseEquipment({ db, familyId, itemId, actionId }) {
+export async function purchaseEquipment({ db, familyId, itemId, quantity = 1, actionId }) {
+  validateResourceQuantity(quantity);
   const item = getEquipmentCatalogItem(itemId);
   if (!item) throw failure('ITEM_NOT_FOUND');
+  if (!hasEquipmentPrice(item)) throw failure('ITEM_NOT_FOR_SALE');
   const now = Date.now();
   return applyAction({ db, familyId, actionId, requiresClearRewardIntegrity: true, makeChange: (profile) => preparePurchase({ profile, item, actionId, now }) });
 }
@@ -104,4 +116,14 @@ export async function unequipSlot({ db, familyId, slot, actionId }) {
   if (!EQUIPMENT_SLOTS.includes(slot)) throw failure('INVALID_EQUIPMENT_SLOT');
   const now = Date.now();
   return applyAction({ db, familyId, actionId, makeChange: (profile) => prepareUnequip({ profile, slot, actionId, now }) });
+}
+
+export function prepareResourcePurchase({ profile, itemId, quantity = 1, actionId, now }) {
+  return prepareResourceTransaction({ profile, offer: getResourceShopItem(itemId), quantity, actionId, now, type: 'resource_purchase', catalogVersion: RESOURCE_SHOP_CATALOG_VERSION });
+}
+export async function purchaseResource({ db, familyId, itemId, quantity = 1, actionId }) {
+  validateResourceQuantity(quantity);
+  if (!getResourceShopItem(itemId)) throw failure('ITEM_NOT_FOUND');
+  const now = Date.now();
+  return applyAction({ db, familyId, actionId, requiresClearRewardIntegrity: true, makeChange: profile => prepareResourcePurchase({ profile, itemId, quantity, actionId, now }) });
 }

@@ -13,7 +13,7 @@ import { activeTimerRef, finishActiveTimer, heartbeatActiveTimer, invalidateStal
 import { studySessionsCollection } from './data/studySessionRepository';
 import { applyStudySessionReward, emptyPlayerProfile, playerProfileRef, rewardLedgerRef, updateSelectedTitle } from './data/rewardLedgerRepository';
 import { correctStudySessionReward, retryPendingRewardCorrection, rewardIntegrityRef } from './data/rewardCorrectionRepository';
-import { createRpgActionId, equipItem, purchaseEquipment, unequipSlot } from './data/rpgShopRepository';
+import { createRpgActionId, equipItem, purchaseEquipment, purchaseResource, unequipSlot } from './data/rpgShopRepository';
 import { createMaterialExchangeActionId, exchangeMaterial } from './data/rpgMaterialExchangeRepository';
 import { attackBattle, createBattleActionId, createBattleId, rpgBattleRef, startBattle, startBossBattle, startTowerBattle, startWeeklyBossBattle, useBattleSkill as runBattleSkill } from './data/rpgBattleRepository';
 import { saveParty } from './data/rpgPartyRepository';
@@ -33,7 +33,6 @@ import { normalizePlayerProfile } from './rpg/playerProfile';
 import { getQuest } from './rpg/questCatalog';
 import { normalizeQuestState } from './rpg/questState';
 import { isStudySessionRewardEligible } from './rpg/rewardCalculator';
-import { MATERIAL_DEFS } from './rpg/rewardConfig';
 import { shouldUseLegacyRpgUi } from './rpg/legacyRpgUi';
 import { deriveAchievements, deriveUnlockedTitles, getSelectedUnlockedTitle, isTitleUnlocked } from './rpg/achievementSelectors';
 import { personalStudyTargets, confirmedGoalProfile } from './personalStudyGoals';
@@ -43,6 +42,7 @@ import RpgWalletPanel from './components/rpg/RpgWalletPanel';
 import FeedbackOverlay from './components/feedback/FeedbackOverlay';
 import { feedbackSession, idleStopFeedback, studyFeedback, progressFeedback, battleFeedback } from './feedback/feedbackEvents';
 import LazyPanel from './components/common/LazyPanel';
+import { getResourceShopItem } from './rpg/resourceShopCatalog';
 import PurchaseConfirmModal from './components/rpg/PurchaseConfirmModal';
 import MaterialExchangeConfirmModal from './components/rpg/MaterialExchangeConfirmModal';
 import QuestTreasureResult from './components/rpg/QuestTreasureResult';
@@ -107,7 +107,7 @@ const getTasksCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-
 const getTestsCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tests');
 const getStudySessionsCol = () => studySessionsCollection(db, FAMILY_ID);
 const getActiveTimerRef = () => activeTimerRef(db, FAMILY_ID);
-const APP_VERSION = 'v2.9.1';
+const APP_VERSION = 'v2.9.2';
 const isDocumentHidden = () => typeof document !== 'undefined' && document.hidden;
 // ==========================================
 // Constants & Master Data
@@ -868,6 +868,8 @@ export default function App() {
     const [rpgStatus, setRpgStatus] = useState(null);
     const [pendingPurchaseItemId, setPendingPurchaseItemId] = useState(null);
     const [pendingMaterialExchange, setPendingMaterialExchange] = useState(false);
+    const purchasePendingRef = useRef(false);
+    const exchangePendingRef = useRef(false);
     const [pendingEquipmentAction, setPendingEquipmentAction] = useState(null);
     const [activeBattle, setActiveBattle] = useState(null);
     const [lastBattle, setLastBattle] = useState(null);
@@ -1305,42 +1307,49 @@ export default function App() {
         INSUFFICIENT_TICKETS: 'チケットが足りません',
         INSUFFICIENT_FRAGMENTS: 'スターのかけらが足りません',
         INSUFFICIENT_ALCHEMY_MATERIALS: '錬金素材が足りません',
+        ITEM_NOT_FOR_SALE: 'この装備は錬金専用です',
+        INVALID_QUANTITY: '取引数量を確認してください',
         EQUIPMENT_ALREADY_OWNED: 'この装備はすでに所持しています',
     }[error?.code || error?.message] || '操作に失敗しました。もう一度お試しください。');
     const handlePurchaseRequest = (item) => {
         if (isSampleMode || !user || pendingPurchaseItemId) return;
         setRpgStatus(null);
-        setPurchaseCandidate(item);
+        setPurchaseCandidate({ ...item, actionId: createRpgActionId('purchase') });
     };
-    const handleMaterialExchangeRequest = ({ sourceMaterialKey, targetMaterialKey }) => {
+    const handleMaterialExchangeRequest = ({ sourceMaterialKey, targetMaterialKey, recipeId }) => {
         if (isSampleMode || !user || pendingMaterialExchange) return;
         setRpgStatus(null);
-        setExchangeCandidate({ sourceMaterialKey, targetMaterialKey });
+        setExchangeCandidate({ sourceMaterialKey, targetMaterialKey, recipeId, actionId: createMaterialExchangeActionId() });
     };
     const handleMaterialExchangeConfirm = async () => {
-        if (!exchangeCandidate || isSampleMode || !user || pendingMaterialExchange) return;
+        if (!exchangeCandidate || isSampleMode || !user || exchangePendingRef.current) return;
+        exchangePendingRef.current = true;
         setPendingMaterialExchange(true);
         try {
-            const result = await exchangeMaterial({ db, familyId: FAMILY_ID, ...exchangeCandidate, actionId: createMaterialExchangeActionId() });
+            const result = await exchangeMaterial({ db, familyId: FAMILY_ID, ...exchangeCandidate });
             setExchangeCandidate(null);
-            setRpgStatus(result.applied ? { kind: 'success', message: `${MATERIAL_DEFS[exchangeCandidate.targetMaterialKey]?.label || '素材'}を1個手に入れました！` } : { kind: 'error', message: rpgErrorMessage({ code: result.reason }) });
+            setRpgStatus(result.applied ? { kind: 'success', message: '交換が完了しました！' } : { kind: 'error', message: rpgErrorMessage({ code: result.reason }) });
         } catch (error) {
             setRpgStatus({ kind: 'error', message: rpgErrorMessage(error) });
         } finally {
+            exchangePendingRef.current = false;
             setPendingMaterialExchange(false);
         }
     };
     const handlePurchaseConfirm = async () => {
-        if (!purchaseCandidate || isSampleMode || !user || pendingPurchaseItemId) return;
+        if (!purchaseCandidate || isSampleMode || !user || purchasePendingRef.current) return;
+        purchasePendingRef.current = true;
         const item = purchaseCandidate;
         setPendingPurchaseItemId(item.id);
         try {
-            const result = await purchaseEquipment({ db, familyId: FAMILY_ID, itemId: item.id, actionId: createRpgActionId('purchase') });
+            const buy = getResourceShopItem(item.id) ? purchaseResource : purchaseEquipment;
+            const result = await buy({ db, familyId: FAMILY_ID, itemId: item.id, actionId: item.actionId });
             setPurchaseCandidate(null);
             setRpgStatus(result.applied ? { kind: 'success', message: `${item.name}を購入しました` } : { kind: 'error', message: rpgErrorMessage({ code: result.reason }) });
         } catch (error) {
             setRpgStatus({ kind: 'error', message: rpgErrorMessage(error) });
         } finally {
+            purchasePendingRef.current = false;
             setPendingPurchaseItemId(null);
         }
     };
@@ -2302,8 +2311,8 @@ export default function App() {
           </div>
         </div>)}
         {!isSampleMode && <FeedbackOverlay />}
-        <PurchaseConfirmModal item={purchaseCandidate} profile={playerProfile} purchasing={Boolean(pendingPurchaseItemId)} onCancel={() => !pendingPurchaseItemId && setPurchaseCandidate(null)} onConfirm={handlePurchaseConfirm}/>
-        <MaterialExchangeConfirmModal exchange={exchangeCandidate} profile={playerProfile} exchanging={pendingMaterialExchange} onCancel={() => !pendingMaterialExchange && setExchangeCandidate(null)} onConfirm={handleMaterialExchangeConfirm}/>
+        <PurchaseConfirmModal error={rpgStatus?.kind === 'error' ? rpgStatus.message : null} item={purchaseCandidate} profile={playerProfile} purchasing={Boolean(pendingPurchaseItemId)} onCancel={() => !pendingPurchaseItemId && setPurchaseCandidate(null)} onConfirm={handlePurchaseConfirm}/>
+        <MaterialExchangeConfirmModal error={rpgStatus?.kind === 'error' ? rpgStatus.message : null} exchange={exchangeCandidate} profile={playerProfile} exchanging={pendingMaterialExchange} onCancel={() => !pendingMaterialExchange && setExchangeCandidate(null)} onConfirm={handleMaterialExchangeConfirm}/>
         <StudyTimeReviewModal key={timeReviewSession?.id || 'none'} session={timeReviewSession} subjectLabel={timeReviewSession ? getTaskMeta(timeReviewSession.taskSnapshot).subjectLabel : ''} busy={Boolean(timeReviewSession && reviewBusySessionIds[timeReviewSession.id])} error={reviewError} onClose={() => { if (!timeReviewSession || !timeReviewSubmittingRef.current.has(timeReviewSession.id)) { setTimeReviewSession(null); setReviewError(null); } }} onSubmit={handleTimeConfirmation}/>
         <HistoryCorrectionModal key={`${historyCorrectionSession?.id || 'none'}-${historyCorrectionDecision}`} session={historyCorrectionSession} initialDecision={historyCorrectionDecision} busy={Boolean(historyCorrectionSession && reviewBusySessionIds[historyCorrectionSession.id])} error={reviewError} onClose={() => { if (!historyCorrectionSession || !reviewBusySessionIds[historyCorrectionSession.id]) { setHistoryCorrectionSession(null); setReviewError(null); } }} onSubmit={handleHistoryCorrection}/>
 

@@ -1,3 +1,5 @@
+import { purchaseResource } from '../../src/data/rpgShopRepository.js';
+import { exchangeMaterial } from '../../src/data/rpgMaterialExchangeRepository.js';
 import { readFileSync } from 'node:fs';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { assertFails, assertSucceeds, initializeTestEnvironment } from '@firebase/rules-unit-testing';
@@ -112,5 +114,49 @@ describe('Firestore Security Rules', () => {
     await assertSucceeds(setDoc(fixed, { value: 1 })); await assertSucceeds(getDoc(fixed)); await assertSucceeds(updateDoc(fixed, { value: 2 })); await assertFails(deleteDoc(fixed));
     const anonymous = ref(anonymousDb(), towerPath); await assertFails(getDoc(anonymous)); await assertFails(setDoc(anonymous, { value: 1 })); await assertFails(updateDoc(anonymous, { value: 2 }));
     const other = ref(userDb('other-user'), appPath('other-family', 'rpgTowerProgress', 'current')); await assertFails(getDoc(other)); await assertFails(setDoc(other, { value: 1 })); await assertFails(updateDoc(other, { value: 2 }));
+  });
+});
+
+describe('v2.9.2 real Firestore commerce transactions', () => {
+  it('deduplicates the same purchase action across two clients and keeps its ledger immutable', async () => {
+    await seedDoc(appPath(appFamilyId, 'rpg', 'playerProfile'), { gold: 90, materials: { iron: 0 }, future: { keep: true } });
+    const args = { familyId: appFamilyId, itemId: 'material_iron', actionId: 'same-buy' };
+    const results = await Promise.all([purchaseResource({ ...args, db: userDb('device-a') }), purchaseResource({ ...args, db: userDb('device-b') })]);
+    expect(results.map(result => result.applied).sort()).toEqual([false, true]);
+    const profile = (await getDoc(ref(userDb(), appPath(appFamilyId, 'rpg', 'playerProfile')))).data();
+    expect(profile).toMatchObject({ gold: 60, materials: { iron: 1 }, future: { keep: true } });
+    const ledger = ref(userDb(), appPath(appFamilyId, 'rpgActionLedger', 'same-buy'));
+    expect((await getDoc(ledger)).data()).toMatchObject({ type: 'resource_purchase', cost: { gold: 30 }, receive: { materials: { iron: 1 } } });
+    await assertFails(updateDoc(ledger, { cost: { gold: 0 } }));
+  });
+  it('prevents distinct concurrent purchases from overspending while permitting funded repeats', async () => {
+    const profileRef = ref(userDb(), appPath(appFamilyId, 'rpg', 'playerProfile'));
+    await seedDoc(appPath(appFamilyId, 'rpg', 'playerProfile'), { gold: 30 });
+    const args = { familyId: appFamilyId, itemId: 'material_iron' };
+    const results = await Promise.allSettled([purchaseResource({ ...args, db: userDb('a'), actionId: 'first' }), purchaseResource({ ...args, db: userDb('b'), actionId: 'second' })]);
+    expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(1);
+    expect(results.find(result => result.status === 'rejected').reason.code).toBe('INSUFFICIENT_GOLD');
+    expect((await getDoc(profileRef)).data()).toMatchObject({ gold: 0, materials: { iron: 1 } });
+    await updateDoc(profileRef, { gold: 60 });
+    await Promise.all([purchaseResource({ ...args, db: userDb('a'), actionId: 'third' }), purchaseResource({ ...args, db: userDb('b'), actionId: 'fourth' })]);
+    expect((await getDoc(profileRef)).data()).toMatchObject({ gold: 0, materials: { iron: 3 } });
+  });
+  it('atomically exchanges materials for GOLD and alchemy items without duplicate consumption', async () => {
+    await seedDoc(appPath(appFamilyId, 'rpg', 'playerProfile'), { gold: 0, materials: { iron: 9, mineral: 6 }, gacha: { alchemyItems: { dragon_scale: 1 } } });
+    const args = { familyId: appFamilyId, recipeId: 'gold_iron', actionId: 'same-trade' };
+    const results = await Promise.all([exchangeMaterial({ ...args, db: userDb('a') }), exchangeMaterial({ ...args, db: userDb('b') })]);
+    expect(results.map(result=>result.applied).sort()).toEqual([false,true]);
+    await exchangeMaterial({ db: userDb(), familyId: appFamilyId, recipeId: 'trade_silver_ore', actionId: 'silver' });
+    expect((await getDoc(ref(userDb(), appPath(appFamilyId, 'rpg', 'playerProfile')))).data()).toMatchObject({ gold: 15, materials: { iron: 0, mineral: 0 }, gacha: { alchemyItems: { silver_ore: 1, dragon_scale: 1 } } });
+    expect((await getDoc(ref(userDb(), appPath(appFamilyId, 'rpgExchangeLedger', 'silver')))).data()).toMatchObject({ cost: { materials: { iron: 6, mineral: 6 } }, receive: { alchemyItems: { silver_ore: 1 } } });
+  });
+  it('blocks commerce during pending correction and rejects anonymous access without writes', async () => {
+    await seedDoc(appPath(appFamilyId, 'rpg', 'playerProfile'), { gold: 90, materials: { iron: 6 } });
+    await seedDoc(appPath(appFamilyId, 'rewardIntegrity', 'current'), { pendingSessionIds: ['pending'] });
+    await expect(purchaseResource({ db: userDb(), familyId: appFamilyId, itemId: 'material_iron', actionId: 'blocked' })).rejects.toThrow('REWARD_CORRECTION_PENDING');
+    await expect(exchangeMaterial({ db: userDb(), familyId: appFamilyId, recipeId: 'gold_iron', actionId: 'blocked' })).rejects.toThrow('REWARD_CORRECTION_PENDING');
+    await assertFails(purchaseResource({ db: anonymousDb(), familyId: appFamilyId, itemId: 'material_iron', actionId: 'anonymous' }));
+    expect((await getDoc(ref(userDb(), appPath(appFamilyId, 'rpg', 'playerProfile')))).data()).toMatchObject({ gold: 90, materials: { iron: 6 } });
+    expect((await getDoc(ref(userDb(), appPath(appFamilyId, 'rpgActionLedger', 'blocked')))).exists()).toBe(false);
   });
 });
