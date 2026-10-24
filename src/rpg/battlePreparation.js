@@ -1,3 +1,4 @@
+import { statAllocationStats, SKILL_MP_COSTS } from './statAllocation.js';
 import { normalizePlayerProfile } from './playerProfile.js';
 import { buildTowerPartySnapshot, validatePartyMemberIds } from './partyMemberCatalog.js';
 import { calculatePlayerAttack, calculatePlayerDefense, calculatePlayerMaxHp } from './battleCalculator.js';
@@ -74,7 +75,7 @@ export function buildBattlePreparation({ profile, candidate, towerProgress }) {
   const target = candidate.isWeekly ? getWeeklyBossDefinition(candidate.weekId) : candidate.isBoss ? getBoss(candidate.id) : getEnemyCatalogItem(candidate.id);
   const enemies = encounter?.enemies || (target ? [target] : []);
   if (!enemies.length) return null;
-  const members = solo ? [{ memberId: 'hero', name: '主人公', role: 'バランス型', ...playerStats(safe), skills: Object.values(SKILL_CATALOG) }] : buildTowerPartySnapshot(safe);
+  const members = solo ? [{ memberId: 'hero', name: '主人公', role: 'バランス型', maxMp: statAllocationStats(safe).maxMp, ...playerStats(safe), skills: Object.values(SKILL_CATALOG).map(skill => ({ ...skill, mpCost: SKILL_MP_COSTS[skill.id] })) }] : buildTowerPartySnapshot(safe);
   const affinities = enemySkillAffinities(enemies, members);
   const equipment = EQUIPMENT_SLOTS.map(slot => {
     const item = EQUIPMENT_CATALOG[safe.equipped[slot]];

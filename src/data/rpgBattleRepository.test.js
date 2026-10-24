@@ -156,6 +156,9 @@ describe('battle transaction logic', () => {
   });
   it('keeps the legacy Orc Chief snapshot beatable with the existing two Heals and deterministic skill sequence', () => {
     const start = prepareBattleStart({ profile: { battleEnergy: 3 }, enemy: { ...BOSS_CATALOG.orc_chief, maxHp: 58, attack: 5 }, battleId: 'bare-orc', now, battleKind: 'boss', bossId: 'orc_chief' });
+    // Saved pre-MP battle: factory now creates new MP battles.
+    delete start.battle.mpRulesVersion;
+    delete start.battle.playerMp;
     let battle = start.battle;
     const skillTurn = (skillId, useNumber, actionId) => {
       const skill = battle.playerSnapshot.skills[skillId];

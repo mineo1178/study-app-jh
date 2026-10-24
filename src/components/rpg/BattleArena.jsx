@@ -1,4 +1,5 @@
 import { battleHeadingLabel, battleHpPercent, canUseBattleActions, getBattleSkillEntries } from '../../rpg/battleUiLogic.js';
+import BattleMpBar from './BattleMpBar.jsx';
 import BattleSkillList from './BattleSkillList.jsx';
 import BattleFeedback from './BattleFeedback.jsx';
 import { ELEMENT_LABELS } from '../../rpg/elementConfig.js';
@@ -20,6 +21,7 @@ export default function BattleArena({ battle, onAttack, onSkill, attacking, feed
     <p className="mt-5 text-sm font-bold text-indigo-100">攻撃力 {battle.playerSnapshot?.attack || 5} ・ 防御力 {battle.playerSnapshot?.defense || 0}（戦闘開始時）</p>
     <p className="mt-2 text-xs text-indigo-100">{canAct ? '行動可能' : attacking ? '行動を処理中です' : '現在は行動できません'} ・ 攻撃対象：{battle.enemySnapshot?.name || '敵'}</p>
     <button type="button" disabled={!canAct} onClick={onAttack} className="mt-6 w-full rounded-xl bg-rose-500 py-4 text-base font-black text-white disabled:bg-slate-500">{attacking ? '行動中…' : '通常攻撃'}</button>
+    <BattleMpBar battle={battle}/>
     <BattleSkillList battle={battle} skills={getBattleSkillEntries(battle)} attacking={attacking} onSkill={onSkill}/>
     <BattleFeedback feedback={feedback}/>
   </section>;

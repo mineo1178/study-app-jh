@@ -34,7 +34,7 @@ describe('preparation presentation', () => {
   });
   it('shows real party stats, Japanese skills, a preview and locked members', () => {
     const html = render(<PartyPanel profile={profile}/>);
-    for (const text of ['HP 40 / 攻撃力 10 / 防御力 0', '守護の壁', 'ファイアストーム', 'ヒーリングプレア', '受けるダメージを60%軽減', '合計HP', '合計攻撃力', '参考情報', '主人公は固定', '未解放', '保存済み：編成中', 'この編成で保存']) expect(html).toContain(text);
+    for (const text of ['HP 40 / MP 8 / 攻撃力 10 / 防御力 0', '守護の壁', 'ファイアストーム', 'ヒーリングプレア', '受けるダメージを60%軽減', '合計HP', '合計攻撃力', '参考情報', '主人公は固定', '未解放', '保存済み：編成中', 'この編成で保存']) expect(html).toContain(text);
     expect(html).not.toContain('guardian_wall');
     expect(html).not.toContain('flame_slash');
     allButtonsDisabled(render(<PartyPanel profile={profile} locked/>));

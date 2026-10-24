@@ -1,4 +1,5 @@
 /* global process */
+import { battleMpCost } from '../src/rpg/statAllocation.js';
 import { pathToFileURL } from 'node:url';
 import { ENEMY_CATALOG } from '../src/rpg/enemyCatalog.js';
 import { BOSS_CATALOG } from '../src/rpg/bossCatalog.js';
@@ -39,7 +40,7 @@ function partyAction(battle, policy) {
   const target = [...living].sort((a,b) => a.hp - b.hp)[0];
   const normal = { targetEnemyInstanceId: target.enemyInstanceId };
   if (policy === 'normal') return normal;
-  const skills = actor.skills.filter(skill => (battle.skillUses[partySkillKey(actor.memberId, skill.id)] || 0) < skill.maxUses);
+  const skills = actor.skills.filter(skill => (battle.skillUses[partySkillKey(actor.memberId, skill.id)] || 0) < skill.maxUses && (actor.memberId !== 'hero' || !battle.mpRulesVersion || battle.playerMp >= battleMpCost(battle, skill)));
   const wounded = battle.partyStates.filter(state => state.status === 'active').map(state => ({ ...state, maxHp: battle.partySnapshot.members.find(member => member.memberId === state.memberId).maxHp })).sort((a,b) => a.hp/a.maxHp - b.hp/b.maxHp);
   const heal = skills.find(skill => skill.kind === 'heal');
   if (heal && wounded[0]?.hp < wounded[0]?.maxHp * .55) return { skillId: heal.id, targetMemberId: wounded[0].memberId };
@@ -61,10 +62,12 @@ function partyAction(battle, policy) {
   return action;
 }
 
-export function simulateBattle(player, scenario, policy = 'strategy') {
+export function simulateBattle(player, scenario, policy = 'strategy', { mpRules = false } = {}) {
   let battle = scenario.enemy
     ? prepareBattleStart({ profile: player, enemy: scenario.enemy, battleId: 'simulation', now: 1, battleKind: scenario.boss ? 'boss' : 'normal' }).battle
-    : createPartyBattle({ battleId: 'simulation', encounter: scenario.encounter, members: buildTowerPartySnapshot(player), now: 1, battleKind: scenario.encounter.boss ? 'boss' : 'normal' });
+    : createPartyBattle({ mpRulesVersion: mpRules ? 1 : null, battleId: 'simulation', encounter: scenario.encounter, members: buildTowerPartySnapshot(player), now: 1, battleKind: scenario.encounter.boss ? 'boss' : 'normal' });
+  // Keep the v2.9.1 baseline reproducible; explicitly opt in for the new MP matrix.
+  if (!mpRules) { delete battle.mpRulesVersion; delete battle.playerMp; }
   const initial = structuredClone(battle);
   let actions = 0, damage = 0, enemyActions = 0, heals = 0, guards = 0;
   while (battle.status === 'active' && actions < 300) {
@@ -73,7 +76,7 @@ export function simulateBattle(player, scenario, policy = 'strategy') {
       let action = { kind: 'normal_attack', damage: null };
       if (policy === 'strategy') {
         const actor = battle.playerSnapshot;
-        const skills = Object.values(actor.skills).filter(skill => (battle.skillUses[skill.id] || 0) < skill.maxUses);
+        const skills = Object.values(actor.skills).filter(skill => (battle.skillUses[skill.id] || 0) < skill.maxUses && (!battle.mpRulesVersion || battle.playerMp >= battleMpCost(battle, skill)));
         const heal = skills.find(skill => skill.kind === 'heal');
         const enemyAction = enemyActionForTurn(battle.enemySnapshot.actionPattern, battle.attackCount + 1);
         const incoming = calculateEnemyActionDamage({ enemyAttack: battle.enemySnapshot.attack, powerPercent: enemyAction.powerPercent, playerDefense: actor.defense }).damage;
@@ -107,7 +110,7 @@ export function simulateBattle(player, scenario, policy = 'strategy') {
   const hp = scenario.enemy ? battle.playerHp : battle.partyStates.reduce((sum,state) => sum + state.hp, 0);
   const maxHp = scenario.enemy ? initial.playerHp : initial.partyStates.reduce((sum,state) => sum + state.hp, 0);
   const turns = scenario.enemy ? actions : battle.status === 'active' ? battle.roundNumber - 1 : battle.roundNumber;
-  return { status: battle.status, winRate: battle.status === 'won' ? 100 : 0, turns, oneTurnRate: battle.status === 'won' && turns === 1 ? 100 : 0, hp, hpPercent: Math.round(hp/maxHp*1000)/10, damage, enemyActions, heals, guards, unhurt: damage === 0, actions };
+  return { ...(mpRules ? { mpRemaining: battle.playerMp, maxMp: initial.playerSnapshot?.maxMp ?? initial.partySnapshot?.members.find(member => member.memberId === 'hero').maxMp, heroSkillUses: Object.entries(battle.skillUses).filter(([key]) => !key.includes(':') || key.startsWith('hero:')).reduce((sum, [,used]) => sum + used, 0) } : {}), status: battle.status, winRate: battle.status === 'won' ? 100 : 0, turns, oneTurnRate: battle.status === 'won' && turns === 1 ? 100 : 0, hp, hpPercent: Math.round(hp/maxHp*1000)/10, damage, enemyActions, heals, guards, unhurt: damage === 0, actions };
 }
 
 export function measureBalance() {

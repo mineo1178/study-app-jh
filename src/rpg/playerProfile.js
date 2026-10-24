@@ -16,6 +16,7 @@ export const createEmptyPlayerProfile = () => ({
   equipped: { ...EMPTY_EQUIPMENT },
   totalExp: 0,
   level: 1,
+  statAllocation: { hp: 0, mp: 0 },
   activeBattleId: null,
   partyMemberIds: [...DEFAULT_PARTY_MEMBER_IDS],
   unlockedPartyMemberIds: [...STARTER_PARTY_MEMBER_IDS],

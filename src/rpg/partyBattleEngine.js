@@ -1,3 +1,4 @@
+import { MP_RULES_VERSION, consumeBattleMp } from './statAllocation.js';
 import { calculateEnemyActionDamage, calculateHealAmount, calculateSkillDamage, getElementMultiplier } from './battleCalculator.js';
 import { enemyActionForTurn, getEnemyAction } from './enemyActionCatalog.js';
 
@@ -15,9 +16,10 @@ const snapshotEnemyActions = (pattern) => {
   });
 };
 
-export function createPartyBattle({ battleId, floor = null, encounter, members, now, battleKind, battleMode = 'tower', schemaVersion = 8, weeklyBossSnapshot = null }) {
+export function createPartyBattle({ battleId, floor = null, encounter, members, now, battleKind, battleMode = 'tower', schemaVersion = 8, weeklyBossSnapshot = null, mpRulesVersion = null }) {
   const enemySnapshots = encounter.enemies.map((enemy) => ({ ...enemy, actionPattern: snapshotEnemyActions(enemy.actionPattern) }));
   return {
+    ...(mpRulesVersion === MP_RULES_VERSION ? { mpRulesVersion, playerMp: members.find(member => member.memberId === 'hero').maxMp } : {}),
     schemaVersion, battleId, battleKind, battleMode, ...(floor ? { towerFloor: floor, towerRulesVersion: encounter.rulesVersion } : {}), ...(weeklyBossSnapshot ? { weeklyBossSnapshot } : {}),
     encounterSnapshot: { floor, rulesVersion: encounter.rulesVersion, energyCost: encounter.energyCost, expReward: encounter.expReward, enemies: enemySnapshots },
     partySnapshot: { members }, partyStates: members.map((member) => ({ memberId: member.memberId, hp: member.maxHp, status: 'active', guardPercent: 0 })),
@@ -55,6 +57,8 @@ export function preparePartyBattleAction({ battle, action, now }) {
   if (!['single_enemy', 'all_enemies', 'self', 'single_ally', 'all_allies'].includes(targetType)) fail('INVALID_BATTLE_TARGET');
   const targetEnemy = action.targetEnemyInstanceId ? enemyStates.find((state) => state.enemyInstanceId === action.targetEnemyInstanceId) : null;
   const targetAlly = action.targetMemberId ? partyStates.find((state) => state.memberId === action.targetMemberId) : null;
+  if (battle.mpRulesVersion === MP_RULES_VERSION && action.targetEnemyInstanceId && (!targetEnemy || !alive(targetEnemy))) fail('INVALID_BATTLE_TARGET');
+  if (battle.mpRulesVersion === MP_RULES_VERSION && action.targetMemberId && (!targetAlly || !alive(targetAlly))) fail('INVALID_BATTLE_TARGET');
   const event = { actorId, actionKind: skill ? 'skill' : 'normal_attack', ...(skill ? { skillId: skill.id } : {}) };
   if (targetType === 'single_enemy') {
     const only = enemyStates.filter(alive); const target = targetEnemy || (only.length === 1 ? only[0] : null);
@@ -69,9 +73,11 @@ export function preparePartyBattleAction({ battle, action, now }) {
     if (targets.every((target) => target.hp >= memberFor(battle, target.memberId).maxHp)) fail('HEAL_NOT_NEEDED');
     targets.forEach((target) => { const member = memberFor(battle, target.memberId); const healed = calculateHealAmount({ playerMaxHp: member.maxHp, playerHp: target.hp, healPercent: skill.healPercent }); partyStates = partyStates.map((state) => state.memberId === target.memberId ? { ...state, hp: healed.playerHpAfterHeal } : state); actionEffects.push({ kind: 'heal', targetId: target.memberId, actualHeal: healed.actualHeal }); }); event.targetType = targetType;
   }
+  const mpPatch = consumeBattleMp(battle, skill, actorId);
+  if (Object.hasOwn(mpPatch, 'playerMp')) event.mp = { before: battle.playerMp, after: mpPatch.playerMp, cost: battle.playerMp - mpPatch.playerMp };
   const skillUses = skill ? { ...battle.skillUses, [usesKey]: n(battle.skillUses?.[usesKey]) + 1 } : battle.skillUses;
-  if (enemyStates.every((state) => !alive(state))) return { battle: { ...battle, partyStates, enemyStates, skillUses, status: 'won', activePartyMemberId: null, updatedAt: now, victory: { actionId: action.actionId, grantedAt: now } }, event, actionEffects, enemyEvents: [] };
+  if (enemyStates.every((state) => !alive(state))) return { battle: { ...battle, ...mpPatch, partyStates, enemyStates, skillUses, status: 'won', activePartyMemberId: null, updatedAt: now, victory: { actionId: action.actionId, grantedAt: now } }, event, actionEffects, enemyEvents: [] };
   const acted = [...battle.actedMemberIds, actorId]; let next = nextActor(battle, partyStates, acted); let round = battle.roundNumber; let enemyEvents = [];
-  if (!next) { const phase = resolveEnemyPhase(battle, partyStates, enemyStates, round); partyStates = phase.partyStates; enemyEvents = phase.events; if (partyStates.every((state) => !alive(state))) return { battle: { ...battle, partyStates, enemyStates, skillUses, actedMemberIds: acted, activePartyMemberId: null, status: 'lost', updatedAt: now, defeat: { actionId: action.actionId, defeatedAt: now } }, event, actionEffects, enemyEvents }; round += 1; next = nextActor(battle, partyStates, []); return { battle: { ...battle, partyStates, enemyStates, skillUses, roundNumber: round, actedMemberIds: [], activePartyMemberId: next, updatedAt: now }, event, actionEffects, enemyEvents }; }
-  return { battle: { ...battle, partyStates, enemyStates, skillUses, actedMemberIds: acted, activePartyMemberId: next, updatedAt: now }, event, actionEffects, enemyEvents };
+  if (!next) { const phase = resolveEnemyPhase(battle, partyStates, enemyStates, round); partyStates = phase.partyStates; enemyEvents = phase.events; if (partyStates.every((state) => !alive(state))) return { battle: { ...battle, ...mpPatch, partyStates, enemyStates, skillUses, actedMemberIds: acted, activePartyMemberId: null, status: 'lost', updatedAt: now, defeat: { actionId: action.actionId, defeatedAt: now } }, event, actionEffects, enemyEvents }; round += 1; next = nextActor(battle, partyStates, []); return { battle: { ...battle, ...mpPatch, partyStates, enemyStates, skillUses, roundNumber: round, actedMemberIds: [], activePartyMemberId: next, updatedAt: now }, event, actionEffects, enemyEvents }; }
+  return { battle: { ...battle, ...mpPatch, partyStates, enemyStates, skillUses, actedMemberIds: acted, activePartyMemberId: next, updatedAt: now }, event, actionEffects, enemyEvents };
 }

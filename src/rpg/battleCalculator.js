@@ -1,8 +1,9 @@
+import { statAllocationStats } from './statAllocation.js';
 import { EQUIPMENT_CATALOG, EQUIPMENT_SLOTS } from './equipmentCatalog.js';
 import { normalizePlayerProfile } from './playerProfile.js';
 
 export const BASE_PLAYER_ATTACK = 5;
-export const BASE_PLAYER_MAX_HP = 40;
+export { BASE_PLAYER_MAX_HP } from './statAllocation.js';
 export const BASE_PLAYER_DEFENSE = 0;
 
 export const calculatePlayerAttack = (profile) => {
@@ -22,7 +23,7 @@ export const calculateAttackResult = (enemyHp, attack) => {
   return { damage, hpBefore, hpAfter, victory: hpAfter === 0 };
 };
 export const calculatePlayerDefense = (profile) => { const safe = normalizePlayerProfile(profile || {}); return BASE_PLAYER_DEFENSE + EQUIPMENT_SLOTS.reduce((total, slot) => { const id = safe.equipped[slot]; const item = EQUIPMENT_CATALOG[id]; return total + (item && item.slot === slot && safe.ownedEquipment[id] ? Math.max(0, Number(item.stats?.defense) || 0) : 0); }, 0); };
-export const calculatePlayerMaxHp = () => BASE_PLAYER_MAX_HP;
+export const calculatePlayerMaxHp = profile => statAllocationStats(profile).maxHp;
 export const calculateEnemyActionDamage = ({ enemyAttack, powerPercent = 100, playerDefense }) => {
   const attack = Math.max(0, Number(enemyAttack) || 0);
   const poweredAttack = Math.floor(attack * Math.max(0, Number(powerPercent) || 0) / 100);

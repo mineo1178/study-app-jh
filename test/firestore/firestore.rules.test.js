@@ -1,3 +1,6 @@
+import { saveStatAllocation } from '../../src/data/rpgStatAllocationRepository.js';
+import { startBattle, useBattleSkill } from '../../src/data/rpgBattleRepository.js';
+import { totalExpForLevel } from '../../src/rpg/levelSystem.js';
 import { purchaseResource } from '../../src/data/rpgShopRepository.js';
 import { exchangeMaterial } from '../../src/data/rpgMaterialExchangeRepository.js';
 import { readFileSync } from 'node:fs';
@@ -158,5 +161,66 @@ describe('v2.9.2 real Firestore commerce transactions', () => {
     await assertFails(purchaseResource({ db: anonymousDb(), familyId: appFamilyId, itemId: 'material_iron', actionId: 'anonymous' }));
     expect((await getDoc(ref(userDb(), appPath(appFamilyId, 'rpg', 'playerProfile')))).data()).toMatchObject({ gold: 90, materials: { iron: 6 } });
     expect((await getDoc(ref(userDb(), appPath(appFamilyId, 'rpgActionLedger', 'blocked')))).exists()).toBe(false);
+  });
+});
+
+// Real emulator transactions: no mocks, includes contention/retry against the shared profile.
+describe('stat allocation emulator transactions', () => {
+  const profilePath = appPath(appFamilyId, 'rpg', 'playerProfile');
+  const base = () => ({ gold: 300, totalExp: totalExpForLevel(10), battleEnergy: 30, statAllocation: { hp: 6, mp: 3 }, custom: { retained: true } });
+  const request = p => ({ familyId: appFamilyId, allocation: { hp: 3, mp: 6 }, expected: { ...p.statAllocation, totalExp: p.totalExp, gold: p.gold } });
+  it('deduplicates simultaneous paid allocation across devices and preserves unrelated profile fields', async () => {
+    const p = base(); await seedDoc(profilePath, p);
+    const results = await Promise.all(['a','b'].map(uid => saveStatAllocation({ ...request(p), db: userDb(uid), actionId: 'same-stat-action' })));
+    expect(results.filter(result => result.applied)).toHaveLength(1);
+    const saved = (await getDoc(ref(userDb(), profilePath))).data();
+    expect(saved).toMatchObject({ gold: 180, statAllocation: { hp: 3, mp: 6 }, custom: p.custom });
+    expect((await getDoc(ref(userDb(), appPath(appFamilyId, 'rpgActionLedger', 'same-stat-action')))).data()).toMatchObject({ cost: { gold: 120 }, before: p.statAllocation });
+  });
+  it('accepts only one competing allocation with different IDs against the same baseline', async () => {
+    const p = base(); await seedDoc(profilePath, p);
+    const results = await Promise.allSettled(['a','b'].map((uid,index) => saveStatAllocation({ ...request(p), allocation: { hp: index + 1, mp: 8 - index }, db: userDb(uid), actionId: 'competing-' + uid })));
+    expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(1);
+    expect(results.find(result => result.status === 'rejected').reason.code).toBe('STAT_PROFILE_CHANGED');
+    expect((await getDoc(ref(userDb(), profilePath))).data().gold).toBe(180);
+  });
+  it('serializes allocation and battle start; the snapshot uses either complete old or complete new stats', async () => {
+    const p = base(); await seedDoc(profilePath, p);
+    const results = await Promise.allSettled([
+      saveStatAllocation({ ...request(p), db: userDb('a'), actionId: 'race-stat' }),
+      startBattle({ db: userDb('b'), familyId: appFamilyId, enemyId: 'slime', battleId: 'race-battle' }),
+    ]);
+    expect(results[1].status).toBe('fulfilled');
+    const saved = (await getDoc(ref(userDb(), profilePath))).data();
+    const battle = (await getDoc(ref(userDb(), appPath(appFamilyId, 'rpgBattles', 'race-battle')))).data();
+    expect(saved.activeBattleId).toBe('race-battle');
+    expect(battle.playerSnapshot.maxHp).toBe(40 + saved.statAllocation.hp * 3);
+    expect(battle.playerSnapshot.maxMp).toBe(8 + saved.statAllocation.mp * 2);
+    expect(saved.gold).toBe(results[0].status === 'fulfilled' ? 180 : 300);
+    if (results[0].status === 'rejected') expect(results[0].reason.code).toBe('STAT_CHANGE_DURING_BATTLE');
+  });
+  it('consumes MP only once for simultaneous identical battle actions', async () => {
+    await seedDoc(profilePath, base());
+    const args = { db: userDb('a'), familyId: appFamilyId, battleId: 'mp-replay' };
+    await startBattle({ ...args, enemyId: 'slime' });
+    const action = { ...args, actionId: 'same-skill', skillId: 'guard_stance' };
+    const results = await Promise.all([useBattleSkill(action), useBattleSkill({ ...action, db: userDb('b') })]);
+    expect(results.filter(result => result.applied)).toHaveLength(1);
+    const battle = (await getDoc(ref(userDb(), appPath(appFamilyId, 'rpgBattles', 'mp-replay')))).data();
+    expect(battle.playerMp).toBe(12); expect(battle.skillUses.guard_stance).toBe(1);
+  });
+  it('blocks correction, insufficient gold, unauthenticated writes and mid-battle changes atomically', async () => {
+    const p = base(); await seedDoc(profilePath, p);
+    const args = { ...request(p), db: userDb(), actionId: 'rejected' };
+    await seedDoc(appPath(appFamilyId, 'rewardIntegrity', 'current'), { pendingSessionIds: ['pending'] });
+    await expect(saveStatAllocation(args)).rejects.toThrow('REWARD_CORRECTION_PENDING');
+    await seedDoc(appPath(appFamilyId, 'rewardIntegrity', 'current'), {});
+    await assertFails(saveStatAllocation({ ...args, db: anonymousDb() }));
+    for (const patch of [{ gold: 119 }, { activeBattleId: 'another-device' }]) {
+      const latest = { ...p, ...patch }; await seedDoc(profilePath, latest);
+      await expect(saveStatAllocation({ ...args, expected: request(latest).expected })).rejects.toThrow(patch.gold ? 'INSUFFICIENT_GOLD' : 'STAT_CHANGE_DURING_BATTLE');
+      expect((await getDoc(ref(userDb(), profilePath))).data()).toEqual(latest);
+    }
+    expect((await getDoc(ref(userDb(), appPath(appFamilyId, 'rpgActionLedger', 'rejected')))).exists()).toBe(false);
   });
 });

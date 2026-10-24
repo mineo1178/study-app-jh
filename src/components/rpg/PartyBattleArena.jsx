@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { canUseBattleActions, resolvePartyBattleSelection } from '../../rpg/battleUiLogic.js';
+import BattleMpBar from './BattleMpBar.jsx';
 import BattleSkillList from './BattleSkillList.jsx';
 import BattleHpBar from './BattleHpBar.jsx';
 import BattleFeedback from './BattleFeedback.jsx';
@@ -27,6 +28,7 @@ export default function PartyBattleArena({ battle, onAttack, onSkill, attacking,
       return <button type="button" aria-pressed={selected.allyId === member.memberId} disabled={attacking || state.status !== 'active'} onClick={() => setAllyId(member.memberId)} key={member.memberId} className={`min-w-0 break-words rounded-xl p-3 text-left ${selected.allyId === member.memberId ? 'bg-emerald-600 ring-2 ring-emerald-200' : 'bg-white/10'} disabled:opacity-40`}><b>{member.name}</b><p className="mt-1 text-xs font-bold">{state.status !== 'active' ? '戦闘不能' : member.memberId === battle.activePartyMemberId ? '行動可能・今回の行動者' : battle.actedMemberIds?.includes(member.memberId) ? 'このラウンドは行動済み' : '行動待ち'}</p><BattleHpBar name={member.name} hp={state.hp} maxHp={member.maxHp} ally/><p className="text-xs">{member.role} / HP {state.hp}/{member.maxHp}</p><p className="mt-1 text-xs">{Number(state.guardPercent) > 0 ? `防御中・被ダメージ${state.guardPercent}%軽減（敵の反撃終了まで）` : '防御効果なし'}</p><p className="mt-1 text-xs">{state.status !== 'active' ? '回復対象外' : selected.allyId === member.memberId ? '回復対象（仲間1人のスキル）' : '選択して回復対象にする'}</p></button>;
     })}</div>
     <button type="button" disabled={!canAct || !selected.enemyId} onClick={() => onAttack?.(selected.enemyId)} className="mt-5 w-full rounded-xl bg-rose-500 py-3 font-black disabled:bg-slate-500">通常攻撃</button>
+    <BattleMpBar battle={battle}/>
     <BattleSkillList battle={battle} skills={actor?.skills || []} selected={selected} attacking={attacking} onSkill={onSkill}/>
     <BattleFeedback feedback={feedback}/>
   </section>;

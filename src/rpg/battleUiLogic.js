@@ -1,3 +1,4 @@
+import { battleMpCost, hasMpRules } from './statAllocation.js';
 import { normalizePlayerProfile } from './playerProfile.js';
 import { ELEMENT_LABELS } from './elementConfig.js';
 export const battleEnergyState = (profile, enemy) => { const energy = Number(normalizePlayerProfile(profile || {}).battleEnergy) || 0; const required = Number(enemy?.energyCost) || 0; return { energy, required, sufficient: energy >= required }; };
@@ -38,6 +39,7 @@ export function battleSkillAvailability(battle, skill, selected = {}, pending = 
   if (pending) reason = '行動を処理中です';
   else if (!canUseBattleActions(battle)) reason = '現在は行動できません';
   else if (!remaining) reason = '使用回数を使い切りました';
+  else if (hasMpRules(battle) && (!party || battle.activePartyMemberId === 'hero') && battle.playerMp < battleMpCost(battle, skill)) reason = 'MPが不足しています';
   else if (party) {
     const target = skill.targetType;
     const enemies = battle.enemyStates || [];

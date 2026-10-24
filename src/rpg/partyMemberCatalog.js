@@ -1,4 +1,5 @@
-import { calculatePlayerAttack, calculatePlayerDefense, calculatePlayerMaxHp } from './battleCalculator.js';
+import { calculatePlayerAttack, calculatePlayerDefense, BASE_PLAYER_MAX_HP } from './battleCalculator.js';
+import { statAllocationStats, SKILL_MP_COSTS } from './statAllocation.js';
 import { SKILL_CATALOG } from './skillCatalog.js';
 import { GACHA_MEMBERS } from './gachaCatalog.js';
 
@@ -31,10 +32,11 @@ export function buildTowerPartySnapshot(profile) {
   const ids = validatePartyMemberIds(profile.partyMemberIds, profile.unlockedPartyMemberIds);
   const level = Math.max(1, integer(profile.level) || 1);
   const hero = {
-    maxHp: calculatePlayerMaxHp(profile) + 2 * (level - 1),
+    maxHp: BASE_PLAYER_MAX_HP + 2 * (level - 1),
     attack: calculatePlayerAttack(profile) + Math.floor((level - 1) / 2),
     defense: calculatePlayerDefense(profile) + Math.floor((level - 1) / 3),
   };
+  const growth = statAllocationStats(profile);
   return ids.map((memberId) => {
     const member = PARTY_MEMBER_CATALOG[memberId];
     const role = roleForMember(memberId, member);
@@ -46,6 +48,6 @@ export function buildTowerPartySnapshot(profile) {
           ? { maxHp: hero.maxHp * .95, attack: hero.attack * 1.20, defense: Math.max(0, hero.defense - 1) }
           : { maxHp: hero.maxHp * .95, attack: hero.attack * .85, defense: hero.defense + 1 };
     const multiplier = member.multiplier || 1;
-    return { memberId, name: member.name, role: member.role, maxHp: Math.round(stats.maxHp * multiplier), attack: Math.round(stats.attack * multiplier), defense: Math.round(stats.defense * multiplier), skills: member.skillIds.map((id) => ({ ...partySkill(id), targetType: partySkill(id).targetType || (id === 'healing_light' ? 'single_ally' : id === 'guard_stance' ? 'self' : 'single_enemy') })) };
+    return { memberId, name: member.name, role: member.role, maxHp: Math.round(stats.maxHp * multiplier) + (memberId === 'hero' ? growth.hpBonus : 0), ...(memberId === 'hero' ? { maxMp: growth.maxMp } : {}), attack: Math.round(stats.attack * multiplier), defense: Math.round(stats.defense * multiplier), skills: member.skillIds.map((id) => ({ ...partySkill(id), ...(memberId === 'hero' ? { mpCost: SKILL_MP_COSTS[id] } : {}), targetType: partySkill(id).targetType || (id === 'healing_light' ? 'single_ally' : id === 'guard_stance' ? 'self' : 'single_enemy') })) };
   });
 }
