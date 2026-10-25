@@ -1,10 +1,12 @@
 import { useRef, useState } from 'react';
 import { normalizePlayerProfile } from '../../rpg/playerProfile.js';
-import { readStatAllocation, statAllocationStats, statAllocationValues, statAllocationCost, STAT_REALLOCATION_GOLD } from '../../rpg/statAllocation.js';
+import { readStatAllocation, statAllocationStats, statAllocationCost, STAT_REALLOCATION_GOLD } from '../../rpg/statAllocation.js';
+import { heroJobSnapshot } from '../../rpg/jobStats.js';
 import { createRpgActionId } from '../../data/rpgShopRepository.js';
 import CommerceConfirmModal from './CommerceConfirmModal.jsx';
 
 const errorMessage = error => ({ STAT_PROFILE_CHANGED: '他の操作でデータが更新されました。「最新データを反映」で確認し直してください。', STAT_CHANGE_DURING_BATTLE: '戦闘中は能力を変更できません。', REWARD_CORRECTION_PENDING: '報酬訂正の確認中は再配分できません。', INSUFFICIENT_GOLD: 'GOLDが足りません。', INVALID_STAT_ALLOCATION: '保存された配分が不正です。配分を保存できません。', STAT_POINTS_EXCEEDED: '育成ポイントが不足しています。' }[error?.code || error?.message] || '保存に失敗しました。入力内容を保持しています。もう一度お試しください。');
+const allocationDisplay = (profile, allocation, totalExp) => { const { maxHp, maxMp } = heroJobSnapshot({ jobId: profile?.jobId, statAllocation: allocation, totalExp }); return { maxHp, maxMp }; };
 const baseline = profile => ({ ...readStatAllocation(profile), totalExp: profile.totalExp || 0, gold: profile.gold || 0 });
 export default function StatAllocationPanel(props) {
   try { readStatAllocation(props.profile); }
@@ -20,8 +22,8 @@ function AllocationEditor({ profile, onSave, locked, onPendingChange }) {
   const [success, setSuccess] = useState('');
   const request = useRef(null);
   const lock = useRef(false);
-  const current = statAllocationStats({ totalExp: source.totalExp, statAllocation: { hp: source.hp, mp: source.mp } });
-  const preview = { used: allocation.hp + allocation.mp, remaining: current.earned - allocation.hp - allocation.mp, ...statAllocationValues(allocation) };
+  const current = { ...statAllocationStats({ totalExp: source.totalExp, statAllocation: { hp: source.hp, mp: source.mp } }), ...allocationDisplay(profile, { hp: source.hp, mp: source.mp }, source.totalExp) };
+  const preview = { used: allocation.hp + allocation.mp, remaining: current.earned - allocation.hp - allocation.mp, ...allocationDisplay(profile, allocation, source.totalExp) };
   const cost = statAllocationCost(source, allocation);
   const changed = source.hp !== allocation.hp || source.mp !== allocation.mp;
   const stale = JSON.stringify(source) !== JSON.stringify(baseline(profile));

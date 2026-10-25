@@ -1,3 +1,5 @@
+import { changePlayerJob } from '../../src/data/rpgJobRepository.js';
+import { JOB_CATALOG } from '../../src/rpg/jobCatalog.js';
 import { buildTowerEncounter } from '../../src/rpg/towerCatalog.js';
 import { saveStatAllocation } from '../../src/data/rpgStatAllocationRepository.js';
 import { startBattle, useBattleSkill, preparePartyTowerStart } from '../../src/data/rpgBattleRepository.js';
@@ -239,5 +241,30 @@ describe('skill rules v2 emulator transactions', () => {
     expect(saved.memberMp).toEqual({guardian:8,mage:8}); expect(saved.playerMp).toBe(8); expect(saved.skillUses['mage:firestorm']).toBe(3);
     expect(saved.activePartyMemberId).toBe('hero'); expect(saved.partySnapshot).toEqual(initial.partySnapshot);
     const ledger=(await getDoc(ref(userDb(),appPath(appFamilyId,'rpgBattleLedger','third-spell')))).data(); expect(ledger.action.mp).toEqual({before:12,after:8,cost:4});
+  });
+});
+
+describe('job change emulator transactions',()=>{
+  const profilePath=appPath(appFamilyId,'rpg','playerProfile');
+  const base=()=>({totalExp:totalExpForLevel(12),gold:300,battleEnergy:30,statAllocation:{hp:5,mp:6},ownedEquipment:{iron_sword:true},equipped:{weapon:'iron_sword'},custom:{keep:1}});
+  it.each(Object.keys(JOB_CATALOG))('persists %s across clients without resetting other profile data',async jobId=>{
+    const before={...base(),jobId:jobId==='adventurer'?'warrior':'adventurer'};await seedDoc(profilePath,before);
+    const args={db:userDb('a'),familyId:appFamilyId,actionId:'job-'+jobId,jobId,expected:{jobId:before.jobId,revision:0}};
+    const results=await Promise.all([changePlayerJob(args),changePlayerJob({...args,db:userDb('b')})]);expect(results.filter(result=>result.applied)).toHaveLength(1);
+    const saved=(await getDoc(ref(userDb('c'),profilePath))).data();expect(saved).toMatchObject({...before,jobId,jobRevision:1});
+  });
+  it('rejects concurrent stale job changes and battle-time or invalid changes',async()=>{
+    await seedDoc(profilePath,base());const args={db:userDb('a'),familyId:appFamilyId,expected:{jobId:'adventurer',revision:0}};
+    const results=await Promise.allSettled([changePlayerJob({...args,jobId:'mage',actionId:'job-mage'}),changePlayerJob({...args,db:userDb('b'),jobId:'knight',actionId:'job-knight'})]);
+    expect(results.filter(result=>result.status==='fulfilled')).toHaveLength(1);expect(results.find(result=>result.status==='rejected').reason.code).toBe('JOB_PROFILE_CHANGED');
+    await expect(changePlayerJob({...args,jobId:'bogus',actionId:'bad'})).rejects.toThrow('INVALID_JOB_ID');
+    await seedDoc(profilePath,{...base(),activeBattleId:'existing'});await expect(changePlayerJob({...args,jobId:'mage',actionId:'blocked'})).rejects.toThrow('JOB_CHANGE_DURING_BATTLE');
+  });
+  it('serializes job changes with battle start and freezes the committed job',async()=>{
+    await seedDoc(profilePath,base());
+    const results=await Promise.allSettled([changePlayerJob({db:userDb('a'),familyId:appFamilyId,jobId:'mage',expected:{jobId:'adventurer',revision:0},actionId:'race-job'}),startBattle({db:userDb('b'),familyId:appFamilyId,enemyId:'slime',battleId:'job-start'})]);
+    expect(results[1].status).toBe('fulfilled');const saved=(await getDoc(ref(userDb(),profilePath))).data();const battle=(await getDoc(ref(userDb(),appPath(appFamilyId,'rpgBattles','job-start')))).data();
+    expect(battle.playerSnapshot.jobId).toBe(saved.jobId||'adventurer');expect(saved.activeBattleId).toBe('job-start');
+    if(results[0].status==='rejected')expect(results[0].reason.code).toBe('JOB_CHANGE_DURING_BATTLE');
   });
 });

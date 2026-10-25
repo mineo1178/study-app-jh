@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import '../../src/index.css';
 import RpgHub from '../../src/components/rpg/RpgHub.jsx';
 import { normalizePlayerProfile } from '../../src/rpg/playerProfile.js';
 import { totalExpForLevel } from '../../src/rpg/levelSystem.js';
+import { prepareJobChange } from '../../src/data/rpgJobRepository.js';
 import { prepareStatAllocation } from '../../src/data/rpgStatAllocationRepository.js';
 import { prepareBattleStart, prepareBattleAttack, preparePartyTowerStart, prepareWeeklyBossStart } from '../../src/data/rpgBattleRepository.js';
 import { preparePartyBattleAction } from '../../src/rpg/partyBattleEngine.js';
@@ -12,7 +13,8 @@ import { getWeeklyBossDefinition } from '../../src/rpg/weeklyBossCatalog.js';
 import { ENEMY_CATALOG } from '../../src/rpg/enemyCatalog.js';
 const initial = () => normalizePlayerProfile({ gold: 300, totalExp: totalExpForLevel(10), battleEnergy: 30, statAllocation: { hp: 3, mp: 2 } });
 export default function Fixture() {
-  const [profile, setProfile] = useState(initial);
+  const [profile, setProfile] = useState(() => { try { return { ...initial(), ...JSON.parse(sessionStorage.getItem('rpg-job-fixture') || '{}') }; } catch { return initial(); } });
+  useEffect(() => { sessionStorage.setItem('rpg-job-fixture', JSON.stringify({ jobId: profile.jobId, jobRevision: profile.jobRevision || 0 })); }, [profile.jobId, profile.jobRevision]);
   const [uid, setUid] = useState('a');
   const [fail, setFail] = useState(false);
   const [battle, setBattle] = useState(null);
@@ -26,9 +28,9 @@ export default function Fixture() {
     setProfile(change.profile); setCount(value => value + 1); return { ...change, applied: true };
   };
   const start = (mode, legacy = false) => {
-    const args = { profile: { ...profile, activeBattleId: null }, battleId: mode, now: 1 };
+    const args = { profile: { ...profile, ...(legacy ? { jobId: 'adventurer' } : {}), activeBattleId: null }, battleId: mode, now: 1 };
     const change = mode === 'campaign' ? prepareBattleStart({ ...args, enemy: ENEMY_CATALOG.slime }) : mode === 'tower' ? preparePartyTowerStart({ ...args, encounter: buildTowerEncounter({ floor: 10 }) }) : prepareWeeklyBossStart({ ...args, boss: getWeeklyBossDefinition('2026-W01') });
-    if (legacy) { delete change.battle.skillRulesVersion; delete change.battle.memberMp; delete change.battle.mpRulesVersion; delete change.battle.playerMp; }
+    if (legacy) { const hero = change.battle.playerSnapshot || change.battle.partySnapshot.members[0]; delete hero.jobId; delete hero.jobName; delete hero.jobRulesVersion; delete hero.jobModifiers; if (change.battle.partySnapshot) { hero.role = 'バランス型'; for (const member of change.battle.partySnapshot.members.filter(member => member.memberId !== 'hero')) { delete member.maxMp; member.skills.forEach(skill => { delete skill.mpCost; }); } } delete change.battle.skillRulesVersion; delete change.battle.memberMp; delete change.battle.mpRulesVersion; delete change.battle.playerMp; }
     setProfile(change.profile); setBattle(change.battle); setCandidate(null);
   };
   const act = async (skillId, targetEnemyInstanceId, targetMemberId) => {
@@ -43,6 +45,6 @@ export default function Fixture() {
     <button onClick={() => { setProfile(initial()); setBattle(null); setUid(value => value + 'a'); }}>リセット</button><button onClick={() => setProfile(value => ({ ...value, gold: 0 }))}>GOLD不足</button><button onClick={() => { setUid(value => value === 'a' ? 'b' : 'a'); setProfile(initial()); setBattle(null); }}>UID切替</button><button onClick={() => setProfile(value => ({ ...value, totalExp: totalExpForLevel(1), statAllocation: { hp: 0, mp: 0 } }))}>Lv1</button><button onClick={() => setProfile(value => ({ ...value, gold: value.gold + 1 }))}>他端末更新</button>
     <label><input type="checkbox" checked={fail} onChange={event => setFail(event.target.checked)}/>保存失敗</label>
     {['campaign','tower','weekly'].flatMap(mode => [false,true].map(legacy => <button key={mode + legacy} onClick={() => start(mode, legacy)}>{mode} {legacy ? '旧' : '新'}</button>))}
-    </div><RpgHub key={uid} profile={profile} progress={{ campaignCompleted: true }} towerProgress={{ currentFloor: 10 }} battle={battle} onSaveStatAllocation={save} onAttackBattle={target => act(null, target)} onUseBattleSkill={act} attacking={pending} onBattleBack={() => { setBattle(null); setProfile(value => ({ ...value, activeBattleId: null })); }} onStartBattleRequest={setCandidate} battleCandidate={candidate} onCancelBattleStart={() => setCandidate(null)} onConfirmBattleStart={() => start('campaign')}/></main>;
+    </div><RpgHub key={uid} profile={profile} progress={{ campaignCompleted: true }} towerProgress={{ currentFloor: 10 }} battle={battle} onChangeJob={async request => { await new Promise(resolve => setTimeout(resolve, 300)); const change = prepareJobChange({ profile, ...request, now: 1 }); setProfile(change.profile); return { applied: true, ...change }; }} onSaveStatAllocation={save} onAttackBattle={target => act(null, target)} onUseBattleSkill={act} attacking={pending} onBattleBack={() => { setBattle(null); setProfile(value => ({ ...value, activeBattleId: null })); }} onStartBattleRequest={setCandidate} battleCandidate={candidate} onCancelBattleStart={() => setCandidate(null)} onConfirmBattleStart={() => start('campaign')}/></main>;
 }
 createRoot(document.getElementById('root')).render(<Fixture/>);

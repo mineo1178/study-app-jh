@@ -13,6 +13,7 @@ import { activeTimerRef, finishActiveTimer, heartbeatActiveTimer, invalidateStal
 import { studySessionsCollection } from './data/studySessionRepository';
 import { applyStudySessionReward, emptyPlayerProfile, playerProfileRef, rewardLedgerRef, updateSelectedTitle } from './data/rewardLedgerRepository';
 import { correctStudySessionReward, retryPendingRewardCorrection, rewardIntegrityRef } from './data/rewardCorrectionRepository';
+import { changePlayerJob } from './data/rpgJobRepository.js';
 import { saveStatAllocation } from './data/rpgStatAllocationRepository.js';
 import { createRpgActionId, equipItem, purchaseEquipment, purchaseResource, unequipSlot } from './data/rpgShopRepository';
 import { createMaterialExchangeActionId, exchangeMaterial } from './data/rpgMaterialExchangeRepository';
@@ -108,7 +109,7 @@ const getTasksCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-
 const getTestsCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tests');
 const getStudySessionsCol = () => studySessionsCollection(db, FAMILY_ID);
 const getActiveTimerRef = () => activeTimerRef(db, FAMILY_ID);
-const APP_VERSION = 'v2.9.4';
+const APP_VERSION = 'v2.9.5';
 const isDocumentHidden = () => typeof document !== 'undefined' && document.hidden;
 // ==========================================
 // Constants & Master Data
@@ -1412,6 +1413,10 @@ export default function App() {
             setRpgStatus({ kind: 'error', message: code === 'QUEST_NOT_COMPLETED' ? 'クエスト条件を達成していません' : code === 'QUEST_ALREADY_CLAIMED' ? 'このクエストはすでに受取済みです' : 'クエスト報酬の受取に失敗しました' });
         } finally { setPendingQuestId(null); }
     };
+    const handleChangeJob = async request => {
+        if (isSampleMode || !user) throw new Error('JOB_SAVE_UNAVAILABLE');
+        return changePlayerJob({ db, familyId: FAMILY_ID, ...request });
+    };
     const handleSaveStatAllocation = async (request) => {
         if (isSampleMode || !user || statAllocationPendingRef.current) throw new Error('STAT_SAVE_UNAVAILABLE');
         statAllocationPendingRef.current = true;
@@ -2294,7 +2299,7 @@ export default function App() {
                 </div>
               </div>)}
             {activeTab === 'rpg' && !isSampleMode && (
-              <LazyPanel label="RPG"><RpgHub onSaveStatAllocation={handleSaveStatAllocation} key={user?.uid || 'sample'} battleCandidate={battleCandidate?.requestedByUid === user?.uid ? battleCandidate : null} onCancelBattleStart={() => !battleStartPendingRef.current && setBattleCandidate(null)} onConfirmBattleStart={handleBattleStartConfirm} profile={playerProfile} progress={rpgProgress} towerProgress={towerProgress} achievements={achievements} unlockedTitles={unlockedTitles} selectedTitle={selectedTitle} onSelectTitle={handleSelectTitle} savingTitle={savingTitle} questState={questState} onClaimQuest={handleClaimQuest} pendingQuestId={pendingQuestId} onPurchaseRequest={handlePurchaseRequest} onMaterialExchangeRequest={handleMaterialExchangeRequest} pendingMaterialExchange={pendingMaterialExchange} onEquip={handleEquip} onUnequip={handleUnequip} pendingItemId={pendingPurchaseItemId} pendingAction={pendingEquipmentAction} status={rpgStatus} battle={activeBattle || lastBattle} onStartBattleRequest={handleBattleStartRequest} onAttackBattle={handleAttackBattle} onUseBattleSkill={handleUseBattleSkill} startingEnemyId={pendingBattleEnemyId} attacking={isAttackingBattle} onBattleBack={handleBattleResultClose} battleFeedback={battleTurnFeedback} onSaveParty={handleSaveParty} savingParty={savingParty} onGachaBuy={(type) => handleGacha('buy', type)} onGachaDraw={(type) => handleGacha('draw', type)} onGachaExchange={(kind, id) => handleGacha('exchange', kind, id)} onAlchemyCraft={handleAlchemyCraft} loadEncyclopediaLedgers={loadEncyclopediaLedgers} gachaPending={gachaPending} alchemyPending={alchemyPending}/></LazyPanel>
+              <LazyPanel label="RPG"><RpgHub onChangeJob={handleChangeJob} onSaveStatAllocation={handleSaveStatAllocation} key={user?.uid || 'sample'} battleCandidate={battleCandidate?.requestedByUid === user?.uid ? battleCandidate : null} onCancelBattleStart={() => !battleStartPendingRef.current && setBattleCandidate(null)} onConfirmBattleStart={handleBattleStartConfirm} profile={playerProfile} progress={rpgProgress} towerProgress={towerProgress} achievements={achievements} unlockedTitles={unlockedTitles} selectedTitle={selectedTitle} onSelectTitle={handleSelectTitle} savingTitle={savingTitle} questState={questState} onClaimQuest={handleClaimQuest} pendingQuestId={pendingQuestId} onPurchaseRequest={handlePurchaseRequest} onMaterialExchangeRequest={handleMaterialExchangeRequest} pendingMaterialExchange={pendingMaterialExchange} onEquip={handleEquip} onUnequip={handleUnequip} pendingItemId={pendingPurchaseItemId} pendingAction={pendingEquipmentAction} status={rpgStatus} battle={activeBattle || lastBattle} onStartBattleRequest={handleBattleStartRequest} onAttackBattle={handleAttackBattle} onUseBattleSkill={handleUseBattleSkill} startingEnemyId={pendingBattleEnemyId} attacking={isAttackingBattle} onBattleBack={handleBattleResultClose} battleFeedback={battleTurnFeedback} onSaveParty={handleSaveParty} savingParty={savingParty} onGachaBuy={(type) => handleGacha('buy', type)} onGachaDraw={(type) => handleGacha('draw', type)} onGachaExchange={(kind, id) => handleGacha('exchange', kind, id)} onAlchemyCraft={handleAlchemyCraft} loadEncyclopediaLedgers={loadEncyclopediaLedgers} gachaPending={gachaPending} alchemyPending={alchemyPending}/></LazyPanel>
             )}
             {activeTab === 'review' && canReview && !isSampleMode && <ManualReviewPanel onOpenTimeReview={openTimeReview} subjectLabel={(session) => getTaskMeta(session.taskSnapshot).subjectLabel} queue={reviewQueue} profile={playerProfile} studySessions={studySessions} ledgersBySessionId={pendingCorrectionLedgers} busySessionIds={reviewBusySessionIds} message={reviewError} onOpenCorrection={openHistoryCorrection} onRetry={handlePendingCorrectionRetry}/>}
           </main>

@@ -109,7 +109,7 @@ describe('pure party and equipment comparison', () => {
   });
   it('compares actual HP, attack, healing, guarding, area attacks and elements without mutating the profile', () => {
     const original = structuredClone(profile);
-    expect(partyPreview(profile, profile.partyMemberIds)).toEqual(buildTowerPartySnapshot(profile, { skillRulesVersion: 2 }));
+    expect(partyPreview(profile, profile.partyMemberIds)).toEqual(buildTowerPartySnapshot(profile, { skillRulesVersion: 2, jobRulesVersion: 1 }));
     const before = partySummary(partyPreview(profile, profile.partyMemberIds));
     const after = partySummary(partyPreview(profile, ['hero', 'healer']));
     expect(before.area).toBe(true);
@@ -135,7 +135,7 @@ describe('pure party and equipment comparison', () => {
     const saved = JSON.stringify(battle);
     const updated = { ...profile, equipped: { weapon: 'scholar_blade' }, partyMemberIds: ['hero', 'healer'] };
     const data = buildBattlePreparation({ profile: updated, candidate: { id: 'tower', isTower: true }, towerProgress: { currentFloor: 4 } });
-    expect(data.members).toEqual(buildTowerPartySnapshot(updated, { skillRulesVersion: 2 }));
+    expect(data.members).toEqual(buildTowerPartySnapshot(updated, { skillRulesVersion: 2, jobRulesVersion: 1 }));
     expect(data.members).not.toEqual(battle.partySnapshot.members);
     expect(JSON.stringify(battle)).toBe(saved);
   });

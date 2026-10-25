@@ -63,10 +63,10 @@ function partyAction(battle, policy) {
   return action;
 }
 
-export function simulateBattle(player, scenario, policy = 'strategy', { mpRules = false, skillRules = false } = {}) {
+export function simulateBattle(player, scenario, policy = 'strategy', { mpRules = false, skillRules = false, jobRules = false } = {}) {
   let battle = scenario.enemy
-    ? prepareBattleStart({ profile: player, enemy: scenario.enemy, battleId: 'simulation', now: 1, battleKind: scenario.boss ? 'boss' : 'normal' }).battle
-    : createPartyBattle({ skillRulesVersion: skillRules ? 2 : null, mpRulesVersion: mpRules ? 1 : null, battleId: 'simulation', encounter: scenario.encounter, members: buildTowerPartySnapshot(player, { skillRulesVersion: skillRules ? 2 : null }), now: 1, battleKind: scenario.encounter.boss ? 'boss' : 'normal' });
+    ? prepareBattleStart({ profile: jobRules ? player : { ...player, jobId: 'adventurer' }, enemy: scenario.enemy, battleId: 'simulation', now: 1, battleKind: scenario.boss ? 'boss' : 'normal' }).battle
+    : createPartyBattle({ skillRulesVersion: skillRules ? 2 : null, mpRulesVersion: mpRules ? 1 : null, battleId: 'simulation', encounter: scenario.encounter, members: buildTowerPartySnapshot(player, { skillRulesVersion: skillRules ? 2 : null, jobRulesVersion: jobRules ? 1 : null }), now: 1, battleKind: scenario.encounter.boss ? 'boss' : 'normal' });
   // Keep the v2.9.1 baseline reproducible; explicitly opt in for the new MP matrix.
   if (!skillRules) delete battle.skillRulesVersion;
   if (!mpRules) { delete battle.mpRulesVersion; delete battle.playerMp; }

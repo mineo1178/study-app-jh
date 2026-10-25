@@ -1,3 +1,5 @@
+import { heroJobSnapshot } from './jobStats.js';
+import { JOB_RULES_VERSION } from './jobCatalog.js';
 import { calculatePlayerAttack, calculatePlayerDefense, BASE_PLAYER_MAX_HP } from './battleCalculator.js';
 import { statAllocationStats, SKILL_MP_COSTS } from './statAllocation.js';
 import { hasUnlimitedSkills, COMPANION_MAX_MP, COMPANION_SKILL_MP_COSTS } from './skillRules.js';
@@ -40,6 +42,7 @@ export function buildTowerPartySnapshot(profile, rules = {}) {
   const growth = statAllocationStats(profile);
   return ids.map((memberId) => {
     const member = PARTY_MEMBER_CATALOG[memberId];
+    const job = memberId === 'hero' && rules.jobRulesVersion === JOB_RULES_VERSION ? heroJobSnapshot(profile, { party: true }) : null;
     const role = roleForMember(memberId, member);
     const stats = memberId === 'hero' ? hero : role === 'Guardian'
       ? { maxHp: hero.maxHp * 1.30, attack: hero.attack * .80, defense: hero.defense + 3 }
@@ -49,6 +52,7 @@ export function buildTowerPartySnapshot(profile, rules = {}) {
           ? { maxHp: hero.maxHp * .95, attack: hero.attack * 1.20, defense: Math.max(0, hero.defense - 1) }
           : { maxHp: hero.maxHp * .95, attack: hero.attack * .85, defense: hero.defense + 1 };
     const multiplier = member.multiplier || 1;
+    if (job) return { memberId, name: member.name, role: job.jobName, ...job };
     return { memberId, name: member.name, role: member.role, maxHp: Math.round(stats.maxHp * multiplier) + (memberId === 'hero' ? growth.hpBonus : 0), ...(memberId === 'hero' ? { maxMp: growth.maxMp } : hasUnlimitedSkills(rules) ? { maxMp: COMPANION_MAX_MP[role] } : {}), attack: Math.round(stats.attack * multiplier), defense: Math.round(stats.defense * multiplier), skills: member.skillIds.map((id) => ({ ...partySkill(id), ...(memberId === 'hero' || hasUnlimitedSkills(rules) ? { mpCost: SKILL_MP_COSTS[id] ?? COMPANION_SKILL_MP_COSTS[id] } : {}), targetType: partySkill(id).targetType || (id === 'healing_light' ? 'single_ally' : id === 'guard_stance' ? 'self' : 'single_enemy') })) };
   });
 }

@@ -1,9 +1,10 @@
 import { SKILL_RULES_VERSION } from './skillRules.js';
-import { statAllocationStats, SKILL_MP_COSTS } from './statAllocation.js';
+import { heroJobSnapshot } from './jobStats.js';
+import { JOB_RULES_VERSION } from './jobCatalog.js';
 import { normalizePlayerProfile } from './playerProfile.js';
 import { buildTowerPartySnapshot, validatePartyMemberIds } from './partyMemberCatalog.js';
-import { calculatePlayerAttack, calculatePlayerDefense, calculatePlayerMaxHp } from './battleCalculator.js';
-import { SKILL_CATALOG } from './skillCatalog.js';
+
+
 import { EQUIPMENT_CATALOG, EQUIPMENT_SLOTS } from './equipmentCatalog.js';
 import { getEnemyCatalogItem } from './enemyCatalog.js';
 import { getBoss } from './bossCatalog.js';
@@ -12,7 +13,7 @@ import { normalizeTowerProgress } from './towerProgress.js';
 import { getWeeklyBossDefinition } from './weeklyBossCatalog.js';
 import { battleEnergyState } from './battleUiLogic.js';
 
-export const playerStats = profile => ({ maxHp: calculatePlayerMaxHp(profile), attack: calculatePlayerAttack(profile), defense: calculatePlayerDefense(profile) });
+export const playerStats = profile => { const { maxHp, attack, defense } = heroJobSnapshot(profile); return { maxHp, attack, defense }; };
 
 export function equipmentPreview(profile, slot, itemId) {
   const safe = normalizePlayerProfile(profile || {});
@@ -25,7 +26,7 @@ export function equipmentPreview(profile, slot, itemId) {
 export function partyPreview(profile, ids) {
   const safe = normalizePlayerProfile(profile || {});
   validatePartyMemberIds(ids, safe.unlockedPartyMemberIds);
-  return buildTowerPartySnapshot({ ...safe, partyMemberIds: ids }, { skillRulesVersion: SKILL_RULES_VERSION });
+  return buildTowerPartySnapshot({ ...safe, partyMemberIds: ids }, { skillRulesVersion: SKILL_RULES_VERSION, jobRulesVersion: JOB_RULES_VERSION });
 }
 
 export function partySummary(members) {
@@ -76,7 +77,7 @@ export function buildBattlePreparation({ profile, candidate, towerProgress }) {
   const target = candidate.isWeekly ? getWeeklyBossDefinition(candidate.weekId) : candidate.isBoss ? getBoss(candidate.id) : getEnemyCatalogItem(candidate.id);
   const enemies = encounter?.enemies || (target ? [target] : []);
   if (!enemies.length) return null;
-  const members = solo ? [{ memberId: 'hero', name: '主人公', role: 'バランス型', maxMp: statAllocationStats(safe).maxMp, ...playerStats(safe), skills: Object.values(SKILL_CATALOG).map(skill => ({ ...skill, mpCost: SKILL_MP_COSTS[skill.id] })) }] : buildTowerPartySnapshot(safe, { skillRulesVersion: SKILL_RULES_VERSION });
+  const members = solo ? [{ memberId: 'hero', name: '主人公', role: 'バランス型', ...heroJobSnapshot(safe) }] : buildTowerPartySnapshot(safe, { skillRulesVersion: SKILL_RULES_VERSION, jobRulesVersion: JOB_RULES_VERSION });
   const affinities = enemySkillAffinities(enemies, members);
   const equipment = EQUIPMENT_SLOTS.map(slot => {
     const item = EQUIPMENT_CATALOG[safe.equipped[slot]];

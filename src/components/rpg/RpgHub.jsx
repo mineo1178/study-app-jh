@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import JobPanel from './JobPanel.jsx';
 import StatAllocationPanel from './StatAllocationPanel.jsx';
 import RpgWalletPanel from './RpgWalletPanel.jsx';
 import RpgShop from './RpgShop.jsx';
@@ -16,7 +17,7 @@ import EncyclopediaPanel from './EncyclopediaPanel.jsx';
 import AchievementPanel from './AchievementPanel.jsx';
 import { createCachedEncyclopediaLedgerLoader } from '../../data/rpgEncyclopediaRepository.js';
 
-export default function RpgHub({ onSaveStatAllocation, profile, progress, towerProgress, battleCandidate, onCancelBattleStart, onConfirmBattleStart, achievements, unlockedTitles, selectedTitle, onSelectTitle, savingTitle, questState, onClaimQuest, pendingQuestId, onPurchaseRequest, onMaterialExchangeRequest, pendingMaterialExchange, onEquip, onUnequip, pendingItemId, pendingAction, status, battle, onStartBattleRequest, onAttackBattle, onUseBattleSkill, startingEnemyId, attacking, onBattleBack, battleFeedback, onSaveParty, savingParty, onGachaBuy, onGachaDraw, onGachaExchange, onAlchemyCraft, loadEncyclopediaLedgers, gachaPending, alchemyPending }) {
+export default function RpgHub({ onChangeJob, onSaveStatAllocation, profile, progress, towerProgress, battleCandidate, onCancelBattleStart, onConfirmBattleStart, achievements, unlockedTitles, selectedTitle, onSelectTitle, savingTitle, questState, onClaimQuest, pendingQuestId, onPurchaseRequest, onMaterialExchangeRequest, pendingMaterialExchange, onEquip, onUnequip, pendingItemId, pendingAction, status, battle, onStartBattleRequest, onAttackBattle, onUseBattleSkill, startingEnemyId, attacking, onBattleBack, battleFeedback, onSaveParty, savingParty, onGachaBuy, onGachaDraw, onGachaExchange, onAlchemyCraft, loadEncyclopediaLedgers, gachaPending, alchemyPending }) {
   const [statPending, setStatPending] = useState(false);
   const [section, setSection] = useState('battle');
   const [reviewing, setReviewing] = useState(false);
@@ -47,7 +48,7 @@ export default function RpgHub({ onSaveStatAllocation, profile, progress, towerP
     setEncyclopediaLoading(true);
     loaderRef.current().then((ledgers) => { if (mountedRef.current) setEncyclopediaLedgers(ledgers); }).catch((error) => { if (mountedRef.current) setEncyclopediaError(error); }).finally(() => { if (mountedRef.current) setEncyclopediaLoading(false); });
   };
-  const sections = [['battle', '戦闘'], ['party', 'パーティー'], ['stats', '能力育成'], ['gacha', 'ガチャ'], ['alchemy', '錬金'], ['quest', 'クエスト'], ['achievements', '実績・称号'], ['shop', 'ショップ'], ['equipment', '装備'], ['materials', '素材'], ['encyclopedia', '図鑑']];
+  const sections = [['battle', '戦闘'], ['party', 'パーティー'], ['stats', '能力育成'], ['job', '転職'], ['gacha', 'ガチャ'], ['alchemy', '錬金'], ['quest', 'クエスト'], ['achievements', '実績・称号'], ['shop', 'ショップ'], ['equipment', '装備'], ['materials', '素材'], ['encyclopedia', '図鑑']];
   return <section className="space-y-6 animate-in fade-in duration-500">
     <div>
       <p className="text-[10px] font-black tracking-widest text-violet-600">STUDY ADVENTURE</p>
@@ -62,6 +63,7 @@ export default function RpgHub({ onSaveStatAllocation, profile, progress, towerP
     {reviewing && <button type="button" disabled={Boolean(pendingAction || savingParty)} onClick={() => { setSection('battle'); setReviewing(false); }} className="rounded-xl bg-violet-100 px-4 py-3 text-sm font-black text-violet-800 disabled:opacity-50">準備を終えて戦闘画面へ戻る</button>}
     <BattleStartConfirmModal enemy={battleCandidate} profile={profile} towerProgress={towerProgress} starting={Boolean(startingEnemyId)} onCancel={onCancelBattleStart} onConfirm={confirmPreparation} onReview={reviewPreparation}/>
     {section === 'battle' ? <BattlePanel profile={profile} progress={progress} towerProgress={towerProgress} battle={battle} onStartRequest={onStartBattleRequest} onAttack={onAttackBattle} onSkill={onUseBattleSkill} startingEnemyId={startingEnemyId} attacking={attacking} onBack={onBattleBack} feedback={battleFeedback}/>
+      : section === 'job' ? <JobPanel profile={profile} onSave={onChangeJob} locked={battleLocked} onPendingChange={setStatPending}/>
       : section === 'stats' ? <StatAllocationPanel profile={profile} onSave={onSaveStatAllocation} locked={battleLocked} onPendingChange={setStatPending}/>
       : section === 'party' ? <PartyPanel key={JSON.stringify([profile?.partyMemberIds, profile?.unlockedPartyMemberIds, battleLocked])} profile={profile} onSave={onSaveParty} pending={savingParty} locked={battleLocked}/>
         : section === 'gacha' ? <GachaPanel profile={profile} onBuy={onGachaBuy} onDraw={onGachaDraw} onExchange={onGachaExchange} pending={gachaPending}/>
