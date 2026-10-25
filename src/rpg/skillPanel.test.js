@@ -21,7 +21,7 @@ describe('derived SP and catalog reachability',()=>{
   const sp=earnedSkillSp({...profile(),weeklyBoss:{totalClears:500,clearedWeekIds:['2026-W01','2026-W01']}},{completedChapterIds:['chapter_1','chapter_1','chapter_2','fake']},{highestFloor:100,bossWins:999});
   expect(sp).toMatchObject({earned:64,sources:{level:38,campaign:4,tower:12,weekly:10}});
   expect(earnedSkillSp(profile(),progress,{highestFloor:10,bossWins:999}).sources.tower).toBe(2);
-  expect(Object.keys(SKILL_PANEL_CATALOG)).toHaveLength(25);expect(readSkillPanel({})).toEqual({unlockedNodeIds:[],revision:0});
+  expect(Object.values(SKILL_PANEL_CATALOG).filter(node=>!node.jobId)).toHaveLength(25);expect(readSkillPanel({})).toEqual({unlockedNodeIds:[],revision:0});
  });
  it('requires adjacency, hides secrets until both branches are obtained and enforces SP/level',()=>{
   expect(panelNodeState('attack_3',profile(),progress,towerProgress).unlockable).toBe(false);

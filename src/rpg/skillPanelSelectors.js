@@ -25,6 +25,7 @@ export function skillPanelStats(profile={},progress={},towerProgress={}) {
  const used=state.unlockedNodeIds.reduce((sum,id)=>sum+SKILL_PANEL_CATALOG[id].cost,0);
  return {...state,...sp,used,remaining:sp.earned-used};
 }
+export const skillPanelNodes = (profile={},scope='common') => Object.values(SKILL_PANEL_CATALOG).filter(node=>node.id==='start'||(scope==='job'?node.jobId===playerJobId(profile):!node.jobId));
 export function panelNodeState(nodeId,profile={},progress={},towerProgress={}) {
  if(!Object.hasOwn(SKILL_PANEL_CATALOG,nodeId))return {status:'locked',visible:false,unlockable:false,reason:'不正なパネルです'};
  const node=SKILL_PANEL_CATALOG[nodeId],stats=skillPanelStats(profile,progress,towerProgress),owned=new Set(['start',...stats.unlockedNodeIds]);
@@ -49,7 +50,7 @@ export function skillPanelEffects(profile={}) {
 export function applySkillPanelEffects(profile,snapshot) {
  const effects=skillPanelEffects(profile),state=readSkillPanel(profile);
  const skills=snapshot.skills.map(skill=>{const copy={...skill,mpCost:Math.max(1,skill.mpCost-effects.mpReduction)};
- if(skill.kind==='attack'){const bonus=Math.min(25,effects.skillPowerPercent+(skill.element&&skill.element!=='neutral'?effects.elementPowerPercent:0));copy.powerPercent=Math.floor(skill.powerPercent*(100+bonus)/100);}
+ if(skill.kind==='attack'){const specific=effects[{flame_slash:'flamePowerPercent',aqua_edge:'aquaPowerPercent',thunder_strike:'thunderPowerPercent'}[skill.id]]||0;const bonus=Math.min(25,specific+effects.skillPowerPercent+(skill.element&&skill.element!=='neutral'?effects.elementPowerPercent:0));copy.powerPercent=Math.floor(skill.powerPercent*(100+bonus)/100);}
  if(skill.kind==='heal')copy.healPercent=Math.min(60,Math.floor(skill.healPercent*(100+effects.healPowerPercent)/100));
  if(skill.kind==='guard')copy.damageReductionPercent=Math.min(80,skill.damageReductionPercent+effects.guardPoints);
  return copy;});

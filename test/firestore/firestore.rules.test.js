@@ -1,3 +1,5 @@
+import commonPanelBattles from '../fixtures/rpg-v2.9.8-panel-battles.json';
+import { heroJobSnapshot } from '../../src/rpg/jobStats.js';
 import { saveSkillPanel } from '../../src/data/rpgSkillPanelRepository.js';
 import { skillPanelStats } from '../../src/rpg/skillPanelSelectors.js';
 import oldBattles from '../fixtures/rpg-v2.9.6-battles.json';
@@ -352,4 +354,31 @@ describe('skill panel real transactions',()=>{
  it('blocks insufficient GOLD and pending correction resets atomically',async()=>{const before={...base(),gold:999,skillPanel:{unlockedNodeIds:['attack_1'],revision:1}};await seedDoc(profilePath,before);const request={...args(),kind:'reset',expectedRevision:1};await expect(saveSkillPanel(request)).rejects.toThrow('INSUFFICIENT_GOLD');await updateDoc(ref(userDb(),profilePath),{gold:3000});await seedDoc(appPath(appFamilyId,'rewardIntegrity','current'),{pendingSessionIds:['pending']});await expect(saveSkillPanel(request)).rejects.toThrow('REWARD_CORRECTION_PENDING');expect((await getDoc(ref(userDb(),profilePath))).data().gold).toBe(3000);});
  it('serializes panel changes with Battle start and freezes the committed effect',async()=>{await seedDoc(profilePath,base());const results=await Promise.allSettled([saveSkillPanel(args()),startBattle({db:userDb('b'),familyId:appFamilyId,enemyId:'slime',battleId:'panel-race'})]);expect(results[1].status).toBe('fulfilled');const saved=(await getDoc(ref(userDb(),profilePath))).data(),battle=(await getDoc(ref(userDb(),appPath(appFamilyId,'rpgBattles','panel-race')))).data();expect(battle.playerSnapshot.skillPanelSnapshot.unlockedNodeIds).toEqual(saved.skillPanel?.unlockedNodeIds||[]);if(results[0].status==='rejected')expect(results[0].reason.code).toBe('PANEL_CHANGE_DURING_BATTLE');});
  it('leaves the profile and ledger intact on a failed client request, then retries safely',async()=>{await seedDoc(profilePath,base());await assertFails(saveSkillPanel({...args(),db:anonymousDb()}));expect((await getDoc(ref(userDb(),profilePath))).data()).not.toHaveProperty('skillPanel');expect((await saveSkillPanel(args())).applied).toBe(true);});
+});
+
+describe('job panels real transactions',()=>{
+ const profilePath=appPath(appFamilyId,'rpg','playerProfile');
+ const base=jobId=>({jobId,totalExp:totalExpForLevel(20),gold:3000,battleEnergy:30,statAllocation:{hp:9,mp:10},ownedEquipment:{iron_sword:true},equipped:{weapon:'iron_sword'},weeklyBoss:{totalClears:10},custom:{keep:true}});
+ it.each(Object.keys(JOB_CATALOG))('retains shared %s investments, restores effects on switching back, and captures MP cost once',async jobId=>{
+  await seedDoc(profilePath,base(jobId));const args={db:userDb('a'),familyId:appFamilyId,expectedJobId:jobId};
+  await saveSkillPanel({...args,nodeId:'attack_1',expectedRevision:0,actionId:'common'});
+  for(let i=1;i<=5;i++)await saveSkillPanel({...args,nodeId:'job_'+jobId+'_'+i,expectedRevision:i,actionId:'own-'+i});
+  const grown=(await getDoc(ref(userDb('b'),profilePath))).data(),stats=skillPanelStats(grown);expect(stats.used).toBe(21);expect(grown.gold).toBe(3000);
+  const other=jobId==='warrior'?'mage':'warrior';await changePlayerJob({db:userDb('b'),familyId:appFamilyId,jobId:other,expected:{jobId,revision:0},actionId:'switch'});
+  const inactive=(await getDoc(ref(userDb(),profilePath))).data();expect(inactive.skillPanel).toEqual(grown.skillPanel);expect(skillPanelStats(inactive).used).toBe(21);
+  expect(heroJobSnapshot(inactive).skillPanelSnapshot.effects).toEqual(heroJobSnapshot({...inactive,skillPanel:{unlockedNodeIds:['attack_1'],revision:6}}).skillPanelSnapshot.effects);
+  await changePlayerJob({db:userDb(),familyId:appFamilyId,jobId,expected:{jobId:other,revision:1},actionId:'switch-back'});
+  const restored=(await getDoc(ref(userDb(),profilePath))).data();expect(heroJobSnapshot(restored)).toEqual(heroJobSnapshot(grown));
+  const start=await startBattle({db:userDb(),familyId:appFamilyId,enemyId:'slime',battleId:'own-panel-battle'});expect(start.battle.playerSnapshot.skillPanelSnapshot.unlockedNodeIds).toEqual(grown.skillPanel.unlockedNodeIds);
+  await expect(changePlayerJob({db:userDb(),familyId:appFamilyId,jobId:other,expected:{jobId,revision:2},actionId:'mid-battle'})).rejects.toThrow('JOB_CHANGE_DURING_BATTLE');
+  const skill=jobId==='thief'?start.battle.playerSnapshot.skills.thunder_strike:jobId==='mage'?start.battle.playerSnapshot.skills.aqua_edge:Object.values(start.battle.playerSnapshot.skills)[0],request={db:userDb(),familyId:appFamilyId,battleId:'own-panel-battle',skillId:skill.id,actionId:'same-attack'};
+  const results=await Promise.all([useBattleSkill(request),useBattleSkill({...request,db:userDb('b')})]);expect(results.filter(r=>r.applied)).toHaveLength(1);
+  const saved=(await getDoc(ref(userDb(),appPath(appFamilyId,'rpgBattles','own-panel-battle')))).data();expect(saved.playerMp).toBe(start.battle.playerMp-skill.mpCost);expect(saved.playerSnapshot).toEqual(start.battle.playerSnapshot);const ledger=(await getDoc(ref(userDb(),appPath(appFamilyId,'rpgBattleLedger','same-attack')))).data();expect(ledger.skill.powerPercent).toBe(skill.powerPercent);expect(ledger.playerAttack.damage).toBe({adventurer:24,warrior:51,knight:9,mage:14,priest:8,thief:26}[jobId]);
+ },30000);
+ it('serializes job switching with own-panel purchase and never creates extra SP',async()=>{
+  await seedDoc(profilePath,base('adventurer'));const results=await Promise.allSettled([saveSkillPanel({db:userDb('a'),familyId:appFamilyId,nodeId:'job_adventurer_1',expectedRevision:0,expectedJobId:'adventurer',actionId:'purchase'}),changePlayerJob({db:userDb('b'),familyId:appFamilyId,jobId:'warrior',expected:{jobId:'adventurer',revision:0},actionId:'change'})]);expect(results[1].status).toBe('fulfilled');const saved=(await getDoc(ref(userDb(),profilePath))).data();expect(saved.jobId).toBe('warrior');expect(saved.gold).toBe(3000);expect(skillPanelStats(saved).used).toBe(results[0].status==='fulfilled'?2:0);if(results[0].status==='rejected')expect(results[0].reason.code).toBe('PANEL_PROFILE_CHANGED');
+ });
+ it.each(commonPanelBattles.map((change,index)=>[index,change]))('resumes common-panel v2.9.8 mode %s with unchanged bonuses/costs',async(_index,change)=>{
+  await seedDoc(profilePath,change.profile);await seedDoc(appPath(appFamilyId,'rpgBattles',change.battle.battleId),change.battle);await attackBattle({db:userDb(),familyId:appFamilyId,battleId:change.battle.battleId,actionId:'old-panel',targetEnemyInstanceId:change.battle.enemyStates?.[0].enemyInstanceId||null});const saved=(await getDoc(ref(userDb(),appPath(appFamilyId,'rpgBattles',change.battle.battleId)))).data();expect(saved.partySnapshot||saved.playerSnapshot).toEqual(change.battle.partySnapshot||change.battle.playerSnapshot);
+ });
 });

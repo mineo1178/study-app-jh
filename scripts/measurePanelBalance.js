@@ -5,7 +5,10 @@ const branch=kind=>Array.from({length:6},(_,i)=>kind+'_'+(i+1));
 export const PANEL_BUILDS={none:[],early:['attack_1','defense_1','magic_1','support_1'],attack:[...branch('attack'),...branch('magic')],defense:[...branch('defense'),...branch('support')],magic:[...branch('magic'),...branch('attack')],balanced:Array.from({length:6},(_,i)=>['attack','defense','magic','support'].map(kind=>kind+'_'+(i+1))).flat()};
 export function panelBuildProfile(base,build,progress,towerProgress) {
  let profile={...base,skillPanel:{unlockedNodeIds:[],revision:0}};
- for(const id of PANEL_BUILDS[build])if(panelNodeState(id,profile,progress,towerProgress).unlockable)profile={...profile,skillPanel:{unlockedNodeIds:[...profile.skillPanel.unlockedNodeIds,id],revision:profile.skillPanel.revision+1}};
+ const own=Array.from({length:5},(_,i)=>'job_'+base.jobId+'_'+(i+1));
+ const main=build==='attack'?'attack':build==='defense'?'defense':'magic';
+ const sequence=build==='none'?[]:build==='early'?[...PANEL_BUILDS.early,own[0]]:build==='balanced'?Array.from({length:6},(_,i)=>[...['attack','defense','magic','support'].map(kind=>kind+'_'+(i+1)),...(own[i]?[own[i]]:[])]).flat():[...Array.from({length:6},(_,i)=>[main+'_'+(i+1),...(own[i]?[own[i]]:[])]).flat(),...PANEL_BUILDS[build].filter(id=>!id.startsWith(main+'_'))];
+ for(const id of sequence)if(panelNodeState(id,profile,progress,towerProgress).unlockable)profile={...profile,skillPanel:{unlockedNodeIds:[...profile.skillPanel.unlockedNodeIds,id],revision:profile.skillPanel.revision+1}};
  return profile;
 }
 export function measurePanelBalance() {
