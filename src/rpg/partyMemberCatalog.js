@@ -1,3 +1,5 @@
+import { applyCompanionGrowth } from './companionGrowthSelectors.js';
+import { COMPANION_GROWTH_RULES_VERSION } from './companionGrowthCatalog.js';
 import { heroJobSnapshot } from './jobStats.js';
 import { JOB_RULES_VERSION } from './jobCatalog.js';
 import { calculatePlayerAttack, calculatePlayerDefense, BASE_PLAYER_MAX_HP } from './battleCalculator.js';
@@ -53,6 +55,7 @@ export function buildTowerPartySnapshot(profile, rules = {}) {
           : { maxHp: hero.maxHp * .95, attack: hero.attack * .85, defense: hero.defense + 1 };
     const multiplier = member.multiplier || 1;
     if (job) return { memberId, name: member.name, role: job.jobName, ...job };
-    return { memberId, name: member.name, role: member.role, maxHp: Math.round(stats.maxHp * multiplier) + (memberId === 'hero' ? growth.hpBonus : 0), ...(memberId === 'hero' ? { maxMp: growth.maxMp } : hasUnlimitedSkills(rules) ? { maxMp: COMPANION_MAX_MP[role] } : {}), attack: Math.round(stats.attack * multiplier), defense: Math.round(stats.defense * multiplier), skills: member.skillIds.map((id) => ({ ...partySkill(id), ...(memberId === 'hero' || hasUnlimitedSkills(rules) ? { mpCost: SKILL_MP_COSTS[id] ?? COMPANION_SKILL_MP_COSTS[id] } : {}), targetType: partySkill(id).targetType || (id === 'healing_light' ? 'single_ally' : id === 'guard_stance' ? 'self' : 'single_enemy') })) };
+    const snapshot = { memberId, name: member.name, role: member.role, maxHp: Math.round(stats.maxHp * multiplier) + (memberId === 'hero' ? growth.hpBonus : 0), ...(memberId === 'hero' ? { maxMp: growth.maxMp } : hasUnlimitedSkills(rules) ? { maxMp: COMPANION_MAX_MP[role] } : {}), attack: Math.round(stats.attack * multiplier), defense: Math.round(stats.defense * multiplier), skills: member.skillIds.map((id) => ({ ...partySkill(id), ...(memberId === 'hero' || hasUnlimitedSkills(rules) ? { mpCost: SKILL_MP_COSTS[id] ?? COMPANION_SKILL_MP_COSTS[id] } : {}), targetType: partySkill(id).targetType || (id === 'healing_light' ? 'single_ally' : id === 'guard_stance' ? 'self' : 'single_enemy') })) };
+    return memberId !== 'hero' && rules.companionGrowthRulesVersion === COMPANION_GROWTH_RULES_VERSION ? applyCompanionGrowth(profile, snapshot) : snapshot;
   });
 }

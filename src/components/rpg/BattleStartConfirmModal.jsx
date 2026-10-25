@@ -11,7 +11,9 @@ export default function BattleStartConfirmModal({ enemy, profile, towerProgress,
     dialogRef.current?.focus();
     return () => previous?.focus();
   }, [enemy]);
-  const data = buildBattlePreparation({ profile, candidate: enemy, towerProgress });
+  let data;
+  try { data = buildBattlePreparation({ profile, candidate: enemy, towerProgress }); }
+  catch { return <div className="fixed inset-0 z-[160] flex items-center justify-center bg-slate-900/60 p-4"><section ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="育成データの確認" className="w-full max-w-lg space-y-4 rounded-3xl bg-white p-4"><p role="alert">育成データを確認できないため、戦闘を開始できません。保存済みデータは変更していません。</p><button type="button" onClick={onCancel} className="min-h-11 rounded-xl bg-slate-100 px-4 py-3">閉じる</button></section></div>; }
   if (!data) return null;
   const keyDown = event => {
     if (event.key === 'Escape' && !starting) onCancel?.();

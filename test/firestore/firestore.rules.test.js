@@ -1,3 +1,5 @@
+import { saveCompanionGrowth } from '../../src/data/rpgCompanionGrowthRepository.js';
+import { startWeeklyBossBattle } from '../../src/data/rpgBattleRepository.js';
 import towerV4 from '../fixtures/rpg-v2.9.9-tower.json';
 import commonPanelBattles from '../fixtures/rpg-v2.9.8-panel-battles.json';
 import { heroJobSnapshot } from '../../src/rpg/jobStats.js';
@@ -410,4 +412,81 @@ describe('v2.9.10 Tower snapshot transactions',()=>{
   const profile=(await getDoc(ref(userDb(),appPath(appFamilyId,'rpg','playerProfile')))).data();
   expect(profile.battleEnergy).toBe(fixture.profile.battleEnergy-3);
  });
+});
+
+
+describe('v2.9.11 companion growth real transactions', () => {
+  const profilePath = appPath(appFamilyId, 'rpg', 'playerProfile');
+  const base = () => ({ totalExp: totalExpForLevel(20), gold: 500, battleEnergy: 100, partyMemberIds: ['hero', 'guardian', 'mage'], unlockedPartyMemberIds: ['hero', 'guardian', 'mage', 'healer', 'homura'], companionGrowth: {} });
+  const args = (memberId = 'guardian') => ({ db: userDb('a'), familyId: appFamilyId, memberId, actionId: 'growth-' + memberId, expectedRevision: 0, allocation: { hp: 5, mp: 0, attack: 0, defense: 0 }, unlockedNodeIds: ['vitality'] });
+  const saved = async () => (await getDoc(ref(userDb('read'), profilePath))).data();
+  it('deduplicates simultaneous sends across clients and records immutable canonical ledger', async () => {
+    await seedDoc(profilePath, base());
+    const results = await Promise.all([saveCompanionGrowth(args()), saveCompanionGrowth({ ...args(), db: userDb('b') })]);
+    expect(results.filter(r => r.applied)).toHaveLength(1);
+    expect((await saved()).companionGrowth.guardian).toMatchObject({ revision: 1, allocation: { hp: 5 } });
+    const ledger = ref(userDb(), appPath(appFamilyId, 'rpgActionLedger', 'growth-guardian'));
+    expect((await getDoc(ledger)).data()).toMatchObject({ memberId: 'guardian', cost: { gold: 0 }, after: { revision: 1 } });
+    await assertFails(updateDoc(ledger, { status: 'changed' }));
+  });
+  it('rejects stale concurrent edits for one member and permits an explicit latest-revision retry', async () => {
+    await seedDoc(profilePath, base());
+    const results = await Promise.allSettled([saveCompanionGrowth(args()), saveCompanionGrowth({ ...args(), db: userDb('b'), actionId: 'other', allocation: { hp: 0, mp: 5, attack: 0, defense: 0 } })]);
+    expect(results.filter(r => r.status === 'fulfilled')).toHaveLength(1);
+    expect(results.find(r => r.status === 'rejected').reason.code).toBe('COMPANION_PROFILE_CHANGED');
+    await saveCompanionGrowth({ ...args(), actionId: 'latest', kind: 'reset', expectedRevision: 1 });
+    expect((await saved()).companionGrowth.guardian.revision).toBe(2);
+  });
+  it('merges different members under contention without losing either member or unrelated data', async () => {
+    const before = { ...base(), custom: { preserved: true }, skillPanel: { unlockedNodeIds: [], revision: 7 } };
+    await seedDoc(profilePath, before);
+    const results = await Promise.all([saveCompanionGrowth(args()), saveCompanionGrowth({ ...args('mage'), db: userDb('b') })]);
+    expect(results.every(r => r.applied)).toBe(true);
+    expect(await saved()).toMatchObject({ ...before, companionGrowth: { guardian: { revision: 1 }, mage: { revision: 1 } } });
+  });
+  it('charges one reset exactly once and leaves the other member intact', async () => {
+    await seedDoc(profilePath, base()); await saveCompanionGrowth(args()); await saveCompanionGrowth(args('mage'));
+    const reset = { ...args(), actionId: 'reset', kind: 'reset', expectedRevision: 1 };
+    const results = await Promise.all([saveCompanionGrowth(reset), saveCompanionGrowth({ ...reset, db: userDb('b') })]);
+    expect(results.filter(r => r.applied)).toHaveLength(1);
+    expect(await saved()).toMatchObject({ gold: 400, companionGrowth: { guardian: { revision: 2, unlockedNodeIds: [], allocation: { hp: 0 } }, mage: { revision: 1, allocation: { hp: 5 } } } });
+  });
+  it('prevents concurrent paid resets from overspending shared GOLD', async () => {
+    await seedDoc(profilePath, base()); await saveCompanionGrowth(args()); await saveCompanionGrowth(args('mage'));
+    await updateDoc(ref(userDb(), profilePath), { gold: 100 });
+    const results = await Promise.allSettled(['guardian', 'mage'].map(memberId => saveCompanionGrowth({ ...args(memberId), db: userDb(memberId), kind: 'reset', actionId: 'paid-' + memberId, expectedRevision: 1 })));
+    expect(results.filter(r => r.status === 'fulfilled')).toHaveLength(1); expect(results.find(r => r.status === 'rejected').reason.code).toBe('INSUFFICIENT_GOLD'); expect((await saved()).gold).toBe(0);
+  });
+  it('rejects locked, unknown, over-budget, disconnected and stale requests atomically', async () => {
+    const before = base(); await seedDoc(profilePath, before);
+    for (const patch of [{ memberId: 'hero' }, { memberId: 'terra' }, { allocation: { hp: 0, mp: 0, attack: 7, defense: 0 } }, { unlockedNodeIds: ['signature'] }, { expectedRevision: 99 }, { unlockedNodeIds: ['vitality', 'focus', 'offense', 'defense', 'aptitude', 'signature'], allocation: { hp: 12, mp: 12, attack: 0, defense: 0 } }]) await expect(saveCompanionGrowth({ ...args(), ...patch })).rejects.toBeTruthy();
+    expect(await saved()).toEqual(before); expect((await getDoc(ref(userDb(), appPath(appFamilyId, 'rpgActionLedger', 'growth-guardian')))).exists()).toBe(false);
+  });
+  it('derives old-profile budgets from EXP and refuses corrupt states without normalization', async () => {
+    const before = base(); delete before.companionGrowth; await seedDoc(profilePath, { ...before, totalExp: 0, level: 99 });
+    await expect(saveCompanionGrowth(args())).rejects.toThrow('COMPANION_POINTS_EXCEEDED');
+    await seedDoc(profilePath, before); await saveCompanionGrowth(args()); expect((await saved()).companionGrowth.guardian.revision).toBe(1);
+    for (const bad of [null, { guardian: null }, { guardian: { allocation: { hp: 0, mp: 0, attack: 0, defense: 0 }, unlockedNodeIds: ['signature'], revision: 0 } }]) {
+      await seedDoc(profilePath, { ...before, companionGrowth: bad }); await expect(saveCompanionGrowth({ ...args(), actionId: 'corrupt' })).rejects.toBeTruthy(); expect((await saved()).companionGrowth).toEqual(bad);
+    }
+  });
+  it('blocks corrections and unauthorized clients and retries safely with the same action ID', async () => {
+    await seedDoc(profilePath, base()); await assertFails(saveCompanionGrowth({ ...args(), db: anonymousDb() })); await saveCompanionGrowth(args());
+    await seedDoc(appPath(appFamilyId, 'rewardIntegrity', 'current'), { pendingSessionIds: ['pending'] });
+    const reset = { ...args(), kind: 'reset', actionId: 'reset-correction', expectedRevision: 1 };
+    await expect(saveCompanionGrowth(reset)).rejects.toThrow('REWARD_CORRECTION_PENDING'); expect((await saved()).gold).toBe(500);
+    await seedDoc(appPath(appFamilyId, 'rewardIntegrity', 'current'), { pendingSessionIds: [] }); expect((await saveCompanionGrowth(reset)).applied).toBe(true);
+  });
+  it.each(['tower', 'weekly'])('serializes growth against new %s battle start and freezes committed stats', async mode => {
+    await seedDoc(profilePath, base()); await seedDoc(appPath(appFamilyId, 'rpgProgress', 'current'), { campaignCompleted: true });
+    const start = mode === 'tower' ? startTowerBattle : startWeeklyBossBattle;
+    const results = await Promise.allSettled([saveCompanionGrowth(args()), start({ db: userDb('b'), familyId: appFamilyId, battleId: 'growth-battle' })]);
+    expect(results[1].status).toBe('fulfilled');
+    const current = await saved(), battle = (await getDoc(ref(userDb(), appPath(appFamilyId, 'rpgBattles', 'growth-battle')))).data();
+    const member = battle.partySnapshot.members.find(m => m.memberId === 'guardian');
+    expect(member.companionGrowthSnapshot.allocation.hp).toBe(current.companionGrowth.guardian?.allocation.hp || 0);
+    expect(member.companionGrowthSnapshot.rulesVersion).toBe(1);
+    if (results[0].status === 'rejected') expect(results[0].reason.code).toBe('COMPANION_CHANGE_DURING_BATTLE');
+    await expect(saveCompanionGrowth({ ...args('mage'), actionId: 'during' })).rejects.toThrow('COMPANION_CHANGE_DURING_BATTLE');
+  });
 });

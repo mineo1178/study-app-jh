@@ -1,3 +1,4 @@
+import { COMPANION_GROWTH_RULES_VERSION } from './companionGrowthCatalog.js';
 import { SKILL_RULES_VERSION } from './skillRules.js';
 import { heroJobSnapshot } from './jobStats.js';
 import { JOB_RULES_VERSION } from './jobCatalog.js';
@@ -26,7 +27,7 @@ export function equipmentPreview(profile, slot, itemId) {
 export function partyPreview(profile, ids) {
   const safe = normalizePlayerProfile(profile || {});
   validatePartyMemberIds(ids, safe.unlockedPartyMemberIds);
-  return buildTowerPartySnapshot({ ...safe, partyMemberIds: ids }, { skillRulesVersion: SKILL_RULES_VERSION, jobRulesVersion: JOB_RULES_VERSION });
+  return buildTowerPartySnapshot({ ...safe, partyMemberIds: ids }, { skillRulesVersion: SKILL_RULES_VERSION, jobRulesVersion: JOB_RULES_VERSION, companionGrowthRulesVersion: COMPANION_GROWTH_RULES_VERSION });
 }
 
 export function partySummary(members) {
@@ -77,7 +78,7 @@ export function buildBattlePreparation({ profile, candidate, towerProgress }) {
   const target = candidate.isWeekly ? getWeeklyBossDefinition(candidate.weekId) : candidate.isBoss ? getBoss(candidate.id) : getEnemyCatalogItem(candidate.id);
   const enemies = encounter?.enemies || (target ? [target] : []);
   if (!enemies.length) return null;
-  const members = solo ? [{ memberId: 'hero', name: '主人公', role: 'バランス型', ...heroJobSnapshot(safe) }] : buildTowerPartySnapshot(safe, { skillRulesVersion: SKILL_RULES_VERSION, jobRulesVersion: JOB_RULES_VERSION });
+  const members = solo ? [{ memberId: 'hero', name: '主人公', role: 'バランス型', ...heroJobSnapshot(safe) }] : buildTowerPartySnapshot(safe, { skillRulesVersion: SKILL_RULES_VERSION, jobRulesVersion: JOB_RULES_VERSION, companionGrowthRulesVersion: COMPANION_GROWTH_RULES_VERSION });
   const affinities = enemySkillAffinities(enemies, members);
   const equipment = EQUIPMENT_SLOTS.map(slot => {
     const item = EQUIPMENT_CATALOG[safe.equipped[slot]];

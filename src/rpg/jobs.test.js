@@ -30,7 +30,7 @@ describe('job changes and captured combat',()=>{
     }
     const tower=preparePartyTowerStart({profile:restored,encounter:buildTowerEncounter({floor:10}),battleId:'tower',now:1}).battle;
     expect(tower.partySnapshot.members[0]).toMatchObject(heroJobSnapshot(restored,{party:true}));
-    const baseline=buildTowerPartySnapshot(profile(),{skillRulesVersion:2,jobRulesVersion:1});expect(tower.partySnapshot.members.slice(1)).toEqual(baseline.slice(1));
+    const baseline=buildTowerPartySnapshot(profile(),{skillRulesVersion:2,jobRulesVersion:1,companionGrowthRulesVersion:1});expect(tower.partySnapshot.members.slice(1)).toEqual(baseline.slice(1));
     const skill=tower.partySnapshot.members[0].skills[0];
     const next=preparePartyBattleAction({battle:tower,action:{skillId:skill.id,targetEnemyInstanceId:tower.enemyStates[0].enemyInstanceId},now:2}).battle;
     expect(next.playerMp).toBe(tower.playerMp-skill.mpCost);expect(findUndefinedPaths(next)).toEqual([]);

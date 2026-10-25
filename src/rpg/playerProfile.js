@@ -19,6 +19,7 @@ export const createEmptyPlayerProfile = () => ({
   statAllocation: { hp: 0, mp: 0 },
   jobId: 'adventurer',
   skillPanel: { unlockedNodeIds: [], revision: 0 },
+  companionGrowth: {},
   activeBattleId: null,
   partyMemberIds: [...DEFAULT_PARTY_MEMBER_IDS],
   unlockedPartyMemberIds: [...STARTER_PARTY_MEMBER_IDS],
