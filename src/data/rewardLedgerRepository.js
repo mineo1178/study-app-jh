@@ -1,5 +1,5 @@
 import { doc, runTransaction, setDoc } from 'firebase/firestore';
-import { REWARD_POLICY_VERSION, REWARD_SCHEMA_VERSION } from '../rpg/rewardConfig.js';
+import { REWARD_SCHEMA_VERSION } from '../rpg/rewardConfig.js';
 import { createEmptyPlayerProfile, normalizePlayerProfile } from '../rpg/playerProfile.js';
 import { calculateStudyReward, isStudySessionRewardEligible } from '../rpg/rewardCalculator.js';
 
@@ -60,19 +60,27 @@ export async function applyStudySessionReward({ db, familyId, session }) {
     if (!prepared.eligible) return { applied: false, reason: prepared.reason };
     const nextProfile = applyRewardToPlayerProfile(profileSnap.exists() ? profileSnap.data() : emptyPlayerProfile(), prepared.rewards, now);
     transaction.set(profile, nextProfile);
-    transaction.set(ledger, { schemaVersion: REWARD_SCHEMA_VERSION, studySessionId: canonicalSession.id, timerId: canonicalSession.timerId || null, rewardPolicyVersion: REWARD_POLICY_VERSION, basis: prepared.basis, rewards: prepared.rewards, status: 'applied', appliedAt: now, reversal: null });
+    transaction.set(ledger, { schemaVersion: REWARD_SCHEMA_VERSION, studySessionId: canonicalSession.id, timerId: canonicalSession.timerId || null, rewardPolicyVersion: canonicalSession.rewardPolicyVersion, basis: prepared.basis, rewards: prepared.rewards, status: 'applied', appliedAt: now, reversal: null });
     return { applied: true, rewards: prepared.rewards };
   });
 }
 
+export function prepareStudyRewardReversal(entry, current, now) {
+  if (!entry) throw new Error('REWARD_LEDGER_NOT_FOUND');
+  if (entry.status === 'reversed') return { reversed: false, reason: 'ALREADY_REVERSED' };
+  if (entry.correctionStatus === 'reversal_pending') throw new Error('REWARD_CORRECTION_PENDING');
+  const rewards = entry.effectiveRewards || entry.rewards;
+  const materialBalance = Number(current?.materials?.[rewards.material.key]) || 0;
+  if (!current || current.gold < rewards.gold || current.battleEnergy < rewards.battleEnergy || materialBalance < rewards.material.quantity) throw new Error('REWARD_PROFILE_INCONSISTENT');
+  return { reversed: true, profilePatch: { gold: current.gold - rewards.gold, battleEnergy: current.battleEnergy - rewards.battleEnergy, ['materials.' + rewards.material.key]: materialBalance - rewards.material.quantity, updatedAt: now }, ledgerPatch: { status: 'reversed', reversal: { reversedAt: now, reason: 'manual', rewards } } };
+}
 export async function reverseStudySessionReward({ db, familyId, sessionId }) {
   const ledger = rewardLedgerRef(db, familyId, sessionId); const profile = playerProfileRef(db, familyId);
-  return runTransaction(db, async (transaction) => {
+  return runTransaction(db, async transaction => {
     const [ledgerSnap, profileSnap] = await Promise.all([transaction.get(ledger), transaction.get(profile)]);
-    if (!ledgerSnap.exists()) throw new Error('REWARD_LEDGER_NOT_FOUND');
-    const entry = ledgerSnap.data(); if (entry.status === 'reversed') return { reversed: false, reason: 'ALREADY_REVERSED' };
-    const current = profileSnap.data(); if (!current || current.gold < entry.rewards.gold || current.battleEnergy < entry.rewards.battleEnergy || (current.materials?.[entry.rewards.material.key] || 0) < entry.rewards.material.quantity) throw new Error('REWARD_PROFILE_INCONSISTENT');
-    transaction.update(profile, { gold: current.gold - entry.rewards.gold, battleEnergy: current.battleEnergy - entry.rewards.battleEnergy, [`materials.${entry.rewards.material.key}`]: current.materials[entry.rewards.material.key] - entry.rewards.material.quantity, updatedAt: Date.now() });
-    transaction.update(ledger, { status: 'reversed', reversal: { reversedAt: Date.now(), reason: 'manual' } }); return { reversed: true };
+    const change = prepareStudyRewardReversal(ledgerSnap.exists() ? ledgerSnap.data() : null, profileSnap.data(), Date.now());
+    if (!change.reversed) return change;
+    transaction.update(profile, change.profilePatch); transaction.update(ledger, change.ledgerPatch);
+    return { reversed: true };
   });
 }

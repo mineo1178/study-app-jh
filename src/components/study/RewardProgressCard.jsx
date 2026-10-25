@@ -1,7 +1,7 @@
 export default function RewardProgressCard({ progress, onOpenRpg }) {
   return <section className="min-w-0 rounded-[2rem] border border-violet-100 bg-white p-5 sm:p-6 text-left shadow-sm" aria-label="次の報酬">
     <h3 className="text-lg font-black text-slate-800">次の報酬に向けて</h3>
-    <p className="mt-2 text-xs font-bold leading-relaxed text-slate-500">有効な学習を記録するとGOLDと素材が増えます。確定済みの所持数を表示し、計測中の時間は含みません。</p>
+    <p className="mt-2 text-xs font-bold leading-relaxed text-slate-500">新しく開始する有効な学習は1分100G、30分で3,000G（記録ごとに1分未満を切り捨て）。確定済みの所持数を表示し、計測中の時間は含みません。以下の学習時間は獲得見込みの目安です。</p>
     {progress.status === 'loading' ? <p role="status" className="mt-4 text-sm text-slate-500">報酬を確認しています。読み込み後に次の目標を表示します。</p> : <>
       {progress.status === 'blocked' && <p className="mt-4 text-sm text-amber-700">報酬の訂正が確認待ちです。「確認」画面で内容を確認してください。完了するまで購入・ガチャは利用できません。</p>}
       <div className="mt-4 grid min-w-0 gap-3 sm:grid-cols-2">

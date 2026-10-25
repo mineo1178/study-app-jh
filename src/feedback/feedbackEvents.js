@@ -55,7 +55,7 @@ export function studyFeedback(result, taskName, reward) {
   const details = [`有効学習時間 ${formatHms(session.recordedSeconds)}`];
   if (reward?.applied && reward.rewards) {
     const rewards = reward.rewards;
-    details.push(`GOLD +${rewards.gold} / ENERGY +${rewards.battleEnergy}`);
+    details.push(`GOLD +${Number(rewards.gold).toLocaleString('ja-JP')} / ENERGY +${rewards.battleEnergy}`);
     if (Number.isFinite(rewards.expGranted)) details.push(`EXP +${rewards.expGranted}`);
   } else if (session.rewardPolicyVersion) details.push('RPG報酬は既存の自動反映処理で確認されます');
   return [{ key: `study:${id}`, type: 'study_complete', title: '学習完了！', name: taskName, details }];

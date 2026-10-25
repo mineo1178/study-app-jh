@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { deriveRewardProgress, studySecondsForGold } from './rewardProgress.js';
 import { TICKET_PRICES } from './gachaCatalog.js';
 import { EQUIPMENT_CATALOG } from './equipmentCatalog.js';
+import { REWARD_POLICY_VERSION } from './rewardConfig.js';
 import { calculateStudyReward } from './rewardCalculator.js';
 
 describe('confirmed reward progress', () => {
@@ -14,8 +15,8 @@ describe('confirmed reward progress', () => {
   });
   it('inverts the existing study reward calculator at the exact boundary', () => {
     const seconds = studySecondsForGold(15);
-    expect(calculateStudyReward({ recordedSeconds: seconds }).gold).toBe(15);
-    expect(calculateStudyReward({ recordedSeconds: seconds - 1 }).gold).toBe(14);
+    expect(calculateStudyReward({ rewardPolicyVersion: REWARD_POLICY_VERSION, recordedSeconds: seconds }).gold).toBeGreaterThanOrEqual(15);
+    expect(calculateStudyReward({ rewardPolicyVersion: REWARD_POLICY_VERSION, recordedSeconds: seconds - 1 }).gold).toBeLessThan(15);
   });
   it('handles zero and unsupported extreme gold without an unbounded search', () => {
     expect(studySecondsForGold(0)).toBe(0);
@@ -50,7 +51,7 @@ describe('confirmed reward progress', () => {
   it('does not count live, invalid or unclaimed rewards as confirmed currency', () => {
     const profile = { gold: 0, liveTimer: { recordedSeconds: 7200 }, sessions: [{ recordedSeconds: 7200, validation: { status: 'invalid' } }], unclaimedQuestGold: 120 };
     expect(deriveRewardProgress(profile).goals[0].available).toBe(false);
-    expect(deriveRewardProgress(profile).goals[0].remainingMinutes).toBe(price);
+    expect(deriveRewardProgress(profile).goals[0].remainingMinutes).toBe(Math.ceil(price / 100));
   });
   it('keeps locked purchases unavailable while corrections are pending', () => {
     const result = deriveRewardProgress({ gold: price, gacha: { ticketBalances: { normal: 1 } } }, { blocked: true });

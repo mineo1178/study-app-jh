@@ -3,7 +3,7 @@ import { diagnosticTimerState, recordTimerDiagnostic, traceTimerOperation } from
 import { inferLegacyActivityType, normalizeActivityType } from '../integrity/activityTypes.js';
 import { VALIDATION_VERSION } from '../integrity/validationConfig.js';
 import { validateStudySession } from '../integrity/studyValidation.js';
-import { REWARD_POLICY_VERSION } from '../rpg/rewardConfig.js';
+import { REWARD_POLICY_VERSION, LEGACY_REWARD_POLICY_VERSION } from '../rpg/rewardConfig.js';
 import { closeSegment, isActiveTimer, isStaleActiveTimer, timerRecordedSeconds, timerSegmentsAtEnd } from '../timer/timerEngine.js';
 import { IDLE_AUTO_STOP_SECONDS } from '../timer/timerIdle.js';
 import { timerStaleObserver } from '../timer/timerStale.js';
@@ -20,6 +20,7 @@ export function buildActiveTimer({ task, timerId, ownerClientId, now = Date.now(
   return {
     timerId,
     taskId: task.id,
+    rewardPolicyVersion: REWARD_POLICY_VERSION,
     ownerClientId,
     state: 'running',
     segments: [],
@@ -129,7 +130,7 @@ export function buildForcedInvalidTimerSession(timer, task = {}, reasonCode, now
   const segments = timerSegmentsAtEnd(timer, endAt);
   return {
     timerId: timer.timerId,
-    rewardPolicyVersion: REWARD_POLICY_VERSION,
+    rewardPolicyVersion: timer.rewardPolicyVersion || LEGACY_REWARD_POLICY_VERSION,
     taskId: timer.taskId,
     taskSnapshot: {
       categoryId: taskSnapshot.categoryId || null,
@@ -234,7 +235,7 @@ export function buildFinishedTimerSession(timer, task = {}, { endAt = Date.now()
   const needsReview = reviewReasons.length > 0 && baseValidation.status !== 'invalid';
   return {
     timerId: timer.timerId,
-    rewardPolicyVersion: REWARD_POLICY_VERSION,
+    rewardPolicyVersion: timer.rewardPolicyVersion || LEGACY_REWARD_POLICY_VERSION,
     taskId: timer.taskId,
     taskSnapshot: {
       categoryId: taskSnapshot.categoryId || null,

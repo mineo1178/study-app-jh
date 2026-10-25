@@ -1,7 +1,7 @@
 import { doc, runTransaction } from 'firebase/firestore';
 import { validateStudySession } from '../integrity/studyValidation.js';
 import { applyRewardToPlayerProfile, emptyPlayerProfile, playerProfileRef, prepareCanonicalStudySessionReward, rewardLedgerRef } from './rewardLedgerRepository.js';
-import { REWARD_POLICY_VERSION, REWARD_SCHEMA_VERSION } from '../rpg/rewardConfig.js';
+import { REWARD_SCHEMA_VERSION } from '../rpg/rewardConfig.js';
 import { diagnosticErrorCode, recordTimerDiagnostic } from '../timer/timerDiagnostics.js';
 
 export const isPendingStudyTimeReview = (session) => session?.timeReview?.status === 'pending'
@@ -57,7 +57,7 @@ export async function confirmStudyTime({ db, familyId, sessionId, targetSeconds,
       if (targetSeconds > 0 && prepared.eligible) {
         transaction.set(profileRef, applyRewardToPlayerProfile(profileSnap.exists() ? profileSnap.data() : emptyPlayerProfile(), prepared.rewards, now));
         transaction.set(ledgerRef, { schemaVersion: REWARD_SCHEMA_VERSION, studySessionId: sessionId,
-          timerId: session.timerId || null, rewardPolicyVersion: REWARD_POLICY_VERSION,
+          timerId: session.timerId || null, rewardPolicyVersion: session.rewardPolicyVersion,
           basis: prepared.basis, rewards: prepared.rewards, status: 'applied', appliedAt: now, reversal: null });
       }
       return { session: confirmed, alreadyConfirmed: false, applied: targetSeconds > 0 && prepared.eligible, rewards: prepared.rewards || null };

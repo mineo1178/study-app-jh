@@ -1,6 +1,6 @@
 import { TICKET_PRICES, TICKET_TYPES } from './gachaCatalog.js';
 import { EQUIPMENT_CATALOG } from './equipmentCatalog.js';
-import { MATERIAL_DEFS } from './rewardConfig.js';
+import { REWARD_POLICY_VERSION, MATERIAL_DEFS } from './rewardConfig.js';
 import { calculateStudyReward } from './rewardCalculator.js';
 
 const amount = (value) => Number.isFinite(Number(value)) ? Math.max(0, Math.floor(Number(value))) : 0;
@@ -10,13 +10,13 @@ const requirement = (id, current, target, unit) => ({ id, current: amount(curren
 export function studySecondsForGold(gold) {
   const target = amount(gold);
   if (!target) return 0;
-  if (target > calculateStudyReward({ recordedSeconds: Number.MAX_SAFE_INTEGER }).gold) return null;
+  if (target > calculateStudyReward({ rewardPolicyVersion: REWARD_POLICY_VERSION, recordedSeconds: Number.MAX_SAFE_INTEGER }).gold) return null;
   let high = 1;
-  while (calculateStudyReward({ recordedSeconds: high }).gold < target) high *= 2;
+  while (calculateStudyReward({ rewardPolicyVersion: REWARD_POLICY_VERSION, recordedSeconds: high }).gold < target) high *= 2;
   let low = 0;
   while (low < high) {
     const middle = low + Math.floor((high - low) / 2);
-    if (calculateStudyReward({ recordedSeconds: middle }).gold >= target) high = middle;
+    if (calculateStudyReward({ rewardPolicyVersion: REWARD_POLICY_VERSION, recordedSeconds: middle }).gold >= target) high = middle;
     else low = middle + 1;
   }
   return low;

@@ -13,6 +13,7 @@ import { activeTimerRef, finishActiveTimer, heartbeatActiveTimer, invalidateStal
 import { studySessionsCollection } from './data/studySessionRepository';
 import { applyStudySessionReward, emptyPlayerProfile, playerProfileRef, rewardLedgerRef, updateSelectedTitle } from './data/rewardLedgerRepository';
 import { correctStudySessionReward, retryPendingRewardCorrection, rewardIntegrityRef } from './data/rewardCorrectionRepository';
+import StudyRewardHistory from './components/study/StudyRewardHistory.jsx';
 import { changePlayerJob } from './data/rpgJobRepository.js';
 import { saveStatAllocation } from './data/rpgStatAllocationRepository.js';
 import { createRpgActionId, equipItem, purchaseEquipment, purchaseResource, unequipSlot } from './data/rpgShopRepository';
@@ -109,7 +110,7 @@ const getTasksCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-
 const getTestsCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tests');
 const getStudySessionsCol = () => studySessionsCollection(db, FAMILY_ID);
 const getActiveTimerRef = () => activeTimerRef(db, FAMILY_ID);
-const APP_VERSION = 'v2.9.5';
+const APP_VERSION = 'v2.9.6';
 const isDocumentHidden = () => typeof document !== 'undefined' && document.hidden;
 // ==========================================
 // Constants & Master Data
@@ -1413,6 +1414,11 @@ export default function App() {
             setRpgStatus({ kind: 'error', message: code === 'QUEST_NOT_COMPLETED' ? 'クエスト条件を達成していません' : code === 'QUEST_ALREADY_CLAIMED' ? 'このクエストはすでに受取済みです' : 'クエスト報酬の受取に失敗しました' });
         } finally { setPendingQuestId(null); }
     };
+    const loadStudyRewardLedger = async sessionId => {
+        if (isSampleMode || !user) return null;
+        const snap = await getDoc(rewardLedgerRef(db, FAMILY_ID, sessionId));
+        return snap.exists() ? snap.data() : null;
+    };
     const handleChangeJob = async request => {
         if (isSampleMode || !user) throw new Error('JOB_SAVE_UNAVAILABLE');
         return changePlayerJob({ db, familyId: FAMILY_ID, ...request });
@@ -2407,6 +2413,7 @@ export default function App() {
                                        <span className="text-[10px] font-black bg-slate-50 text-slate-500 px-3 py-1 rounded-full mb-2 inline-block text-left">{h.date}</span>
                                        {h.validation?.status !== 'valid' && <span className={`ml-2 text-[10px] font-black px-2 py-1 rounded-full ${h.validation?.status === 'invalid' ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-600'}`}>{h.validation?.status === 'invalid' ? '無効' : '要確認'}</span>}
                                        <p className="font-bold text-slate-500 text-xs leading-snug break-words text-left">{h.memo || "詳細なし"}</p>
+                                       {!isSampleMode && studySessions.some(session => session.id === h.id && session.rewardPolicyVersion) && <StudyRewardHistory key={`${user?.uid}-${h.id}`} sessionId={h.id} loadLedger={loadStudyRewardLedger}/>}
                                        {canReview && isCanonicalHistoryCorrectionTarget(studySessions.find((session) => session.id === h.id)) && <button type="button" onClick={() => openHistoryCorrection(studySessions.find((session) => session.id === h.id), h.validation?.status === 'pending_review' ? 'valid' : 'valid')} className="mt-3 rounded-lg bg-slate-100 px-3 py-2 text-[10px] font-black text-slate-600 hover:bg-blue-50 hover:text-blue-700">履歴を訂正</button>}
                                     </div>
                                     <div className="text-blue-600 font-mono font-black text-xl tracking-tighter shrink-0 self-end sm:self-auto text-left">{formatDuration(h.recordedSeconds ?? h.duration)}</div>

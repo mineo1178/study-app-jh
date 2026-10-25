@@ -1,4 +1,6 @@
-export const REWARD_POLICY_VERSION = 'rpg-reward-v1';
+export const LEGACY_REWARD_POLICY_VERSION = 'rpg-reward-v1';
+export const REWARD_POLICY_VERSION = 'rpg-reward-v2';
+export const GOLD_PER_MINUTE_BY_POLICY = Object.freeze({ [LEGACY_REWARD_POLICY_VERSION]: 1, [REWARD_POLICY_VERSION]: 100 });
 export const REWARD_SCHEMA_VERSION = 1;
 export const MATERIAL_KEYS = ['iron', 'wisdom_scroll', 'mana_rune', 'mineral', 'history_seal', 'logic_core', 'vitality', 'resonance', 'craft_cloth', 'general_essence'];
 export const MATERIAL_DEFS = {

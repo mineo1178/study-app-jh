@@ -65,7 +65,7 @@ describe('study time confirmation and canonical rewards', () => {
     const result = await confirm(seconds);
     expect(result.session).toMatchObject({ recordedSeconds: seconds, validation: { status: 'valid' }, timeReview: { status: 'confirmed', measuredSeconds: 900, confirmedSeconds: seconds, source: 'self_report', originalSegments: original.segments } });
     expect(getEffectiveStudySeconds(getUnifiedStudySessions([], [result.session]))).toBe(seconds);
-    expect(state.store.get(profileRef)?.gold || 0).toBe(Math.floor(seconds / 60));
+    expect(state.store.get(profileRef)?.gold || 0).toBe(Math.floor(seconds / 60) * 100);
     expect(state.store.get(profileRef)?.battleEnergy || 0).toBe(Math.floor(seconds / 900));
     expect(state.store.has(ledgerRef)).toBe(seconds > 0);
     expect((await confirm(0, 'second-device')).alreadyConfirmed).toBe(true);
@@ -93,14 +93,14 @@ describe('study time confirmation and canonical rewards', () => {
     expect(state.store.get(sessionRef).timeReview.status).toBe('pending');
     expect(state.store.get(profileRef)).toEqual({ gold: 5 });
     expect(state.store.has(ledgerRef)).toBe(false);
-    state.fail = false; await confirm(); expect(state.store.get(profileRef).gold).toBe(20);
+    state.fail = false; await confirm(); expect(state.store.get(profileRef).gold).toBe(1505);
   });
   it('concurrent devices, different submitted durations, and reward reconciliation award once', async () => {
     await pending();
     const results = await Promise.all([confirm(600, 'device-a'), confirm(900, 'device-b'), applyStudySessionReward({ ...args, session: { id: 't' } })]);
     expect(results.filter((result) => result.alreadyConfirmed === false)).toHaveLength(1);
     expect(state.store.get(sessionRef).recordedSeconds).toBe(600);
-    expect(state.store.get(profileRef).gold).toBe(10);
+    expect(state.store.get(profileRef).gold).toBe(1000);
     expect([...state.store.keys()].filter((key) => key.includes('/rewardLedger/'))).toEqual([ledgerRef]);
   });
   it('rechecks a session that became invalid during the transaction', async () => {

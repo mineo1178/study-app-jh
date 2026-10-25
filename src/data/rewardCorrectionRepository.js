@@ -1,4 +1,5 @@
 import { doc, runTransaction } from 'firebase/firestore';
+import { LEGACY_REWARD_POLICY_VERSION } from '../rpg/rewardConfig.js';
 import { calculateStudyReward, materialForSubject } from '../rpg/rewardCalculator.js';
 import { normalizePlayerProfile } from '../rpg/playerProfile.js';
 import { playerProfileRef, rewardLedgerRef } from './rewardLedgerRepository.js';
@@ -122,7 +123,8 @@ export function prepareRewardCorrection({ session, ledger = null, profile = {}, 
 
   const originalRewards = normalizeRewards(ledger.rewards, materialForSubject(session.taskSnapshot?.subjectId || session.subjectId));
   const effectiveRewards = normalizeRewards(ledger.effectiveRewards || ledger.rewards, originalRewards.material.key);
-  const calculatedTarget = calculateStudyReward({ ...session, recordedSeconds: targetSeconds, validation: { ...validation, status: 'valid' } });
+  const rewardPolicyVersion = ledger.rewardPolicyVersion ?? session.rewardPolicyVersion ?? LEGACY_REWARD_POLICY_VERSION;
+  const calculatedTarget = calculateStudyReward({ ...session, rewardPolicyVersion, recordedSeconds: targetSeconds, validation: { ...validation, status: 'valid' } });
   if (calculatedTarget.material.key !== originalRewards.material.key) throw correctionFailure('CORRECTION_MATERIAL_CHANGE_NOT_SUPPORTED');
   const targetRewards = targetStatus === 'invalid'
     ? zeroRewards(originalRewards.material.key)
@@ -140,6 +142,7 @@ export function prepareRewardCorrection({ session, ledger = null, profile = {}, 
   const adjustment = {
     schemaVersion: REWARD_ADJUSTMENT_SCHEMA_VERSION,
     type: 'reward_correction',
+    rewardPolicyVersion,
     adjustmentId,
     studySessionId: session.id,
     revision,

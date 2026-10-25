@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { buildFinishedTimerSession, buildStaleTimerInvalidSession, buildTimerSwitchPlan, canFinishActiveTimer, canForceInvalidateStaleTimer, canHeartbeatActiveTimer, staleTimerSessionId } from './activeTimerRepository';
 import { getEffectiveStudySeconds } from './studySessionSelectors';
 import { gameProgress } from '../gameLogic';
-import { REWARD_POLICY_VERSION } from '../rpg/rewardConfig';
+import { LEGACY_REWARD_POLICY_VERSION } from '../rpg/rewardConfig';
 import { findUndefinedPaths } from '../test/findUndefinedPaths.js';
 import { staleObservation } from '../test/staleObservation.js';
 
@@ -18,7 +18,7 @@ describe('forced stale timer invalidation', () => {
     const session = buildStaleTimerInvalidSession(staleTimer, task, start + 16 * 60 * 1000);
     expect(session).toMatchObject({
       timerId: 'timer-stale-1', taskId: 'math', recordedSeconds: 60,
-      rewardPolicyVersion: REWARD_POLICY_VERSION,
+      rewardPolicyVersion: LEGACY_REWARD_POLICY_VERSION,
       validation: { status: 'invalid', reasonCodes: ['stale_timer_forced_invalid'] },
     });
     expect(session.segments).toEqual([{ startedAt: start, endedAt: start + 60 * 1000, durationSeconds: 60 }]);
