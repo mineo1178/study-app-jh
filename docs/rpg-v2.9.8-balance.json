@@ -1,0 +1,771 @@
+{
+  "cases": 1404,
+  "groups": [
+    {
+      "jobId": "adventurer",
+      "build": "none",
+      "cases": 39,
+      "beforeWins": 37,
+      "afterWins": 37,
+      "oneRoundWeekly": 0,
+      "maxActions": 35
+    },
+    {
+      "jobId": "adventurer",
+      "build": "early",
+      "cases": 39,
+      "beforeWins": 37,
+      "afterWins": 37,
+      "oneRoundWeekly": 0,
+      "maxActions": 35
+    },
+    {
+      "jobId": "adventurer",
+      "build": "attack",
+      "cases": 39,
+      "beforeWins": 37,
+      "afterWins": 37,
+      "oneRoundWeekly": 0,
+      "maxActions": 30
+    },
+    {
+      "jobId": "adventurer",
+      "build": "defense",
+      "cases": 39,
+      "beforeWins": 37,
+      "afterWins": 37,
+      "oneRoundWeekly": 0,
+      "maxActions": 34
+    },
+    {
+      "jobId": "adventurer",
+      "build": "magic",
+      "cases": 39,
+      "beforeWins": 37,
+      "afterWins": 37,
+      "oneRoundWeekly": 0,
+      "maxActions": 42
+    },
+    {
+      "jobId": "adventurer",
+      "build": "balanced",
+      "cases": 39,
+      "beforeWins": 37,
+      "afterWins": 37,
+      "oneRoundWeekly": 0,
+      "maxActions": 34
+    },
+    {
+      "jobId": "warrior",
+      "build": "none",
+      "cases": 39,
+      "beforeWins": 37,
+      "afterWins": 37,
+      "oneRoundWeekly": 0,
+      "maxActions": 30
+    },
+    {
+      "jobId": "warrior",
+      "build": "early",
+      "cases": 39,
+      "beforeWins": 37,
+      "afterWins": 37,
+      "oneRoundWeekly": 0,
+      "maxActions": 28
+    },
+    {
+      "jobId": "warrior",
+      "build": "attack",
+      "cases": 39,
+      "beforeWins": 37,
+      "afterWins": 37,
+      "oneRoundWeekly": 0,
+      "maxActions": 26
+    },
+    {
+      "jobId": "warrior",
+      "build": "defense",
+      "cases": 39,
+      "beforeWins": 37,
+      "afterWins": 37,
+      "oneRoundWeekly": 0,
+      "maxActions": 30
+    },
+    {
+      "jobId": "warrior",
+      "build": "magic",
+      "cases": 39,
+      "beforeWins": 37,
+      "afterWins": 37,
+      "oneRoundWeekly": 0,
+      "maxActions": 27
+    },
+    {
+      "jobId": "warrior",
+      "build": "balanced",
+      "cases": 39,
+      "beforeWins": 37,
+      "afterWins": 37,
+      "oneRoundWeekly": 0,
+      "maxActions": 27
+    },
+    {
+      "jobId": "knight",
+      "build": "none",
+      "cases": 39,
+      "beforeWins": 36,
+      "afterWins": 36,
+      "oneRoundWeekly": 0,
+      "maxActions": 40
+    },
+    {
+      "jobId": "knight",
+      "build": "early",
+      "cases": 39,
+      "beforeWins": 36,
+      "afterWins": 37,
+      "oneRoundWeekly": 0,
+      "maxActions": 40
+    },
+    {
+      "jobId": "knight",
+      "build": "attack",
+      "cases": 39,
+      "beforeWins": 36,
+      "afterWins": 37,
+      "oneRoundWeekly": 0,
+      "maxActions": 33
+    },
+    {
+      "jobId": "knight",
+      "build": "defense",
+      "cases": 39,
+      "beforeWins": 36,
+      "afterWins": 37,
+      "oneRoundWeekly": 0,
+      "maxActions": 40
+    },
+    {
+      "jobId": "knight",
+      "build": "magic",
+      "cases": 39,
+      "beforeWins": 36,
+      "afterWins": 37,
+      "oneRoundWeekly": 0,
+      "maxActions": 40
+    },
+    {
+      "jobId": "knight",
+      "build": "balanced",
+      "cases": 39,
+      "beforeWins": 36,
+      "afterWins": 37,
+      "oneRoundWeekly": 0,
+      "maxActions": 36
+    },
+    {
+      "jobId": "mage",
+      "build": "none",
+      "cases": 39,
+      "beforeWins": 37,
+      "afterWins": 37,
+      "oneRoundWeekly": 0,
+      "maxActions": 28
+    },
+    {
+      "jobId": "mage",
+      "build": "early",
+      "cases": 39,
+      "beforeWins": 37,
+      "afterWins": 37,
+      "oneRoundWeekly": 0,
+      "maxActions": 25
+    },
+    {
+      "jobId": "mage",
+      "build": "attack",
+      "cases": 39,
+      "beforeWins": 37,
+      "afterWins": 37,
+      "oneRoundWeekly": 0,
+      "maxActions": 21
+    },
+    {
+      "jobId": "mage",
+      "build": "defense",
+      "cases": 39,
+      "beforeWins": 37,
+      "afterWins": 37,
+      "oneRoundWeekly": 0,
+      "maxActions": 28
+    },
+    {
+      "jobId": "mage",
+      "build": "magic",
+      "cases": 39,
+      "beforeWins": 37,
+      "afterWins": 37,
+      "oneRoundWeekly": 0,
+      "maxActions": 24
+    },
+    {
+      "jobId": "mage",
+      "build": "balanced",
+      "cases": 39,
+      "beforeWins": 37,
+      "afterWins": 37,
+      "oneRoundWeekly": 0,
+      "maxActions": 23
+    },
+    {
+      "jobId": "priest",
+      "build": "none",
+      "cases": 39,
+      "beforeWins": 37,
+      "afterWins": 37,
+      "oneRoundWeekly": 0,
+      "maxActions": 42
+    },
+    {
+      "jobId": "priest",
+      "build": "early",
+      "cases": 39,
+      "beforeWins": 37,
+      "afterWins": 37,
+      "oneRoundWeekly": 0,
+      "maxActions": 42
+    },
+    {
+      "jobId": "priest",
+      "build": "attack",
+      "cases": 39,
+      "beforeWins": 37,
+      "afterWins": 37,
+      "oneRoundWeekly": 0,
+      "maxActions": 40
+    },
+    {
+      "jobId": "priest",
+      "build": "defense",
+      "cases": 39,
+      "beforeWins": 37,
+      "afterWins": 37,
+      "oneRoundWeekly": 0,
+      "maxActions": 40
+    },
+    {
+      "jobId": "priest",
+      "build": "magic",
+      "cases": 39,
+      "beforeWins": 37,
+      "afterWins": 37,
+      "oneRoundWeekly": 0,
+      "maxActions": 45
+    },
+    {
+      "jobId": "priest",
+      "build": "balanced",
+      "cases": 39,
+      "beforeWins": 37,
+      "afterWins": 37,
+      "oneRoundWeekly": 0,
+      "maxActions": 41
+    },
+    {
+      "jobId": "thief",
+      "build": "none",
+      "cases": 39,
+      "beforeWins": 36,
+      "afterWins": 36,
+      "oneRoundWeekly": 0,
+      "maxActions": 31
+    },
+    {
+      "jobId": "thief",
+      "build": "early",
+      "cases": 39,
+      "beforeWins": 36,
+      "afterWins": 36,
+      "oneRoundWeekly": 0,
+      "maxActions": 31
+    },
+    {
+      "jobId": "thief",
+      "build": "attack",
+      "cases": 39,
+      "beforeWins": 36,
+      "afterWins": 38,
+      "oneRoundWeekly": 0,
+      "maxActions": 27
+    },
+    {
+      "jobId": "thief",
+      "build": "defense",
+      "cases": 39,
+      "beforeWins": 36,
+      "afterWins": 37,
+      "oneRoundWeekly": 0,
+      "maxActions": 32
+    },
+    {
+      "jobId": "thief",
+      "build": "magic",
+      "cases": 39,
+      "beforeWins": 36,
+      "afterWins": 36,
+      "oneRoundWeekly": 0,
+      "maxActions": 31
+    },
+    {
+      "jobId": "thief",
+      "build": "balanced",
+      "cases": 39,
+      "beforeWins": 36,
+      "afterWins": 37,
+      "oneRoundWeekly": 0,
+      "maxActions": 29
+    }
+  ],
+  "bundle": {
+    "bytes": 1530004,
+    "gzip": 441938
+  },
+  "previous": {
+    "bytes": 1513228,
+    "gzip": 436769
+  },
+  "difficultyComparison": [
+    {
+      "level": 1,
+      "jobId": "adventurer",
+      "before": {
+        "turns": 5.46,
+        "hp": 14.09,
+        "mpRemaining": 1.14,
+        "damage": 150.51,
+        "skillUseCount": 5.31
+      },
+      "after": {
+        "turns": 6.11,
+        "hp": 14.91,
+        "mpRemaining": 1.06,
+        "damage": 157.31,
+        "skillUseCount": 5.74
+      }
+    },
+    {
+      "level": 1,
+      "jobId": "warrior",
+      "before": {
+        "turns": 5.6,
+        "hp": 15.91,
+        "mpRemaining": 1.4,
+        "damage": 149.14,
+        "skillUseCount": 3.89
+      },
+      "after": {
+        "turns": 5.89,
+        "hp": 17.46,
+        "mpRemaining": 1.4,
+        "damage": 148.06,
+        "skillUseCount": 3.94
+      }
+    },
+    {
+      "level": 1,
+      "jobId": "knight",
+      "before": {
+        "turns": 6.4,
+        "hp": 17.11,
+        "mpRemaining": 0.74,
+        "damage": 149.03,
+        "skillUseCount": 4.91
+      },
+      "after": {
+        "turns": 6.94,
+        "hp": 18.06,
+        "mpRemaining": 0.69,
+        "damage": 151.49,
+        "skillUseCount": 5.23
+      }
+    },
+    {
+      "level": 1,
+      "jobId": "mage",
+      "before": {
+        "turns": 4.8,
+        "hp": 13.34,
+        "mpRemaining": 3.31,
+        "damage": 132.63,
+        "skillUseCount": 5.37
+      },
+      "after": {
+        "turns": 5.17,
+        "hp": 14.77,
+        "mpRemaining": 3.31,
+        "damage": 132.94,
+        "skillUseCount": 5.54
+      }
+    },
+    {
+      "level": 1,
+      "jobId": "priest",
+      "before": {
+        "turns": 6.74,
+        "hp": 14.31,
+        "mpRemaining": 3.6,
+        "damage": 173.54,
+        "skillUseCount": 5.83
+      },
+      "after": {
+        "turns": 6.94,
+        "hp": 16.46,
+        "mpRemaining": 3.06,
+        "damage": 175.51,
+        "skillUseCount": 5.97
+      }
+    },
+    {
+      "level": 1,
+      "jobId": "thief",
+      "before": {
+        "turns": 4.94,
+        "hp": 14.86,
+        "mpRemaining": 1.54,
+        "damage": 131.8,
+        "skillUseCount": 5.43
+      },
+      "after": {
+        "turns": 5.34,
+        "hp": 16.89,
+        "mpRemaining": 1.43,
+        "damage": 135.2,
+        "skillUseCount": 5.6
+      }
+    },
+    {
+      "level": 7,
+      "jobId": "adventurer",
+      "before": {
+        "turns": 6.52,
+        "hp": 61,
+        "mpRemaining": 4.61,
+        "damage": 163.78,
+        "skillUseCount": 5.79
+      },
+      "after": {
+        "turns": 6.26,
+        "hp": 72.72,
+        "mpRemaining": 4.61,
+        "damage": 139.11,
+        "skillUseCount": 5.79
+      }
+    },
+    {
+      "level": 7,
+      "jobId": "warrior",
+      "before": {
+        "turns": 5.85,
+        "hp": 65.68,
+        "mpRemaining": 2.75,
+        "damage": 133.32,
+        "skillUseCount": 5.1
+      },
+      "after": {
+        "turns": 5.6,
+        "hp": 77.66,
+        "mpRemaining": 2.73,
+        "damage": 117.22,
+        "skillUseCount": 4.86
+      }
+    },
+    {
+      "level": 7,
+      "jobId": "knight",
+      "before": {
+        "turns": 6.44,
+        "hp": 69.47,
+        "mpRemaining": 3.94,
+        "damage": 139.5,
+        "skillUseCount": 5.94
+      },
+      "after": {
+        "turns": 6.37,
+        "hp": 76.72,
+        "mpRemaining": 4.25,
+        "damage": 128.05,
+        "skillUseCount": 5.8
+      }
+    },
+    {
+      "level": 7,
+      "jobId": "mage",
+      "before": {
+        "turns": 5.38,
+        "hp": 57.37,
+        "mpRemaining": 7.97,
+        "damage": 131.3,
+        "skillUseCount": 5.59
+      },
+      "after": {
+        "turns": 5.22,
+        "hp": 68.1,
+        "mpRemaining": 7.8,
+        "damage": 117.01,
+        "skillUseCount": 5.63
+      }
+    },
+    {
+      "level": 7,
+      "jobId": "priest",
+      "before": {
+        "turns": 7.33,
+        "hp": 65.72,
+        "mpRemaining": 6.65,
+        "damage": 175.67,
+        "skillUseCount": 6.77
+      },
+      "after": {
+        "turns": 7.03,
+        "hp": 78.59,
+        "mpRemaining": 6.6,
+        "damage": 153.48,
+        "skillUseCount": 6.55
+      }
+    },
+    {
+      "level": 7,
+      "jobId": "thief",
+      "before": {
+        "turns": 5.61,
+        "hp": 60.99,
+        "mpRemaining": 5.77,
+        "damage": 129.95,
+        "skillUseCount": 5.95
+      },
+      "after": {
+        "turns": 5.52,
+        "hp": 71.05,
+        "mpRemaining": 5.75,
+        "damage": 117.4,
+        "skillUseCount": 5.94
+      }
+    },
+    {
+      "level": 12,
+      "jobId": "adventurer",
+      "before": {
+        "turns": 5.06,
+        "hp": 125.3,
+        "mpRemaining": 9.51,
+        "damage": 116.76,
+        "skillUseCount": 5.31
+      },
+      "after": {
+        "turns": 4.7,
+        "hp": 135.75,
+        "mpRemaining": 10.02,
+        "damage": 97.57,
+        "skillUseCount": 5.01
+      }
+    },
+    {
+      "level": 12,
+      "jobId": "warrior",
+      "before": {
+        "turns": 4.38,
+        "hp": 129.75,
+        "mpRemaining": 7.57,
+        "damage": 90.87,
+        "skillUseCount": 4.47
+      },
+      "after": {
+        "turns": 4.21,
+        "hp": 137.87,
+        "mpRemaining": 8.09,
+        "damage": 76.31,
+        "skillUseCount": 4.21
+      }
+    },
+    {
+      "level": 12,
+      "jobId": "knight",
+      "before": {
+        "turns": 4.85,
+        "hp": 131.9,
+        "mpRemaining": 9.81,
+        "damage": 100.75,
+        "skillUseCount": 4.98
+      },
+      "after": {
+        "turns": 4.42,
+        "hp": 143.12,
+        "mpRemaining": 10.23,
+        "damage": 82.13,
+        "skillUseCount": 4.51
+      }
+    },
+    {
+      "level": 12,
+      "jobId": "mage",
+      "before": {
+        "turns": 3.98,
+        "hp": 118.93,
+        "mpRemaining": 13.32,
+        "damage": 83.28,
+        "skillUseCount": 4.72
+      },
+      "after": {
+        "turns": 3.86,
+        "hp": 125.9,
+        "mpRemaining": 13.9,
+        "damage": 75.16,
+        "skillUseCount": 4.52
+      }
+    },
+    {
+      "level": 12,
+      "jobId": "priest",
+      "before": {
+        "turns": 5.52,
+        "hp": 127.33,
+        "mpRemaining": 12.37,
+        "damage": 132.11,
+        "skillUseCount": 5.74
+      },
+      "after": {
+        "turns": 5.11,
+        "hp": 137.96,
+        "mpRemaining": 13.18,
+        "damage": 105.92,
+        "skillUseCount": 5.41
+      }
+    },
+    {
+      "level": 12,
+      "jobId": "thief",
+      "before": {
+        "turns": 4.18,
+        "hp": 117.89,
+        "mpRemaining": 11.49,
+        "damage": 90.67,
+        "skillUseCount": 4.84
+      },
+      "after": {
+        "turns": 3.94,
+        "hp": 127.54,
+        "mpRemaining": 11.92,
+        "damage": 75.44,
+        "skillUseCount": 4.44
+      }
+    },
+    {
+      "level": 20,
+      "jobId": "adventurer",
+      "before": {
+        "turns": 3.56,
+        "hp": 220.9,
+        "mpRemaining": 19.97,
+        "damage": 49.07,
+        "skillUseCount": 3.69
+      },
+      "after": {
+        "turns": 3.23,
+        "hp": 227.62,
+        "mpRemaining": 20.56,
+        "damage": 33.94,
+        "skillUseCount": 3.43
+      }
+    },
+    {
+      "level": 20,
+      "jobId": "warrior",
+      "before": {
+        "turns": 3.26,
+        "hp": 225.93,
+        "mpRemaining": 17.15,
+        "damage": 38.37,
+        "skillUseCount": 3.16
+      },
+      "after": {
+        "turns": 3.1,
+        "hp": 235.31,
+        "mpRemaining": 17.58,
+        "damage": 27.21,
+        "skillUseCount": 2.94
+      }
+    },
+    {
+      "level": 20,
+      "jobId": "knight",
+      "before": {
+        "turns": 3.55,
+        "hp": 235.58,
+        "mpRemaining": 19.35,
+        "damage": 39.92,
+        "skillUseCount": 3.37
+      },
+      "after": {
+        "turns": 3.37,
+        "hp": 244.17,
+        "mpRemaining": 19.6,
+        "damage": 28.23,
+        "skillUseCount": 3.16
+      }
+    },
+    {
+      "level": 20,
+      "jobId": "mage",
+      "before": {
+        "turns": 3.09,
+        "hp": 210.41,
+        "mpRemaining": 23.12,
+        "damage": 36.15,
+        "skillUseCount": 3.53
+      },
+      "after": {
+        "turns": 2.92,
+        "hp": 215.28,
+        "mpRemaining": 23.55,
+        "damage": 27.32,
+        "skillUseCount": 3.25
+      }
+    },
+    {
+      "level": 20,
+      "jobId": "priest",
+      "before": {
+        "turns": 4.02,
+        "hp": 220.35,
+        "mpRemaining": 23.49,
+        "damage": 53.13,
+        "skillUseCount": 3.95
+      },
+      "after": {
+        "turns": 3.74,
+        "hp": 225.9,
+        "mpRemaining": 24.34,
+        "damage": 37.59,
+        "skillUseCount": 3.64
+      }
+    },
+    {
+      "level": 20,
+      "jobId": "thief",
+      "before": {
+        "turns": 3.39,
+        "hp": 210.67,
+        "mpRemaining": 20.9,
+        "damage": 37.57,
+        "skillUseCount": 3.5
+      },
+      "after": {
+        "turns": 3.1,
+        "hp": 217.2,
+        "mpRemaining": 21.41,
+        "damage": 27.56,
+        "skillUseCount": 3.16
+      }
+    }
+  ]
+}

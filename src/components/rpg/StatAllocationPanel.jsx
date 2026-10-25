@@ -6,7 +6,7 @@ import { createRpgActionId } from '../../data/rpgShopRepository.js';
 import CommerceConfirmModal from './CommerceConfirmModal.jsx';
 
 const errorMessage = error => ({ STAT_PROFILE_CHANGED: '他の操作でデータが更新されました。「最新データを反映」で確認し直してください。', STAT_CHANGE_DURING_BATTLE: '戦闘中は能力を変更できません。', REWARD_CORRECTION_PENDING: '報酬訂正の確認中は再配分できません。', INSUFFICIENT_GOLD: 'GOLDが足りません。', INVALID_STAT_ALLOCATION: '保存された配分が不正です。配分を保存できません。', STAT_POINTS_EXCEEDED: '育成ポイントが不足しています。' }[error?.code || error?.message] || '保存に失敗しました。入力内容を保持しています。もう一度お試しください。');
-const allocationDisplay = (profile, allocation, totalExp) => { const { maxHp, maxMp } = heroJobSnapshot({ jobId: profile?.jobId, statAllocation: allocation, totalExp }); return { maxHp, maxMp }; };
+const allocationDisplay = (profile, allocation, totalExp) => { const { maxHp, maxMp } = heroJobSnapshot({ ...profile, jobId: profile?.jobId, statAllocation: allocation, totalExp }); return { maxHp, maxMp }; };
 const baseline = profile => ({ ...readStatAllocation(profile), totalExp: profile.totalExp || 0, gold: profile.gold || 0 });
 export default function StatAllocationPanel(props) {
   try { readStatAllocation(props.profile); }

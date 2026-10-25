@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import SkillPanelBoard from './SkillPanelBoard.jsx';
 import JobPanel from './JobPanel.jsx';
 import StatAllocationPanel from './StatAllocationPanel.jsx';
 import RpgWalletPanel from './RpgWalletPanel.jsx';
@@ -17,7 +18,8 @@ import EncyclopediaPanel from './EncyclopediaPanel.jsx';
 import AchievementPanel from './AchievementPanel.jsx';
 import { createCachedEncyclopediaLedgerLoader } from '../../data/rpgEncyclopediaRepository.js';
 
-export default function RpgHub({ onChangeJob, onSaveStatAllocation, profile, progress, towerProgress, battleCandidate, onCancelBattleStart, onConfirmBattleStart, achievements, unlockedTitles, selectedTitle, onSelectTitle, savingTitle, questState, onClaimQuest, pendingQuestId, onPurchaseRequest, onMaterialExchangeRequest, pendingMaterialExchange, onEquip, onUnequip, pendingItemId, pendingAction, status, battle, onStartBattleRequest, onAttackBattle, onUseBattleSkill, startingEnemyId, attacking, onBattleBack, battleFeedback, onSaveParty, savingParty, onGachaBuy, onGachaDraw, onGachaExchange, onAlchemyCraft, loadEncyclopediaLedgers, gachaPending, alchemyPending }) {
+export default function RpgHub({ onSaveSkillPanel, onChangeJob, onSaveStatAllocation, profile, progress, towerProgress, battleCandidate, onCancelBattleStart, onConfirmBattleStart, achievements, unlockedTitles, selectedTitle, onSelectTitle, savingTitle, questState, onClaimQuest, pendingQuestId, onPurchaseRequest, onMaterialExchangeRequest, pendingMaterialExchange, onEquip, onUnequip, pendingItemId, pendingAction, status, battle, onStartBattleRequest, onAttackBattle, onUseBattleSkill, startingEnemyId, attacking, onBattleBack, battleFeedback, onSaveParty, savingParty, onGachaBuy, onGachaDraw, onGachaExchange, onAlchemyCraft, loadEncyclopediaLedgers, gachaPending, alchemyPending }) {
+  const [trainingSection, setTrainingSection] = useState('base');
   const [statPending, setStatPending] = useState(false);
   const [section, setSection] = useState('battle');
   const [reviewing, setReviewing] = useState(false);
@@ -64,7 +66,7 @@ export default function RpgHub({ onChangeJob, onSaveStatAllocation, profile, pro
     <BattleStartConfirmModal enemy={battleCandidate} profile={profile} towerProgress={towerProgress} starting={Boolean(startingEnemyId)} onCancel={onCancelBattleStart} onConfirm={confirmPreparation} onReview={reviewPreparation}/>
     {section === 'battle' ? <BattlePanel profile={profile} progress={progress} towerProgress={towerProgress} battle={battle} onStartRequest={onStartBattleRequest} onAttack={onAttackBattle} onSkill={onUseBattleSkill} startingEnemyId={startingEnemyId} attacking={attacking} onBack={onBattleBack} feedback={battleFeedback}/>
       : section === 'job' ? <JobPanel profile={profile} onSave={onChangeJob} locked={battleLocked} onPendingChange={setStatPending}/>
-      : section === 'stats' ? <StatAllocationPanel profile={profile} onSave={onSaveStatAllocation} locked={battleLocked} onPendingChange={setStatPending}/>
+      : section === 'stats' ? <div className="space-y-4"><div className="flex flex-wrap gap-2">{[['base','基礎能力'],['panel','スキルパネル']].map(([id,label])=><button type="button" key={id} disabled={statPending} aria-pressed={trainingSection===id} onClick={()=>setTrainingSection(id)} className="min-h-11 rounded-xl bg-violet-100 px-4 py-3 font-bold">{label}</button>)}</div>{trainingSection==='base'?<StatAllocationPanel profile={profile} onSave={onSaveStatAllocation} locked={battleLocked} onPendingChange={setStatPending}/>:<SkillPanelBoard profile={profile} progress={progress} towerProgress={towerProgress} onSave={onSaveSkillPanel} locked={battleLocked} onPendingChange={setStatPending}/>}</div>
       : section === 'party' ? <PartyPanel key={JSON.stringify([profile?.partyMemberIds, profile?.unlockedPartyMemberIds, battleLocked])} profile={profile} onSave={onSaveParty} pending={savingParty} locked={battleLocked}/>
         : section === 'gacha' ? <GachaPanel profile={profile} onBuy={onGachaBuy} onDraw={onGachaDraw} onExchange={onGachaExchange} pending={gachaPending}/>
           : section === 'alchemy' ? <AlchemyPanel profile={profile} onCraft={onAlchemyCraft} pending={alchemyPending}/>
