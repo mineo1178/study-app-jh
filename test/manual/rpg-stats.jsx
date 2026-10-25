@@ -1,3 +1,4 @@
+import oldBattles from '../fixtures/rpg-v2.9.6-battles.json';
 import { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import '../../src/index.css';
@@ -29,8 +30,7 @@ export default function Fixture() {
   };
   const start = (mode, legacy = false) => {
     const args = { profile: { ...profile, ...(legacy ? { jobId: 'adventurer' } : {}), activeBattleId: null }, battleId: mode, now: 1 };
-    const change = mode === 'campaign' ? prepareBattleStart({ ...args, enemy: ENEMY_CATALOG.slime }) : mode === 'tower' ? preparePartyTowerStart({ ...args, encounter: buildTowerEncounter({ floor: 10 }) }) : prepareWeeklyBossStart({ ...args, boss: getWeeklyBossDefinition('2026-W01') });
-    if (legacy) { const hero = change.battle.playerSnapshot || change.battle.partySnapshot.members[0]; delete hero.jobId; delete hero.jobName; delete hero.jobRulesVersion; delete hero.jobModifiers; if (change.battle.partySnapshot) { hero.role = 'バランス型'; for (const member of change.battle.partySnapshot.members.filter(member => member.memberId !== 'hero')) { delete member.maxMp; member.skills.forEach(skill => { delete skill.mpCost; }); } } delete change.battle.skillRulesVersion; delete change.battle.memberMp; delete change.battle.mpRulesVersion; delete change.battle.playerMp; }
+    const change = legacy ? structuredClone(oldBattles[['campaign','tower','weekly'].indexOf(mode)]) : mode === 'campaign' ? prepareBattleStart({ ...args, enemy: ENEMY_CATALOG.slime }) : mode === 'tower' ? preparePartyTowerStart({ ...args, encounter: buildTowerEncounter({ floor: 10 }) }) : prepareWeeklyBossStart({ ...args, boss: getWeeklyBossDefinition('2026-W01') });
     setProfile(change.profile); setBattle(change.battle); setCandidate(null);
   };
   const act = async (skillId, targetEnemyInstanceId, targetMemberId) => {

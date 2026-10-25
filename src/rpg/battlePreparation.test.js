@@ -8,6 +8,7 @@ import { ENEMY_CATALOG } from './enemyCatalog.js';
 import { getWeeklyBossDefinition } from './weeklyBossCatalog.js';
 import { totalExpForLevel } from './levelSystem.js';
 import { createHash } from 'node:crypto';
+import beforeEnemies from '../../test/fixtures/rpg-v2.9.6-enemies.json';
 import { measureBalance } from '../../scripts/simulateBattleBalance.js';
 
 const profile = normalizePlayerProfile({ battleEnergy: 20, totalExp: totalExpForLevel(12), ownedEquipment: { iron_sword: true, scholar_blade: true }, equipped: { weapon: 'iron_sword' } });
@@ -17,7 +18,7 @@ describe('battle preparation uses actual new-start data', () => {
   it('matches all 160 deterministic v2.9.1 balance results exactly', () => {
     // Verified v2.9.1 matrix against the preserved Before measurements: outcomes, turns, HP,
     // damage, enemy actions, healing/guard uses and both action policies.
-    const results = measureBalance();
+    const results = measureBalance(beforeEnemies.scenarios);
     expect(results).toHaveLength(160);
     expect(createHash('sha256').update(JSON.stringify(results)).digest('hex')).toBe('bbf8e9c3ba26dbd8450b71dcb851419472301dc280a74430995735124477353c');
   });

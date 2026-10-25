@@ -1,0 +1,176 @@
+{
+  "groups": [
+    {
+      "jobId": "adventurer",
+      "cases": 350,
+      "beforeWins": 265,
+      "afterWins": 283,
+      "oneTurnBossWins": 0
+    },
+    {
+      "jobId": "warrior",
+      "cases": 350,
+      "beforeWins": 274,
+      "afterWins": 284,
+      "oneTurnBossWins": 0
+    },
+    {
+      "jobId": "knight",
+      "cases": 350,
+      "beforeWins": 268,
+      "afterWins": 280,
+      "oneTurnBossWins": 0
+    },
+    {
+      "jobId": "mage",
+      "cases": 350,
+      "beforeWins": 267,
+      "afterWins": 283,
+      "oneTurnBossWins": 0
+    },
+    {
+      "jobId": "priest",
+      "cases": 350,
+      "beforeWins": 266,
+      "afterWins": 286,
+      "oneTurnBossWins": 0
+    },
+    {
+      "jobId": "thief",
+      "cases": 350,
+      "beforeWins": 271,
+      "afterWins": 281,
+      "oneTurnBossWins": 0
+    }
+  ],
+  "stats": [
+    {
+      "target": "campaign-slime",
+      "enemy": "スライム",
+      "hp": "20 → 20",
+      "attack": "3 → 3"
+    },
+    {
+      "target": "campaign-goblin",
+      "enemy": "ゴブリン",
+      "hp": "40 → 38",
+      "attack": "5 → 5"
+    },
+    {
+      "target": "campaign-stone_golem",
+      "enemy": "ストーンゴーレム",
+      "hp": "80 → 74",
+      "attack": "8 → 7"
+    },
+    {
+      "target": "campaign-orc_chief",
+      "enemy": "オークチーフ",
+      "hp": "80 → 74",
+      "attack": "7 → 7"
+    },
+    {
+      "target": "campaign-ancient_golem",
+      "enemy": "エンシェントゴーレム",
+      "hp": "110 → 102",
+      "attack": "9 → 8"
+    },
+    {
+      "target": "tower-10",
+      "enemy": "塔のオークチーフ",
+      "hp": "80 → 74",
+      "attack": "11 → 10"
+    },
+    {
+      "target": "tower-10",
+      "enemy": "塔のゴブリン",
+      "hp": "62 → 58",
+      "attack": "13 → 12"
+    },
+    {
+      "target": "tower-20",
+      "enemy": "塔のエンシェントゴーレム",
+      "hp": "155 → 144",
+      "attack": "14 → 13"
+    },
+    {
+      "target": "tower-20",
+      "enemy": "塔のストーンゴーレム",
+      "hp": "130 → 118",
+      "attack": "23 → 20"
+    },
+    {
+      "target": "tower-20",
+      "enemy": "塔のスライム",
+      "hp": "65 → 62",
+      "attack": "13 → 12"
+    },
+    {
+      "target": "tower-30",
+      "enemy": "塔のオークチーフ",
+      "hp": "148 → 137",
+      "attack": "18 → 17"
+    },
+    {
+      "target": "tower-30",
+      "enemy": "塔のスライム",
+      "hp": "85 → 82",
+      "attack": "17 → 16"
+    },
+    {
+      "target": "tower-30",
+      "enemy": "塔のゴブリン",
+      "hp": "114 → 106",
+      "attack": "21 → 20"
+    },
+    {
+      "target": "tower-60",
+      "enemy": "塔のエンシェントゴーレム",
+      "hp": "369 → 342",
+      "attack": "31 → 29"
+    },
+    {
+      "target": "tower-60",
+      "enemy": "塔のスライム",
+      "hp": "155 → 149",
+      "attack": "29 → 28"
+    },
+    {
+      "target": "tower-60",
+      "enemy": "塔のゴブリン",
+      "hp": "207 → 193",
+      "attack": "37 → 36"
+    },
+    {
+      "target": "weekly_ignis",
+      "enemy": "炎帝イグニス",
+      "hp": "430 → 400",
+      "attack": "28 → 26"
+    },
+    {
+      "target": "weekly_leviathan",
+      "enemy": "蒼海竜リヴァイア",
+      "hp": "450 → 420",
+      "attack": "27 → 25"
+    },
+    {
+      "target": "weekly_volt",
+      "enemy": "雷王ヴォルト",
+      "hp": "430 → 400",
+      "attack": "29 → 27"
+    },
+    {
+      "target": "weekly_gaia",
+      "enemy": "大地巨神ガイア",
+      "hp": "470 → 440",
+      "attack": "27 → 25"
+    }
+  ],
+  "bundle": {
+    "bytes": 1513228,
+    "gzip": 436769
+  },
+  "baseline": {
+    "bytes": 1513195,
+    "gzip": 436734
+  }
+}

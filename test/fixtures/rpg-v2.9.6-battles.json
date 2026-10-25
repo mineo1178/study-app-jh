@@ -1,0 +1,1414 @@
+[
+  {
+    "profile": {
+      "schemaVersion": 6,
+      "gold": 0,
+      "battleEnergy": 97,
+      "materials": {
+        "iron": 0,
+        "wisdom_scroll": 0,
+        "mana_rune": 0,
+        "mineral": 0,
+        "history_seal": 0,
+        "logic_core": 0,
+        "vitality": 0,
+        "resonance": 0,
+        "craft_cloth": 0,
+        "general_essence": 0
+      },
+      "ownedEquipment": {
+        "scholar_blade": true,
+        "balanced_robe": true,
+        "logic_badge": true
+      },
+      "equipped": {
+        "weapon": "scholar_blade",
+        "armor": "balanced_robe",
+        "accessory": "logic_badge"
+      },
+      "totalExp": 3850,
+      "level": 12,
+      "statAllocation": {
+        "hp": 0,
+        "mp": 0
+      },
+      "jobId": "adventurer",
+      "activeBattleId": "old-snapshot",
+      "partyMemberIds": [
+        "hero",
+        "guardian",
+        "healer"
+      ],
+      "unlockedPartyMemberIds": [
+        "hero",
+        "guardian",
+        "mage",
+        "healer"
+      ],
+      "gacha": {
+        "ticketBalances": {
+          "normal": 0,
+          "silver": 0,
+          "gold": 0,
+          "premium": 0
+        },
+        "starFragments": 0,
+        "drawsSinceSrPlus": 0,
+        "drawsSinceSsr": 0,
+        "alchemyItems": {},
+        "recentDraws": []
+      },
+      "weeklyBoss": {
+        "clearedWeekIds": [],
+        "totalClears": 0,
+        "lastClearedAt": null,
+        "lastBossId": null
+      },
+      "selectedTitleId": null,
+      "updatedAt": 1
+    },
+    "battle": {
+      "skillRulesVersion": 2,
+      "mpRulesVersion": 1,
+      "playerMp": 8,
+      "schemaVersion": 7,
+      "battleId": "old-snapshot",
+      "battleKind": "boss",
+      "battleMode": "campaign",
+      "bossId": "orc_chief",
+      "chapterSnapshot": {
+        "id": "chapter_1",
+        "number": 1,
+        "name": "はじまりの草原",
+        "normalWinsRequired": 3,
+        "bossId": "orc_chief",
+        "nextChapterId": "chapter_2",
+        "catalogVersion": 1
+      },
+      "enemyId": "orc_chief",
+      "enemySnapshot": {
+        "name": "オークチーフ",
+        "element": "fire",
+        "weaknesses": [
+          "water"
+        ],
+        "resistances": [
+          "fire"
+        ],
+        "maxHp": 80,
+        "attack": 7,
+        "energyCost": 3,
+        "expReward": 120,
+        "actionPattern": [
+          {
+            "id": "normal_attack",
+            "name": "通常攻撃",
+            "powerPercent": 100
+          },
+          {
+            "id": "normal_attack",
+            "name": "通常攻撃",
+            "powerPercent": 100
+          },
+          {
+            "id": "orc_heavy_strike",
+            "name": "豪腕撃",
+            "powerPercent": 150
+          }
+        ],
+        "firstClearReward": {
+          "gold": 150,
+          "materials": {
+            "iron": 5,
+            "wisdom_scroll": 2
+          }
+        },
+        "catalogVersion": 4
+      },
+      "enemyHp": 80,
+      "status": "active",
+      "playerSnapshot": {
+        "level": 12,
+        "jobId": "adventurer",
+        "jobName": "冒険者",
+        "jobRulesVersion": 1,
+        "jobModifiers": {
+          "hpPercent": 100,
+          "mpPercent": 100,
+          "attackPercent": 100,
+          "defenseBonus": 0
+        },
+        "maxHp": 40,
+        "maxMp": 8,
+        "attack": 17,
+        "defense": 6,
+        "skills": {
+          "flame_slash": {
+            "id": "flame_slash",
+            "name": "炎斬り",
+            "kind": "attack",
+            "element": "fire",
+            "maxUses": 2,
+            "powerPercent": 125,
+            "mpCost": 2
+          },
+          "aqua_edge": {
+            "id": "aqua_edge",
+            "name": "水刃",
+            "kind": "attack",
+            "element": "water",
+            "maxUses": 2,
+            "powerPercent": 125,
+            "mpCost": 2
+          },
+          "thunder_strike": {
+            "id": "thunder_strike",
+            "name": "雷撃",
+            "kind": "attack",
+            "element": "lightning",
+            "maxUses": 2,
+            "powerPercent": 125,
+            "mpCost": 2
+          },
+          "healing_light": {
+            "id": "healing_light",
+            "name": "ヒール",
+            "kind": "heal",
+            "element": "neutral",
+            "maxUses": 2,
+            "healPercent": 35,
+            "mpCost": 3
+          },
+          "guard_stance": {
+            "id": "guard_stance",
+            "name": "ガード",
+            "kind": "guard",
+            "element": "neutral",
+            "maxUses": 2,
+            "damageReductionPercent": 50,
+            "mpCost": 2
+          }
+        },
+        "equipped": {
+          "weapon": "scholar_blade",
+          "armor": "balanced_robe",
+          "accessory": "logic_badge"
+        }
+      },
+      "skillUses": {
+        "flame_slash": 0,
+        "aqua_edge": 0,
+        "thunder_strike": 0,
+        "healing_light": 0,
+        "guard_stance": 0
+      },
+      "playerHp": 40,
+      "attackCount": 0,
+      "startedAt": 1,
+      "updatedAt": 1,
+      "victory": null,
+      "defeat": null
+    },
+    "ledger": {
+      "schemaVersion": 2,
+      "type": "battle_start",
+      "battleId": "old-snapshot",
+      "battleKind": "boss",
+      "battleMode": "campaign",
+      "bossId": "orc_chief",
+      "chapterSnapshot": {
+        "id": "chapter_1",
+        "number": 1,
+        "name": "はじまりの草原",
+        "normalWinsRequired": 3,
+        "bossId": "orc_chief",
+        "nextChapterId": "chapter_2",
+        "catalogVersion": 1
+      },
+      "enemyId": "orc_chief",
+      "energySpent": 3,
+      "enemySnapshot": {
+        "name": "オークチーフ",
+        "element": "fire",
+        "weaknesses": [
+          "water"
+        ],
+        "resistances": [
+          "fire"
+        ],
+        "maxHp": 80,
+        "attack": 7,
+        "energyCost": 3,
+        "expReward": 120,
+        "actionPattern": [
+          {
+            "id": "normal_attack",
+            "name": "通常攻撃",
+            "powerPercent": 100
+          },
+          {
+            "id": "normal_attack",
+            "name": "通常攻撃",
+            "powerPercent": 100
+          },
+          {
+            "id": "orc_heavy_strike",
+            "name": "豪腕撃",
+            "powerPercent": 150
+          }
+        ],
+        "firstClearReward": {
+          "gold": 150,
+          "materials": {
+            "iron": 5,
+            "wisdom_scroll": 2
+          }
+        },
+        "catalogVersion": 4
+      },
+      "playerSnapshot": {
+        "level": 12,
+        "jobId": "adventurer",
+        "jobName": "冒険者",
+        "jobRulesVersion": 1,
+        "jobModifiers": {
+          "hpPercent": 100,
+          "mpPercent": 100,
+          "attackPercent": 100,
+          "defenseBonus": 0
+        },
+        "maxHp": 40,
+        "maxMp": 8,
+        "attack": 17,
+        "defense": 6,
+        "skills": {
+          "flame_slash": {
+            "id": "flame_slash",
+            "name": "炎斬り",
+            "kind": "attack",
+            "element": "fire",
+            "maxUses": 2,
+            "powerPercent": 125,
+            "mpCost": 2
+          },
+          "aqua_edge": {
+            "id": "aqua_edge",
+            "name": "水刃",
+            "kind": "attack",
+            "element": "water",
+            "maxUses": 2,
+            "powerPercent": 125,
+            "mpCost": 2
+          },
+          "thunder_strike": {
+            "id": "thunder_strike",
+            "name": "雷撃",
+            "kind": "attack",
+            "element": "lightning",
+            "maxUses": 2,
+            "powerPercent": 125,
+            "mpCost": 2
+          },
+          "healing_light": {
+            "id": "healing_light",
+            "name": "ヒール",
+            "kind": "heal",
+            "element": "neutral",
+            "maxUses": 2,
+            "healPercent": 35,
+            "mpCost": 3
+          },
+          "guard_stance": {
+            "id": "guard_stance",
+            "name": "ガード",
+            "kind": "guard",
+            "element": "neutral",
+            "maxUses": 2,
+            "damageReductionPercent": 50,
+            "mpCost": 2
+          }
+        },
+        "equipped": {
+          "weapon": "scholar_blade",
+          "armor": "balanced_robe",
+          "accessory": "logic_badge"
+        }
+      },
+      "status": "applied",
+      "appliedAt": 1
+    }
+  },
+  {
+    "profile": {
+      "schemaVersion": 6,
+      "gold": 0,
+      "battleEnergy": 97,
+      "materials": {
+        "iron": 0,
+        "wisdom_scroll": 0,
+        "mana_rune": 0,
+        "mineral": 0,
+        "history_seal": 0,
+        "logic_core": 0,
+        "vitality": 0,
+        "resonance": 0,
+        "craft_cloth": 0,
+        "general_essence": 0
+      },
+      "ownedEquipment": {
+        "scholar_blade": true,
+        "balanced_robe": true,
+        "logic_badge": true
+      },
+      "equipped": {
+        "weapon": "scholar_blade",
+        "armor": "balanced_robe",
+        "accessory": "logic_badge"
+      },
+      "totalExp": 3850,
+      "level": 12,
+      "statAllocation": {
+        "hp": 0,
+        "mp": 0
+      },
+      "jobId": "adventurer",
+      "activeBattleId": "old-snapshot",
+      "partyMemberIds": [
+        "hero",
+        "guardian",
+        "healer"
+      ],
+      "unlockedPartyMemberIds": [
+        "hero",
+        "guardian",
+        "mage",
+        "healer"
+      ],
+      "gacha": {
+        "ticketBalances": {
+          "normal": 0,
+          "silver": 0,
+          "gold": 0,
+          "premium": 0
+        },
+        "starFragments": 0,
+        "drawsSinceSrPlus": 0,
+        "drawsSinceSsr": 0,
+        "alchemyItems": {},
+        "recentDraws": []
+      },
+      "weeklyBoss": {
+        "clearedWeekIds": [],
+        "totalClears": 0,
+        "lastClearedAt": null,
+        "lastBossId": null
+      },
+      "selectedTitleId": null,
+      "updatedAt": 1
+    },
+    "battle": {
+      "mpRulesVersion": 1,
+      "playerMp": 8,
+      "skillRulesVersion": 2,
+      "memberMp": {
+        "guardian": 8,
+        "healer": 12
+      },
+      "schemaVersion": 8,
+      "battleId": "old-snapshot",
+      "battleKind": "boss",
+      "battleMode": "tower",
+      "towerFloor": 60,
+      "towerRulesVersion": 3,
+      "encounterSnapshot": {
+        "floor": 60,
+        "rulesVersion": 3,
+        "energyCost": 3,
+        "expReward": 411,
+        "enemies": [
+          {
+            "id": "tower-boss-60-ancient_golem",
+            "name": "塔のエンシェントゴーレム",
+            "element": "earth",
+            "weaknesses": [
+              "water"
+            ],
+            "resistances": [
+              "lightning"
+            ],
+            "maxHp": 369,
+            "attack": 31,
+            "expReward": 315,
+            "energyCost": 3,
+            "actionPattern": [
+              {
+                "id": "normal_attack",
+                "name": "通常攻撃",
+                "powerPercent": 100
+              },
+              {
+                "id": "golem_rock_crush",
+                "name": "岩砕き",
+                "powerPercent": 150
+              },
+              {
+                "id": "normal_attack",
+                "name": "通常攻撃",
+                "powerPercent": 100
+              },
+              {
+                "id": "golem_earthquake",
+                "name": "大地震",
+                "powerPercent": 175
+              }
+            ],
+            "tower": {
+              "rulesVersion": 3,
+              "floor": 60,
+              "tier": 5,
+              "boss": true
+            },
+            "enemyId": "ancient_golem",
+            "enemyInstanceId": "tower-60-e1-ancient_golem"
+          },
+          {
+            "id": "tower-boss-60-slime",
+            "name": "塔のスライム",
+            "element": "water",
+            "weaknesses": [
+              "fire"
+            ],
+            "resistances": [
+              "water"
+            ],
+            "maxHp": 155,
+            "attack": 29,
+            "expReward": 35,
+            "energyCost": 3,
+            "actionPattern": [
+              {
+                "id": "normal_attack",
+                "name": "通常攻撃",
+                "powerPercent": 100
+              }
+            ],
+            "tower": {
+              "rulesVersion": 3,
+              "floor": 60,
+              "tier": 5,
+              "boss": true
+            },
+            "enemyId": "slime",
+            "enemyInstanceId": "tower-60-e2-slime"
+          },
+          {
+            "id": "tower-boss-60-goblin",
+            "name": "塔のゴブリン",
+            "element": "fire",
+            "weaknesses": [
+              "lightning"
+            ],
+            "resistances": [
+              "fire"
+            ],
+            "maxHp": 207,
+            "attack": 37,
+            "expReward": 61,
+            "energyCost": 3,
+            "actionPattern": [
+              {
+                "id": "normal_attack",
+                "name": "通常攻撃",
+                "powerPercent": 100
+              }
+            ],
+            "tower": {
+              "rulesVersion": 3,
+              "floor": 60,
+              "tier": 5,
+              "boss": true
+            },
+            "enemyId": "goblin",
+            "enemyInstanceId": "tower-60-e3-goblin"
+          }
+        ]
+      },
+      "partySnapshot": {
+        "members": [
+          {
+            "memberId": "hero",
+            "name": "主人公",
+            "role": "冒険者",
+            "jobId": "adventurer",
+            "jobName": "冒険者",
+            "jobRulesVersion": 1,
+            "jobModifiers": {
+              "hpPercent": 100,
+              "mpPercent": 100,
+              "attackPercent": 100,
+              "defenseBonus": 0
+            },
+            "maxHp": 62,
+            "maxMp": 8,
+            "attack": 22,
+            "defense": 9,
+            "skills": [
+              {
+                "id": "flame_slash",
+                "name": "炎斬り",
+                "description": "炎属性の一撃。",
+                "kind": "attack",
+                "element": "fire",
+                "powerPercent": 125,
+                "maxUses": 2,
+                "mpCost": 2,
+                "targetType": "single_enemy"
+              },
+              {
+                "id": "aqua_edge",
+                "name": "水刃",
+                "description": "水属性の一撃。",
+                "kind": "attack",
+                "element": "water",
+                "powerPercent": 125,
+                "maxUses": 2,
+                "mpCost": 2,
+                "targetType": "single_enemy"
+              },
+              {
+                "id": "thunder_strike",
+                "name": "雷撃",
+                "description": "雷属性の一撃。",
+                "kind": "attack",
+                "element": "lightning",
+                "powerPercent": 125,
+                "maxUses": 2,
+                "mpCost": 2,
+                "targetType": "single_enemy"
+              },
+              {
+                "id": "healing_light",
+                "name": "ヒール",
+                "description": "HPを回復する。",
+                "kind": "heal",
+                "element": "neutral",
+                "healPercent": 35,
+                "maxUses": 2,
+                "mpCost": 3,
+                "targetType": "single_ally"
+              },
+              {
+                "id": "guard_stance",
+                "name": "ガード",
+                "description": "このターンの敵から受けるダメージを50%軽減する。",
+                "kind": "guard",
+                "element": "neutral",
+                "damageReductionPercent": 50,
+                "maxUses": 2,
+                "mpCost": 2,
+                "targetType": "self"
+              }
+            ]
+          },
+          {
+            "memberId": "guardian",
+            "name": "守護戦士",
+            "role": "高HP・高防御",
+            "maxHp": 81,
+            "maxMp": 8,
+            "attack": 18,
+            "defense": 12,
+            "skills": [
+              {
+                "id": "guardian_wall",
+                "name": "守護の壁",
+                "kind": "guard",
+                "targetType": "self",
+                "damageReductionPercent": 60,
+                "maxUses": 2,
+                "mpCost": 2
+              }
+            ]
+          },
+          {
+            "memberId": "healer",
+            "name": "僧侶",
+            "role": "回復",
+            "maxHp": 59,
+            "maxMp": 12,
+            "attack": 19,
+            "defense": 10,
+            "skills": [
+              {
+                "id": "healing_prayer",
+                "name": "ヒーリングプレア",
+                "kind": "heal",
+                "targetType": "all_allies",
+                "healPercent": 20,
+                "maxUses": 2,
+                "mpCost": 4
+              }
+            ]
+          }
+        ]
+      },
+      "partyStates": [
+        {
+          "memberId": "hero",
+          "hp": 62,
+          "status": "active",
+          "guardPercent": 0
+        },
+        {
+          "memberId": "guardian",
+          "hp": 81,
+          "status": "active",
+          "guardPercent": 0
+        },
+        {
+          "memberId": "healer",
+          "hp": 59,
+          "status": "active",
+          "guardPercent": 0
+        }
+      ],
+      "enemySnapshots": [
+        {
+          "id": "tower-boss-60-ancient_golem",
+          "name": "塔のエンシェントゴーレム",
+          "element": "earth",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "lightning"
+          ],
+          "maxHp": 369,
+          "attack": 31,
+          "expReward": 315,
+          "energyCost": 3,
+          "actionPattern": [
+            {
+              "id": "normal_attack",
+              "name": "通常攻撃",
+              "powerPercent": 100
+            },
+            {
+              "id": "golem_rock_crush",
+              "name": "岩砕き",
+              "powerPercent": 150
+            },
+            {
+              "id": "normal_attack",
+              "name": "通常攻撃",
+              "powerPercent": 100
+            },
+            {
+              "id": "golem_earthquake",
+              "name": "大地震",
+              "powerPercent": 175
+            }
+          ],
+          "tower": {
+            "rulesVersion": 3,
+            "floor": 60,
+            "tier": 5,
+            "boss": true
+          },
+          "enemyId": "ancient_golem",
+          "enemyInstanceId": "tower-60-e1-ancient_golem"
+        },
+        {
+          "id": "tower-boss-60-slime",
+          "name": "塔のスライム",
+          "element": "water",
+          "weaknesses": [
+            "fire"
+          ],
+          "resistances": [
+            "water"
+          ],
+          "maxHp": 155,
+          "attack": 29,
+          "expReward": 35,
+          "energyCost": 3,
+          "actionPattern": [
+            {
+              "id": "normal_attack",
+              "name": "通常攻撃",
+              "powerPercent": 100
+            }
+          ],
+          "tower": {
+            "rulesVersion": 3,
+            "floor": 60,
+            "tier": 5,
+            "boss": true
+          },
+          "enemyId": "slime",
+          "enemyInstanceId": "tower-60-e2-slime"
+        },
+        {
+          "id": "tower-boss-60-goblin",
+          "name": "塔のゴブリン",
+          "element": "fire",
+          "weaknesses": [
+            "lightning"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 207,
+          "attack": 37,
+          "expReward": 61,
+          "energyCost": 3,
+          "actionPattern": [
+            {
+              "id": "normal_attack",
+              "name": "通常攻撃",
+              "powerPercent": 100
+            }
+          ],
+          "tower": {
+            "rulesVersion": 3,
+            "floor": 60,
+            "tier": 5,
+            "boss": true
+          },
+          "enemyId": "goblin",
+          "enemyInstanceId": "tower-60-e3-goblin"
+        }
+      ],
+      "enemyStates": [
+        {
+          "enemyInstanceId": "tower-60-e1-ancient_golem",
+          "hp": 369,
+          "status": "active"
+        },
+        {
+          "enemyInstanceId": "tower-60-e2-slime",
+          "hp": 155,
+          "status": "active"
+        },
+        {
+          "enemyInstanceId": "tower-60-e3-goblin",
+          "hp": 207,
+          "status": "active"
+        }
+      ],
+      "roundNumber": 1,
+      "activePartyMemberId": "hero",
+      "actedMemberIds": [],
+      "skillUses": {},
+      "status": "active",
+      "startedAt": 1,
+      "updatedAt": 1,
+      "victory": null,
+      "defeat": null
+    },
+    "ledger": {
+      "schemaVersion": 2,
+      "type": "battle_start",
+      "battleId": "old-snapshot",
+      "battleKind": "boss",
+      "battleMode": "tower",
+      "floor": 60,
+      "energySpent": 3,
+      "encounterSnapshot": {
+        "floor": 60,
+        "rulesVersion": 3,
+        "energyCost": 3,
+        "expReward": 411,
+        "enemies": [
+          {
+            "id": "tower-boss-60-ancient_golem",
+            "name": "塔のエンシェントゴーレム",
+            "element": "earth",
+            "weaknesses": [
+              "water"
+            ],
+            "resistances": [
+              "lightning"
+            ],
+            "maxHp": 369,
+            "attack": 31,
+            "expReward": 315,
+            "energyCost": 3,
+            "actionPattern": [
+              {
+                "id": "normal_attack",
+                "name": "通常攻撃",
+                "powerPercent": 100
+              },
+              {
+                "id": "golem_rock_crush",
+                "name": "岩砕き",
+                "powerPercent": 150
+              },
+              {
+                "id": "normal_attack",
+                "name": "通常攻撃",
+                "powerPercent": 100
+              },
+              {
+                "id": "golem_earthquake",
+                "name": "大地震",
+                "powerPercent": 175
+              }
+            ],
+            "tower": {
+              "rulesVersion": 3,
+              "floor": 60,
+              "tier": 5,
+              "boss": true
+            },
+            "enemyId": "ancient_golem",
+            "enemyInstanceId": "tower-60-e1-ancient_golem"
+          },
+          {
+            "id": "tower-boss-60-slime",
+            "name": "塔のスライム",
+            "element": "water",
+            "weaknesses": [
+              "fire"
+            ],
+            "resistances": [
+              "water"
+            ],
+            "maxHp": 155,
+            "attack": 29,
+            "expReward": 35,
+            "energyCost": 3,
+            "actionPattern": [
+              {
+                "id": "normal_attack",
+                "name": "通常攻撃",
+                "powerPercent": 100
+              }
+            ],
+            "tower": {
+              "rulesVersion": 3,
+              "floor": 60,
+              "tier": 5,
+              "boss": true
+            },
+            "enemyId": "slime",
+            "enemyInstanceId": "tower-60-e2-slime"
+          },
+          {
+            "id": "tower-boss-60-goblin",
+            "name": "塔のゴブリン",
+            "element": "fire",
+            "weaknesses": [
+              "lightning"
+            ],
+            "resistances": [
+              "fire"
+            ],
+            "maxHp": 207,
+            "attack": 37,
+            "expReward": 61,
+            "energyCost": 3,
+            "actionPattern": [
+              {
+                "id": "normal_attack",
+                "name": "通常攻撃",
+                "powerPercent": 100
+              }
+            ],
+            "tower": {
+              "rulesVersion": 3,
+              "floor": 60,
+              "tier": 5,
+              "boss": true
+            },
+            "enemyId": "goblin",
+            "enemyInstanceId": "tower-60-e3-goblin"
+          }
+        ]
+      },
+      "partySnapshot": {
+        "members": [
+          {
+            "memberId": "hero",
+            "name": "主人公",
+            "role": "冒険者",
+            "jobId": "adventurer",
+            "jobName": "冒険者",
+            "jobRulesVersion": 1,
+            "jobModifiers": {
+              "hpPercent": 100,
+              "mpPercent": 100,
+              "attackPercent": 100,
+              "defenseBonus": 0
+            },
+            "maxHp": 62,
+            "maxMp": 8,
+            "attack": 22,
+            "defense": 9,
+            "skills": [
+              {
+                "id": "flame_slash",
+                "name": "炎斬り",
+                "description": "炎属性の一撃。",
+                "kind": "attack",
+                "element": "fire",
+                "powerPercent": 125,
+                "maxUses": 2,
+                "mpCost": 2,
+                "targetType": "single_enemy"
+              },
+              {
+                "id": "aqua_edge",
+                "name": "水刃",
+                "description": "水属性の一撃。",
+                "kind": "attack",
+                "element": "water",
+                "powerPercent": 125,
+                "maxUses": 2,
+                "mpCost": 2,
+                "targetType": "single_enemy"
+              },
+              {
+                "id": "thunder_strike",
+                "name": "雷撃",
+                "description": "雷属性の一撃。",
+                "kind": "attack",
+                "element": "lightning",
+                "powerPercent": 125,
+                "maxUses": 2,
+                "mpCost": 2,
+                "targetType": "single_enemy"
+              },
+              {
+                "id": "healing_light",
+                "name": "ヒール",
+                "description": "HPを回復する。",
+                "kind": "heal",
+                "element": "neutral",
+                "healPercent": 35,
+                "maxUses": 2,
+                "mpCost": 3,
+                "targetType": "single_ally"
+              },
+              {
+                "id": "guard_stance",
+                "name": "ガード",
+                "description": "このターンの敵から受けるダメージを50%軽減する。",
+                "kind": "guard",
+                "element": "neutral",
+                "damageReductionPercent": 50,
+                "maxUses": 2,
+                "mpCost": 2,
+                "targetType": "self"
+              }
+            ]
+          },
+          {
+            "memberId": "guardian",
+            "name": "守護戦士",
+            "role": "高HP・高防御",
+            "maxHp": 81,
+            "maxMp": 8,
+            "attack": 18,
+            "defense": 12,
+            "skills": [
+              {
+                "id": "guardian_wall",
+                "name": "守護の壁",
+                "kind": "guard",
+                "targetType": "self",
+                "damageReductionPercent": 60,
+                "maxUses": 2,
+                "mpCost": 2
+              }
+            ]
+          },
+          {
+            "memberId": "healer",
+            "name": "僧侶",
+            "role": "回復",
+            "maxHp": 59,
+            "maxMp": 12,
+            "attack": 19,
+            "defense": 10,
+            "skills": [
+              {
+                "id": "healing_prayer",
+                "name": "ヒーリングプレア",
+                "kind": "heal",
+                "targetType": "all_allies",
+                "healPercent": 20,
+                "maxUses": 2,
+                "mpCost": 4
+              }
+            ]
+          }
+        ]
+      },
+      "status": "applied",
+      "appliedAt": 1
+    }
+  },
+  {
+    "profile": {
+      "schemaVersion": 6,
+      "gold": 0,
+      "battleEnergy": 97,
+      "materials": {
+        "iron": 0,
+        "wisdom_scroll": 0,
+        "mana_rune": 0,
+        "mineral": 0,
+        "history_seal": 0,
+        "logic_core": 0,
+        "vitality": 0,
+        "resonance": 0,
+        "craft_cloth": 0,
+        "general_essence": 0
+      },
+      "ownedEquipment": {
+        "scholar_blade": true,
+        "balanced_robe": true,
+        "logic_badge": true
+      },
+      "equipped": {
+        "weapon": "scholar_blade",
+        "armor": "balanced_robe",
+        "accessory": "logic_badge"
+      },
+      "totalExp": 3850,
+      "level": 12,
+      "statAllocation": {
+        "hp": 0,
+        "mp": 0
+      },
+      "jobId": "adventurer",
+      "activeBattleId": "old-snapshot",
+      "partyMemberIds": [
+        "hero",
+        "guardian",
+        "healer"
+      ],
+      "unlockedPartyMemberIds": [
+        "hero",
+        "guardian",
+        "mage",
+        "healer"
+      ],
+      "gacha": {
+        "ticketBalances": {
+          "normal": 0,
+          "silver": 0,
+          "gold": 0,
+          "premium": 0
+        },
+        "starFragments": 0,
+        "drawsSinceSrPlus": 0,
+        "drawsSinceSsr": 0,
+        "alchemyItems": {},
+        "recentDraws": []
+      },
+      "weeklyBoss": {
+        "clearedWeekIds": [],
+        "totalClears": 0,
+        "lastClearedAt": null,
+        "lastBossId": null
+      },
+      "selectedTitleId": null,
+      "updatedAt": 1
+    },
+    "battle": {
+      "mpRulesVersion": 1,
+      "playerMp": 8,
+      "skillRulesVersion": 2,
+      "memberMp": {
+        "guardian": 8,
+        "healer": 12
+      },
+      "schemaVersion": 9,
+      "battleId": "old-snapshot",
+      "battleKind": "boss",
+      "battleMode": "weekly_boss",
+      "weeklyBossSnapshot": {
+        "weekId": "2026-W01",
+        "bossId": "weekly_ignis",
+        "name": "炎帝イグニス",
+        "rulesVersion": 3,
+        "reward": {
+          "goldTicket": 1,
+          "starFragments": 30,
+          "alchemyItemId": "dragon_scale",
+          "alchemyItemQuantity": 1,
+          "expReward": 180
+        }
+      },
+      "encounterSnapshot": {
+        "floor": null,
+        "rulesVersion": 3,
+        "energyCost": 3,
+        "expReward": 180,
+        "enemies": [
+          {
+            "id": "weekly_ignis",
+            "name": "炎帝イグニス",
+            "element": "fire",
+            "weaknesses": [
+              "water"
+            ],
+            "resistances": [
+              "fire"
+            ],
+            "maxHp": 430,
+            "attack": 28,
+            "alchemyItemId": "dragon_scale",
+            "weekId": "2026-W01",
+            "energyCost": 3,
+            "expReward": 180,
+            "actionPattern": [
+              {
+                "id": "normal",
+                "name": "攻撃",
+                "powerPercent": 100
+              },
+              {
+                "id": "power",
+                "name": "強撃",
+                "powerPercent": 150
+              }
+            ],
+            "reward": {
+              "goldTicket": 1,
+              "starFragments": 30,
+              "alchemyItemId": "dragon_scale",
+              "alchemyItemQuantity": 1,
+              "expReward": 180
+            },
+            "rulesVersion": 3,
+            "enemyId": "weekly_ignis",
+            "enemyInstanceId": "weekly-2026-W01-weekly_ignis"
+          }
+        ]
+      },
+      "partySnapshot": {
+        "members": [
+          {
+            "memberId": "hero",
+            "name": "主人公",
+            "role": "冒険者",
+            "jobId": "adventurer",
+            "jobName": "冒険者",
+            "jobRulesVersion": 1,
+            "jobModifiers": {
+              "hpPercent": 100,
+              "mpPercent": 100,
+              "attackPercent": 100,
+              "defenseBonus": 0
+            },
+            "maxHp": 62,
+            "maxMp": 8,
+            "attack": 22,
+            "defense": 9,
+            "skills": [
+              {
+                "id": "flame_slash",
+                "name": "炎斬り",
+                "description": "炎属性の一撃。",
+                "kind": "attack",
+                "element": "fire",
+                "powerPercent": 125,
+                "maxUses": 2,
+                "mpCost": 2,
+                "targetType": "single_enemy"
+              },
+              {
+                "id": "aqua_edge",
+                "name": "水刃",
+                "description": "水属性の一撃。",
+                "kind": "attack",
+                "element": "water",
+                "powerPercent": 125,
+                "maxUses": 2,
+                "mpCost": 2,
+                "targetType": "single_enemy"
+              },
+              {
+                "id": "thunder_strike",
+                "name": "雷撃",
+                "description": "雷属性の一撃。",
+                "kind": "attack",
+                "element": "lightning",
+                "powerPercent": 125,
+                "maxUses": 2,
+                "mpCost": 2,
+                "targetType": "single_enemy"
+              },
+              {
+                "id": "healing_light",
+                "name": "ヒール",
+                "description": "HPを回復する。",
+                "kind": "heal",
+                "element": "neutral",
+                "healPercent": 35,
+                "maxUses": 2,
+                "mpCost": 3,
+                "targetType": "single_ally"
+              },
+              {
+                "id": "guard_stance",
+                "name": "ガード",
+                "description": "このターンの敵から受けるダメージを50%軽減する。",
+                "kind": "guard",
+                "element": "neutral",
+                "damageReductionPercent": 50,
+                "maxUses": 2,
+                "mpCost": 2,
+                "targetType": "self"
+              }
+            ]
+          },
+          {
+            "memberId": "guardian",
+            "name": "守護戦士",
+            "role": "高HP・高防御",
+            "maxHp": 81,
+            "maxMp": 8,
+            "attack": 18,
+            "defense": 12,
+            "skills": [
+              {
+                "id": "guardian_wall",
+                "name": "守護の壁",
+                "kind": "guard",
+                "targetType": "self",
+                "damageReductionPercent": 60,
+                "maxUses": 2,
+                "mpCost": 2
+              }
+            ]
+          },
+          {
+            "memberId": "healer",
+            "name": "僧侶",
+            "role": "回復",
+            "maxHp": 59,
+            "maxMp": 12,
+            "attack": 19,
+            "defense": 10,
+            "skills": [
+              {
+                "id": "healing_prayer",
+                "name": "ヒーリングプレア",
+                "kind": "heal",
+                "targetType": "all_allies",
+                "healPercent": 20,
+                "maxUses": 2,
+                "mpCost": 4
+              }
+            ]
+          }
+        ]
+      },
+      "partyStates": [
+        {
+          "memberId": "hero",
+          "hp": 62,
+          "status": "active",
+          "guardPercent": 0
+        },
+        {
+          "memberId": "guardian",
+          "hp": 81,
+          "status": "active",
+          "guardPercent": 0
+        },
+        {
+          "memberId": "healer",
+          "hp": 59,
+          "status": "active",
+          "guardPercent": 0
+        }
+      ],
+      "enemySnapshots": [
+        {
+          "id": "weekly_ignis",
+          "name": "炎帝イグニス",
+          "element": "fire",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 430,
+          "attack": 28,
+          "alchemyItemId": "dragon_scale",
+          "weekId": "2026-W01",
+          "energyCost": 3,
+          "expReward": 180,
+          "actionPattern": [
+            {
+              "id": "normal",
+              "name": "攻撃",
+              "powerPercent": 100
+            },
+            {
+              "id": "power",
+              "name": "強撃",
+              "powerPercent": 150
+            }
+          ],
+          "reward": {
+            "goldTicket": 1,
+            "starFragments": 30,
+            "alchemyItemId": "dragon_scale",
+            "alchemyItemQuantity": 1,
+            "expReward": 180
+          },
+          "rulesVersion": 3,
+          "enemyId": "weekly_ignis",
+          "enemyInstanceId": "weekly-2026-W01-weekly_ignis"
+        }
+      ],
+      "enemyStates": [
+        {
+          "enemyInstanceId": "weekly-2026-W01-weekly_ignis",
+          "hp": 430,
+          "status": "active"
+        }
+      ],
+      "roundNumber": 1,
+      "activePartyMemberId": "hero",
+      "actedMemberIds": [],
+      "skillUses": {},
+      "status": "active",
+      "startedAt": 1,
+      "updatedAt": 1,
+      "victory": null,
+      "defeat": null
+    },
+    "ledger": {
+      "schemaVersion": 1,
+      "type": "battle_start",
+      "battleId": "old-snapshot",
+      "battleMode": "weekly_boss",
+      "weekId": "2026-W01",
+      "energySpent": 3,
+      "weeklyBossSnapshot": {
+        "weekId": "2026-W01",
+        "bossId": "weekly_ignis",
+        "name": "炎帝イグニス",
+        "rulesVersion": 3,
+        "reward": {
+          "goldTicket": 1,
+          "starFragments": 30,
+          "alchemyItemId": "dragon_scale",
+          "alchemyItemQuantity": 1,
+          "expReward": 180
+        }
+      },
+      "status": "applied",
+      "appliedAt": 1
+    }
+  }
+]

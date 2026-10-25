@@ -112,10 +112,10 @@ export function simulateBattle(player, scenario, policy = 'strategy', { mpRules 
   const hp = scenario.enemy ? battle.playerHp : battle.partyStates.reduce((sum,state) => sum + state.hp, 0);
   const maxHp = scenario.enemy ? initial.playerHp : initial.partyStates.reduce((sum,state) => sum + state.hp, 0);
   const turns = scenario.enemy ? actions : battle.status === 'active' ? battle.roundNumber - 1 : battle.roundNumber;
-  return { ...(mpRules ? { mpRemaining: battle.playerMp, maxMp: initial.playerSnapshot?.maxMp ?? initial.partySnapshot?.members.find(member => member.memberId === 'hero').maxMp, heroSkillUses: Object.entries(battle.skillUses).filter(([key]) => !key.includes(':') || key.startsWith('hero:')).reduce((sum, [,used]) => sum + used, 0) } : {}), status: battle.status, winRate: battle.status === 'won' ? 100 : 0, turns, oneTurnRate: battle.status === 'won' && turns === 1 ? 100 : 0, hp, hpPercent: Math.round(hp/maxHp*1000)/10, damage, enemyActions, heals, guards, unhurt: damage === 0, actions };
+  return { ...(skillRules ? { skillUseCount: Object.values(battle.skillUses).reduce((sum, used) => sum + used, 0), memberMpRemaining: battle.memberMp || {} } : {}), ...(mpRules ? { mpRemaining: battle.playerMp, maxMp: initial.playerSnapshot?.maxMp ?? initial.partySnapshot?.members.find(member => member.memberId === 'hero').maxMp, heroSkillUses: Object.entries(battle.skillUses).filter(([key]) => !key.includes(':') || key.startsWith('hero:')).reduce((sum, [,used]) => sum + used, 0) } : {}), status: battle.status, winRate: battle.status === 'won' ? 100 : 0, turns, oneTurnRate: battle.status === 'won' && turns === 1 ? 100 : 0, hp, hpPercent: Math.round(hp/maxHp*1000)/10, damage, enemyActions, heals, guards, unhurt: damage === 0, actions };
 }
 
-export function measureBalance() {
-  return Object.entries(BALANCE_PLAYERS).flatMap(([player, profile]) => BALANCE_SCENARIOS.flatMap(scenario => ['normal', 'strategy'].map(policy => ({ player, scenario: scenario.id, policy, ...simulateBattle(profile, scenario, policy) }))));
+export function measureBalance(scenarios = BALANCE_SCENARIOS) {
+  return Object.entries(BALANCE_PLAYERS).flatMap(([player, profile]) => scenarios.flatMap(scenario => ['normal', 'strategy'].map(policy => ({ player, scenario: scenario.id, policy, ...simulateBattle(profile, scenario, policy) }))));
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) console.log(JSON.stringify(measureBalance(), null, 2));

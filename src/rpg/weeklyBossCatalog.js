@@ -1,9 +1,9 @@
-export const WEEKLY_BOSS_RULES_VERSION = 3;
+export const WEEKLY_BOSS_RULES_VERSION = 4;
 export const WEEKLY_BOSSES = Object.freeze([
-  { id: 'weekly_ignis', name: '炎帝イグニス', element: 'fire', weaknesses: ['water'], resistances: ['fire'], maxHp: 430, attack: 28, alchemyItemId: 'dragon_scale' },
-  { id: 'weekly_leviathan', name: '蒼海竜リヴァイア', element: 'water', weaknesses: ['lightning'], resistances: ['water'], maxHp: 450, attack: 27, alchemyItemId: 'sage_stone' },
-  { id: 'weekly_volt', name: '雷王ヴォルト', element: 'lightning', weaknesses: ['fire'], resistances: ['lightning'], maxHp: 430, attack: 29, alchemyItemId: 'ancient_core' },
-  { id: 'weekly_gaia', name: '大地巨神ガイア', element: 'earth', weaknesses: ['water'], resistances: ['lightning'], maxHp: 470, attack: 27, alchemyItemId: 'celestial_cloth' },
+  { id: 'weekly_ignis', name: '炎帝イグニス', element: 'fire', weaknesses: ['water'], resistances: ['fire'], maxHp: 400, attack: 26, alchemyItemId: 'dragon_scale' },
+  { id: 'weekly_leviathan', name: '蒼海竜リヴァイア', element: 'water', weaknesses: ['lightning'], resistances: ['water'], maxHp: 420, attack: 25, alchemyItemId: 'sage_stone' },
+  { id: 'weekly_volt', name: '雷王ヴォルト', element: 'lightning', weaknesses: ['fire'], resistances: ['lightning'], maxHp: 400, attack: 27, alchemyItemId: 'ancient_core' },
+  { id: 'weekly_gaia', name: '大地巨神ガイア', element: 'earth', weaknesses: ['water'], resistances: ['lightning'], maxHp: 440, attack: 25, alchemyItemId: 'celestial_cloth' },
 ]);
 const jstParts = (timestamp) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date(timestamp)).reduce((all, part) => ({ ...all, [part.type]: part.value }), {});
 export const getWeeklyBossWeekId = (timestamp) => { const p = jstParts(timestamp); const d = new Date(Date.UTC(p.year, Number(p.month) - 1, p.day)); d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7)); const y = d.getUTCFullYear(); const first = new Date(Date.UTC(y, 0, 1)); const week = Math.ceil((((d - first) / 86400000) + 1) / 7); return `${y}-W${String(week).padStart(2, '0')}`; };

@@ -1,7 +1,7 @@
 import { ENEMY_CATALOG } from './enemyCatalog.js';
 import { BOSS_CATALOG } from './bossCatalog.js';
 
-export const TOWER_RULES_VERSION = 3;
+export const TOWER_RULES_VERSION = 4;
 export const TOWER_BOSS_INTERVAL = 10;
 const number = (value) => Math.max(0, Number(value) || 0);
 export const isTowerBossFloor = (floor) => Number.isInteger(Number(floor)) && Number(floor) > 0 && Number(floor) % TOWER_BOSS_INTERVAL === 0;
@@ -22,6 +22,8 @@ export function buildTowerEnemy({ floor, baseEnemy }) {
   const bossBase = base.id === 'orc_chief' || base.id === 'ancient_golem';
   const baseHp = bossBase ? base.maxHp * 0.65 : 20 + base.maxHp * 0.5;
   const baseAttack = bossBase ? Math.max(10, base.attack) : base.attack + 4;
+  const normalHpRelief = !bossBase && safeFloor > 3 ? 0.96 : 1;
+  const normalAttackRelief = !bossBase && safeFloor > 3 ? 0.95 : 1;
   const expMultiplier = 1 + tier * 0.15;
   return {
     id: `tower-${boss ? 'boss' : 'normal'}-${safeFloor}-${base.id}`,
@@ -29,8 +31,8 @@ export function buildTowerEnemy({ floor, baseEnemy }) {
     element: base.element,
     weaknesses: [...(base.weaknesses || [])],
     resistances: [...(base.resistances || [])],
-    maxHp: scaled(baseHp, hpMultiplier),
-    attack: scaled(baseAttack, attackMultiplier * (bossBase ? 0.75 : 1)),
+    maxHp: scaled(baseHp, hpMultiplier * normalHpRelief),
+    attack: scaled(baseAttack, attackMultiplier * (bossBase ? 0.70 : normalAttackRelief)),
     expReward: scaled(base.expReward, expMultiplier),
     energyCost: boss ? 3 : 1,
     actionPattern: [...(base.actionPattern || [])],

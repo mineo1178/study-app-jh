@@ -7,7 +7,7 @@ describe('tower battle progress', () => {
   it('snapshots a floor and advances EXP and tower progress exactly once on victory', () => {
     const start = prepareBattleStart({ profile, enemy: buildTowerEnemy({ floor: 10 }), battleId: 'tower-10', now: 1, battleKind: 'boss', battleMode: 'tower', towerFloor: 10 });
     const win = prepareBattleAttack({ battle: { ...start.battle, enemyHp: 1 }, profile: start.profile, towerProgress: { currentFloor: 10, highestFloor: 9, totalWins: 9 }, actionId: 'tower-win', now: 2 });
-    expect(start.battle).toMatchObject({ battleMode: 'tower', towerFloor: 10, towerRulesVersion: 3 });
+    expect(start.battle).toMatchObject({ battleMode: 'tower', towerFloor: 10, towerRulesVersion: 4 });
     expect(win.profile.totalExp).toBeGreaterThan(0); expect(win.towerProgress).toMatchObject({ currentFloor: 11, highestFloor: 10, totalWins: 10, bossWins: 1 });
     expect(() => prepareBattleAttack({ battle: win.battle, profile: win.profile, towerProgress: win.towerProgress, actionId: 'again', now: 3 })).toThrow('BATTLE_ALREADY_COMPLETED');
   });
@@ -19,11 +19,11 @@ describe('tower battle progress', () => {
 });
 
 describe('Tower rules version compatibility', () => {
-  it('captures rules 3, Energy and EXP in new party encounters and start ledgers', () => {
+  it('captures rules 4, Energy and EXP in new party encounters and start ledgers', () => {
     const encounter = buildTowerEncounter({ floor: 10 });
     const start = preparePartyTowerStart({ profile, encounter, battleId: 'new-party', now: 1 });
-    expect(encounter.rulesVersion).toBe(3);
-    expect(start.battle).toMatchObject({ towerRulesVersion: 3, encounterSnapshot: { rulesVersion: 3, energyCost: 3, expReward: 155 } });
+    expect(encounter.rulesVersion).toBe(4);
+    expect(start.battle).toMatchObject({ towerRulesVersion: 4, encounterSnapshot: { rulesVersion: 4, energyCost: 3, expReward: 155 } });
     expect(start.profile.battleEnergy).toBe(7);
     expect(start.ledger.energySpent).toBe(3);
     expect(start.ledger.encounterSnapshot).toEqual(start.battle.encounterSnapshot);

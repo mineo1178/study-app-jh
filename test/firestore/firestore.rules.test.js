@@ -1,10 +1,11 @@
+import oldBattles from '../fixtures/rpg-v2.9.6-battles.json';
 import { correctStudySessionReward, retryPendingRewardCorrection } from '../../src/data/rewardCorrectionRepository.js';
 import { calculateStudyReward } from '../../src/rpg/rewardCalculator.js';
 import { changePlayerJob } from '../../src/data/rpgJobRepository.js';
 import { JOB_CATALOG } from '../../src/rpg/jobCatalog.js';
 import { buildTowerEncounter } from '../../src/rpg/towerCatalog.js';
 import { saveStatAllocation } from '../../src/data/rpgStatAllocationRepository.js';
-import { startBattle, useBattleSkill, preparePartyTowerStart } from '../../src/data/rpgBattleRepository.js';
+import { startBattle, useBattleSkill, preparePartyTowerStart, attackBattle } from '../../src/data/rpgBattleRepository.js';
 import { totalExpForLevel } from '../../src/rpg/levelSystem.js';
 import { purchaseResource } from '../../src/data/rpgShopRepository.js';
 import { exchangeMaterial } from '../../src/data/rpgMaterialExchangeRepository.js';
@@ -326,4 +327,13 @@ describe('reward policy start/finish rollover transaction',()=>{
     const finished=await finishActiveTimer({...args,timerId:'old-rate',endAt:2800000,staleProof:null});expect(finished.session.rewardPolicyVersion).toBe('rpg-reward-v1');
     expect((await applyStudySessionReward({...args,session:{...finished.session,id:'old-rate'}})).rewards.gold).toBe(30);
   });
+});
+
+describe('pre-relief battle snapshots in real transactions',()=>{
+ it.each(oldBattles.map((change,index)=>[index,change]))('keeps old mode %s enemy and party snapshots',async(_index,change)=>{
+  await seedDoc(appPath(appFamilyId,'rpg','playerProfile'),change.profile);await seedDoc(appPath(appFamilyId,'rpgBattles',change.battle.battleId),change.battle);
+  const result=await attackBattle({db:userDb(),familyId:appFamilyId,battleId:change.battle.battleId,actionId:'resume-old',targetEnemyInstanceId:change.battle.enemyStates?.[0].enemyInstanceId||null});expect(result.applied).toBe(true);
+  const saved=(await getDoc(ref(userDb(),appPath(appFamilyId,'rpgBattles',change.battle.battleId)))).data();
+  for(const key of change.battle.partySnapshot?['enemySnapshots','partySnapshot','encounterSnapshot','weeklyBossSnapshot']:['enemySnapshot','playerSnapshot','chapterSnapshot'])expect(saved[key]).toEqual(change.battle[key]);
+ });
 });

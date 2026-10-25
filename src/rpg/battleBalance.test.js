@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BALANCE_PLAYERS, BALANCE_SCENARIOS, measureBalance, simulateBattle } from '../../scripts/simulateBattleBalance.js';
+import { BALANCE_PLAYERS, measureBalance, simulateBattle } from '../../scripts/simulateBattleBalance.js';
 import { createPartyBattle, preparePartyBattleAction } from './partyBattleEngine.js';
 import { buildTowerPartySnapshot } from './partyMemberCatalog.js';
 import { calculateEnemyActionDamage } from './battleCalculator.js';
@@ -8,6 +8,8 @@ import { BOSS_CATALOG } from './bossCatalog.js';
 import { buildTowerEncounter } from './towerCatalog.js';
 import { getWeeklyBossDefinition } from './weeklyBossCatalog.js';
 
+import beforeEnemies from '../../test/fixtures/rpg-v2.9.6-enemies.json';
+const BALANCE_SCENARIOS = beforeEnemies.scenarios;
 const scenario = id => BALANCE_SCENARIOS.find(row => row.id === id);
 const simulate = (player, id, policy = 'strategy') => simulateBattle(BALANCE_PLAYERS[player], scenario(id), policy);
 const encounter = { rulesVersion: 1, energyCost: 1, expReward: 20, enemies: [1,2,3].map(id => ({ id: `enemy-${id}`, enemyInstanceId: `enemy-${id}`, maxHp: 1000, attack: 20, actionPattern: ['normal_attack'], weaknesses: [], resistances: [] })) };
@@ -114,8 +116,8 @@ describe('new-start balance and existing snapshot compatibility', () => {
     const boss = BOSS_CATALOG.ancient_golem;
     const normal = calculateEnemyActionDamage({ enemyAttack: boss.attack, playerDefense: 4 });
     const special = calculateEnemyActionDamage({ enemyAttack: boss.attack, powerPercent: 175, playerDefense: 4 });
-    expect(normal.damage).toBe(5);
-    expect(special.damage).toBe(11);
+    expect(normal.damage).toBe(4);
+    expect(special.damage).toBe(10);
   });
   it('continues a saved Campaign battle using captured HP, attack, skills and rewards', () => {
     const oldEnemy = { ...BOSS_CATALOG.orc_chief, maxHp: 58, attack: 5 };
@@ -126,7 +128,7 @@ describe('new-start balance and existing snapshot compatibility', () => {
     expect(next.battle.playerSnapshot).toEqual(before.playerSnapshot);
     expect(next.battle.enemyHp).toBe(58 - before.playerSnapshot.attack);
     expect(next.result.enemyCounter.damage).toBe(1);
-    expect(prepareBattleStart({ profile: BALANCE_PLAYERS.intermediate, enemy: BOSS_CATALOG.orc_chief, battleId: 'new', now: 1 }).battle.enemyHp).toBe(80);
+    expect(prepareBattleStart({ profile: BALANCE_PLAYERS.intermediate, enemy: BOSS_CATALOG.orc_chief, battleId: 'new', now: 1 }).battle.enemyHp).toBe(74);
   });
   it.each([{ rulesVersion: 1, maxHp: 220, attack: 11 }, { rulesVersion: 2, maxHp: 850, attack: 52 }])('keeps Weekly rules $rulesVersion rewards and stats captured at start when resuming', legacyStats => {
     const boss = getWeeklyBossDefinition('2026-W01');
@@ -138,14 +140,14 @@ describe('new-start balance and existing snapshot compatibility', () => {
     expect(next.battle.enemySnapshots).toEqual(snapshots.enemySnapshots);
     expect(next.battle.partySnapshot).toEqual(snapshots.partySnapshot);
     expect(start.battle.enemyStates[0].hp).toBe(legacyStats.maxHp);
-    expect(boss.rulesVersion).toBe(3);
+    expect(boss.rulesVersion).toBe(4);
     expect(boss.reward).toEqual(oldBoss.reward);
   });
   it('preserves costs and XP scaling while generating new Tower encounters', () => {
     const tenth = buildTowerEncounter({ floor: 10 });
     expect(tenth.energyCost).toBe(3);
     expect(tenth.expReward).toBe(tenth.enemies.reduce((sum, enemy) => sum + enemy.expReward, 0));
-    expect(tenth.rulesVersion).toBe(3);
+    expect(tenth.rulesVersion).toBe(4);
     expect(buildTowerEncounter({ floor: 60 }).enemies[0].attack).toBeGreaterThan(tenth.enemies[0].attack);
   });
 });
