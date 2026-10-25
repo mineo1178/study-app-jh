@@ -6,9 +6,9 @@ import { measureDifficultyBalance } from '../../scripts/measureDifficultyBalance
 import { prepareBattleAttack } from '../data/rpgBattleRepository.js';
 import { preparePartyBattleAction } from './partyBattleEngine.js';
 describe('individual enemy relief and unchanged rewards',()=>{
- it('retains actions, affinities, rewards and energy while reducing only selected stats',()=>{
+ it('retains base relief beneath the v2.9.10 Tower ramp, actions, affinities and rewards',()=>{
   for(const old of before.scenarios){const next=BALANCE_SCENARIOS.find(row=>row.id===old.id);const oldEnemies=old.enemy?[old.enemy]:old.encounter.enemies,newEnemies=next.enemy?[next.enemy]:next.encounter.enemies;
-   oldEnemies.forEach((enemy,i)=>{const current=newEnemies[i];expect(current.maxHp).toBeLessThanOrEqual(enemy.maxHp);expect(current.attack).toBeLessThanOrEqual(enemy.attack);for(const key of ['element','weaknesses','resistances','energyCost','expReward','reward','firstClearReward','actionPattern'])expect(current[key]).toEqual(enemy[key]);});
+   oldEnemies.forEach((enemy,i)=>{const current=newEnemies[i];const ramp=old.id.startsWith('tower-')?(Math.max(0,old.floor-20)/80)**2:0;expect(current.maxHp).toBeLessThanOrEqual(Math.ceil(enemy.maxHp*(1+0.4*ramp)));expect(current.attack).toBeLessThanOrEqual(Math.ceil(enemy.attack*(1+0.2*ramp)));for(const key of ['element','weaknesses','resistances','energyCost','expReward','reward','firstClearReward','actionPattern'])expect(current[key]).toEqual(enemy[key]);});
   }
   expect(BALANCE_SCENARIOS.find(row=>row.id==='campaign-slime').enemy).toMatchObject({maxHp:20,attack:3});
  });

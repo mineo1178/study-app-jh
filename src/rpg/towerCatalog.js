@@ -1,7 +1,7 @@
 import { ENEMY_CATALOG } from './enemyCatalog.js';
 import { BOSS_CATALOG } from './bossCatalog.js';
 
-export const TOWER_RULES_VERSION = 4;
+export const TOWER_RULES_VERSION = 5;
 export const TOWER_BOSS_INTERVAL = 10;
 const number = (value) => Math.max(0, Number(value) || 0);
 export const isTowerBossFloor = (floor) => Number.isInteger(Number(floor)) && Number(floor) > 0 && Number(floor) % TOWER_BOSS_INTERVAL === 0;
@@ -17,6 +17,8 @@ export function buildTowerEnemy({ floor, baseEnemy }) {
     : [ENEMY_CATALOG.slime, ENEMY_CATALOG.goblin, ENEMY_CATALOG.stone_golem][(safeFloor - 1) % 3]);
   // Party battles need their own baseline: all living allies act before enemies.
   // Floor growth also applies within each decade; later tiers add pressure.
+  // A continuous ramp after floor 20: no extra jumps at 21/41/61/81.
+  const highFloorGrowth = (Math.max(0, safeFloor - 20) / 80) ** 2;
   const hpMultiplier = 1 + (safeFloor - 1) * 0.06 + tier * tier * 0.025;
   const attackMultiplier = 1 + (safeFloor - 1) * 0.045 + tier * tier * 0.02;
   const bossBase = base.id === 'orc_chief' || base.id === 'ancient_golem';
@@ -31,8 +33,8 @@ export function buildTowerEnemy({ floor, baseEnemy }) {
     element: base.element,
     weaknesses: [...(base.weaknesses || [])],
     resistances: [...(base.resistances || [])],
-    maxHp: scaled(baseHp, hpMultiplier * normalHpRelief),
-    attack: scaled(baseAttack, attackMultiplier * (bossBase ? 0.70 : normalAttackRelief)),
+    maxHp: scaled(baseHp, hpMultiplier * normalHpRelief * (1 + 0.4 * highFloorGrowth)),
+    attack: scaled(baseAttack, attackMultiplier * (bossBase ? 0.70 : normalAttackRelief) * (1 + 0.2 * highFloorGrowth)),
     expReward: scaled(base.expReward, expMultiplier),
     energyCost: boss ? 3 : 1,
     actionPattern: [...(base.actionPattern || [])],

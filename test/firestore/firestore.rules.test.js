@@ -1,3 +1,4 @@
+import towerV4 from '../fixtures/rpg-v2.9.9-tower.json';
 import commonPanelBattles from '../fixtures/rpg-v2.9.8-panel-battles.json';
 import { heroJobSnapshot } from '../../src/rpg/jobStats.js';
 import { saveSkillPanel } from '../../src/data/rpgSkillPanelRepository.js';
@@ -9,7 +10,7 @@ import { changePlayerJob } from '../../src/data/rpgJobRepository.js';
 import { JOB_CATALOG } from '../../src/rpg/jobCatalog.js';
 import { buildTowerEncounter } from '../../src/rpg/towerCatalog.js';
 import { saveStatAllocation } from '../../src/data/rpgStatAllocationRepository.js';
-import { startBattle, useBattleSkill, preparePartyTowerStart, attackBattle } from '../../src/data/rpgBattleRepository.js';
+import { startBattle, startTowerBattle, useBattleSkill, preparePartyTowerStart, attackBattle } from '../../src/data/rpgBattleRepository.js';
 import { totalExpForLevel } from '../../src/rpg/levelSystem.js';
 import { purchaseResource } from '../../src/data/rpgShopRepository.js';
 import { exchangeMaterial } from '../../src/data/rpgMaterialExchangeRepository.js';
@@ -380,5 +381,33 @@ describe('job panels real transactions',()=>{
  });
  it.each(commonPanelBattles.map((change,index)=>[index,change]))('resumes common-panel v2.9.8 mode %s with unchanged bonuses/costs',async(_index,change)=>{
   await seedDoc(profilePath,change.profile);await seedDoc(appPath(appFamilyId,'rpgBattles',change.battle.battleId),change.battle);await attackBattle({db:userDb(),familyId:appFamilyId,battleId:change.battle.battleId,actionId:'old-panel',targetEnemyInstanceId:change.battle.enemyStates?.[0].enemyInstanceId||null});const saved=(await getDoc(ref(userDb(),appPath(appFamilyId,'rpgBattles',change.battle.battleId)))).data();expect(saved.partySnapshot||saved.playerSnapshot).toEqual(change.battle.partySnapshot||change.battle.playerSnapshot);
+ });
+});
+
+describe('v2.9.10 Tower snapshot transactions',()=>{
+ it.each(towerV4.battles)('resumes rules 4 $battle.battleId once without replacing snapshots',async fixture=>{
+  const battlePath=appPath(appFamilyId,'rpgBattles',fixture.battle.battleId);
+  await seedDoc(appPath(appFamilyId,'rpg','playerProfile'),fixture.profile);
+  await seedDoc(appPath(appFamilyId,'rpgTowerProgress','current'),fixture.towerProgress);
+  await seedDoc(battlePath,fixture.battle);
+  const args={db:userDb(),familyId:appFamilyId,battleId:fixture.battle.battleId,actionId:'v4-resume',targetEnemyInstanceId:fixture.battle.enemyStates[0].enemyInstanceId};
+  expect((await attackBattle(args)).applied).toBe(true);
+  const saved=(await getDoc(ref(userDb(),battlePath))).data();
+  for(const key of ['towerRulesVersion','enemySnapshots','partySnapshot','encounterSnapshot'])expect(saved[key]).toEqual(fixture.battle[key]);
+  expect((await attackBattle(args)).applied).toBe(false);
+  expect((await getDoc(ref(userDb(),battlePath))).data()).toEqual(saved);
+ });
+ it('starts rules 5 from the latest floor, and charges energy once',async()=>{
+  const fixture=towerV4.battles[1],floor=60,battleId='tower-rules-5';
+  await seedDoc(appPath(appFamilyId,'rpg','playerProfile'),{...fixture.profile,activeBattleId:null});
+  await seedDoc(appPath(appFamilyId,'rpgProgress','current'),{campaignCompleted:true});
+  await seedDoc(appPath(appFamilyId,'rpgTowerProgress','current'),{currentFloor:floor,highestFloor:floor-1});
+  const args={db:userDb(),familyId:appFamilyId,battleId};
+  const result=await startTowerBattle(args);
+  expect(result.battle.towerRulesVersion).toBe(5);
+  expect(result.battle.enemySnapshots.map(e=>[e.maxHp,e.attack])).toEqual(buildTowerEncounter({floor}).enemies.map(e=>[e.maxHp,e.attack]));
+  expect((await startTowerBattle(args)).applied).toBe(false);
+  const profile=(await getDoc(ref(userDb(),appPath(appFamilyId,'rpg','playerProfile')))).data();
+  expect(profile.battleEnergy).toBe(fixture.profile.battleEnergy-3);
  });
 });

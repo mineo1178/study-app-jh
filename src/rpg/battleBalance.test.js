@@ -147,7 +147,7 @@ describe('new-start balance and existing snapshot compatibility', () => {
     const tenth = buildTowerEncounter({ floor: 10 });
     expect(tenth.energyCost).toBe(3);
     expect(tenth.expReward).toBe(tenth.enemies.reduce((sum, enemy) => sum + enemy.expReward, 0));
-    expect(tenth.rulesVersion).toBe(4);
+    expect(tenth.rulesVersion).toBe(5);
     expect(buildTowerEncounter({ floor: 60 }).enemies[0].attack).toBeGreaterThan(tenth.enemies[0].attack);
   });
 });
