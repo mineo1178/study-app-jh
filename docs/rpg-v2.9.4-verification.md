@@ -1,0 +1,9 @@
+# v2.9.4 verification
+
+- New Campaign, Tower and Weekly battles capture skillRulesVersion 2 independently of mpRulesVersion 1. Captured legacy maxUses remain enforced for old battles.
+- Hero costs remain 2 MP per attack/guard, 3 MP per heal. Companion MP: Guardian/Attacker 8; Mage/Healer 12. Costs: wall 2, area attack/prayer 4; shared hero skills use their existing cost. No MP regeneration.
+- MP candidates were measured with the existing deterministic simulator before acceptance. 162 old/new comparisons (Lv7/12/20; HP/MP/balanced allocations; with/without healer; Campaign bosses, Tower 10/20/30/60, all four Weekly bosses). Results: Lv7 wins 23 -> 29 /54; Lv12 48 -> 48 /54; Lv20 54 -> 54 /54. Lv12 Weekly: 24/24 wins; maximum 38 actions and 7 heals. Healer choice changes heal/turn results. This is deterministic strategy coverage, not a randomized win probability. Boss HP/attack unchanged. See rpg-skill-rules-v2.9.4.json.
+- Unit/regression: 1111 PASS (91 files). Firestore Emulator launched by npm run test:rules: 19 PASS, including two real clients racing the same third ally spell, one MP deduction and one ledger. No production Firestore writes. Rules unchanged.
+- lint/build/diff-check PASS. Existing >500 kB bundle warning remains.
+- UI: Firestore-free existing fixture, 320/375/1440px, new and legacy Campaign/Tower/Weekly (18 cases), no horizontal overflow. Enter executes three hero guards, companion guards and area spells; each action advances the actor/round. Mage 12 -> 8 -> 4 -> 0; fourth spell disabled with required/current/missing MP. Normal attack remains available. Tab navigation and UID switch checked. Fixture and Emulator verification are separate.
+- Bundle JS+CSS (Vite build from archived baseline HEAD vs worktree), bytes: 1502582 -> 1503692 (+1110); gzip: 433649 -> 434027 (+378).

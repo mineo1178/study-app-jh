@@ -28,7 +28,7 @@ export default function Fixture() {
   const start = (mode, legacy = false) => {
     const args = { profile: { ...profile, activeBattleId: null }, battleId: mode, now: 1 };
     const change = mode === 'campaign' ? prepareBattleStart({ ...args, enemy: ENEMY_CATALOG.slime }) : mode === 'tower' ? preparePartyTowerStart({ ...args, encounter: buildTowerEncounter({ floor: 10 }) }) : prepareWeeklyBossStart({ ...args, boss: getWeeklyBossDefinition('2026-W01') });
-    if (legacy) { delete change.battle.mpRulesVersion; delete change.battle.playerMp; }
+    if (legacy) { delete change.battle.skillRulesVersion; delete change.battle.memberMp; delete change.battle.mpRulesVersion; delete change.battle.playerMp; }
     setProfile(change.profile); setBattle(change.battle); setCandidate(null);
   };
   const act = async (skillId, targetEnemyInstanceId, targetMemberId) => {

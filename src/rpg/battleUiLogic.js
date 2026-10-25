@@ -1,4 +1,5 @@
-import { battleMpCost, hasMpRules } from './statAllocation.js';
+import { battleMpCost, actorUsesMp, battleActorMp } from './statAllocation.js';
+import { hasUnlimitedSkills } from './skillRules.js';
 import { normalizePlayerProfile } from './playerProfile.js';
 import { ELEMENT_LABELS } from './elementConfig.js';
 export const battleEnergyState = (profile, enemy) => { const energy = Number(normalizePlayerProfile(profile || {}).battleEnergy) || 0; const required = Number(enemy?.energyCost) || 0; return { energy, required, sufficient: energy >= required }; };
@@ -35,11 +36,14 @@ export function battleSkillAvailability(battle, skill, selected = {}, pending = 
   const party = Number(battle.schemaVersion) >= 8;
   const key = party ? `${battle.activePartyMemberId}:${skill.id}` : skill.id;
   const remaining = getRemainingSkillUses(skill, battle.skillUses?.[key]);
+  const actorId = party ? battle.activePartyMemberId : 'hero';
+  const mpCost = battleMpCost(battle, skill, actorId);
+  const currentMp = battleActorMp(battle, actorId);
   let reason = '';
   if (pending) reason = '行動を処理中です';
   else if (!canUseBattleActions(battle)) reason = '現在は行動できません';
-  else if (!remaining) reason = '使用回数を使い切りました';
-  else if (hasMpRules(battle) && (!party || battle.activePartyMemberId === 'hero') && battle.playerMp < battleMpCost(battle, skill)) reason = 'MPが不足しています';
+  else if (!hasUnlimitedSkills(battle) && !remaining) reason = '使用回数を使い切りました';
+  else if (actorUsesMp(battle, actorId) && currentMp < mpCost) reason = hasUnlimitedSkills(battle) ? `MPが不足しています（必要MP ${mpCost}／現在MP ${currentMp}／不足 ${mpCost - currentMp}）` : 'MPが不足しています';
   else if (party) {
     const target = skill.targetType;
     const enemies = battle.enemyStates || [];
@@ -52,14 +56,14 @@ export function battleSkillAvailability(battle, skill, selected = {}, pending = 
       else if (targets.every(state => state.hp >= battle.partySnapshot.members.find(member => member.memberId === state.memberId)?.maxHp)) reason = '対象のHPは満タンです';
     }
   } else if (skill.kind === 'heal' && battle.playerHp >= battle.playerSnapshot?.maxHp) reason = 'HPは満タンです';
-  return { remaining, reason, available: !reason };
+  return { remaining, mpCost, currentMp, reason, available: !reason };
 }
 
 export function battleDefeatHints(battle) {
   const party = Number(battle?.schemaVersion) >= 8;
   const skills = party ? (battle.partySnapshot?.members || []).flatMap(member => member.skills || []) : getBattleSkillEntries(battle);
   const hints = [];
-  if (skills.some(skill => skill.kind === 'heal' && Number(skill.maxUses) > 0)) hints.push('HPが減ったら、回復スキルと残り使用回数を確認してみよう。');
+  if (skills.some(skill => skill.kind === 'heal' && Number(skill.maxUses) > 0)) hints.push(hasUnlimitedSkills(battle) ? 'HPが減ったら、回復スキルと残りMPを確認してみよう。' : 'HPが減ったら、回復スキルと残り使用回数を確認してみよう。');
   if (skills.some(skill => skill.kind === 'guard' && Number(skill.maxUses) > 0)) hints.push(party ? '防御は敵の反撃中のダメージを軽減します。仲間の行動順も確認してみよう。' : '防御を使うと、その行動に続く敵の反撃ダメージを軽減できます。');
   if ((party ? battle.enemySnapshots : [battle.enemySnapshot])?.some(enemy => enemy?.weaknesses?.length) && skills.some(skill => skill.kind === 'attack')) hints.push('敵の弱点と、攻撃スキルの属性を確認してみよう。');
   hints.push('装備やレベルを強化して、再挑戦できます。');

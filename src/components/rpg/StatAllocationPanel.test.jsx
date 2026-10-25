@@ -33,9 +33,9 @@ describe('stat allocation UI', () => {
     const old = renderToStaticMarkup(<BattleArena battle={battle}/>);
     expect(old).not.toContain('主人公 MP'); expect(old).not.toContain('消費MP'); expect(old).not.toContain('MPが不足');
   });
-  it('keeps ally skills usable with zero hero MP and hides their MP costs', () => {
+  it('keeps legacy ally skills usable with zero hero MP and hides their MP costs', () => {
     const { battle } = preparePartyTowerStart({ profile, encounter: buildTowerEncounter({ floor: 10 }), battleId: 'party', now: 1 });
-    const html = renderToStaticMarkup(<PartyBattleArena battle={{ ...battle, playerMp: 0, activePartyMemberId: 'guardian' }}/>);
+    const html = renderToStaticMarkup(<PartyBattleArena battle={{ ...battle, skillRulesVersion: 1, playerMp: 0, activePartyMemberId: 'guardian' }}/>);
     expect(html).toContain('主人公 MP 0 / 14'); expect(html).toContain('守護の壁'); expect(html).not.toContain('MPが不足'); expect(html).not.toContain('消費MP');
   });
 });

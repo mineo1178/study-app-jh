@@ -1,5 +1,6 @@
+import { buildTowerEncounter } from '../../src/rpg/towerCatalog.js';
 import { saveStatAllocation } from '../../src/data/rpgStatAllocationRepository.js';
-import { startBattle, useBattleSkill } from '../../src/data/rpgBattleRepository.js';
+import { startBattle, useBattleSkill, preparePartyTowerStart } from '../../src/data/rpgBattleRepository.js';
 import { totalExpForLevel } from '../../src/rpg/levelSystem.js';
 import { purchaseResource } from '../../src/data/rpgShopRepository.js';
 import { exchangeMaterial } from '../../src/data/rpgMaterialExchangeRepository.js';
@@ -222,5 +223,21 @@ describe('stat allocation emulator transactions', () => {
       expect((await getDoc(ref(userDb(), profilePath))).data()).toEqual(latest);
     }
     expect((await getDoc(ref(userDb(), appPath(appFamilyId, 'rpgActionLedger', 'rejected')))).exists()).toBe(false);
+  });
+});
+
+describe('skill rules v2 emulator transactions', () => {
+  it('repeats an ally spell beyond two uses and spends MP once under replay across devices', async () => {
+    const profilePath = appPath(appFamilyId, 'rpg', 'playerProfile');
+    const change = preparePartyTowerStart({ profile: { totalExp: totalExpForLevel(12), battleEnergy: 30 }, encounter: buildTowerEncounter({floor:10}), battleId:'ally-mp', now:1 });
+    const initial = { ...change.battle, activePartyMemberId:'mage', enemyStates:change.battle.enemyStates.map(state=>({...state,hp:10000})), partyStates:change.battle.partyStates.map(state=>({...state,hp:10000})), skillUses:{'mage:firestorm':2} };
+    await seedDoc(profilePath, change.profile); await seedDoc(appPath(appFamilyId,'rpgBattles','ally-mp'),initial);
+    const args={db:userDb('a'),familyId:appFamilyId,battleId:'ally-mp',actionId:'third-spell',skillId:'firestorm'};
+    const results=await Promise.all([useBattleSkill(args),useBattleSkill({...args,db:userDb('b')})]);
+    expect(results.filter(result=>result.applied)).toHaveLength(1);
+    const saved=(await getDoc(ref(userDb(),appPath(appFamilyId,'rpgBattles','ally-mp')))).data();
+    expect(saved.memberMp).toEqual({guardian:8,mage:8}); expect(saved.playerMp).toBe(8); expect(saved.skillUses['mage:firestorm']).toBe(3);
+    expect(saved.activePartyMemberId).toBe('hero'); expect(saved.partySnapshot).toEqual(initial.partySnapshot);
+    const ledger=(await getDoc(ref(userDb(),appPath(appFamilyId,'rpgBattleLedger','third-spell')))).data(); expect(ledger.action.mp).toEqual({before:12,after:8,cost:4});
   });
 });

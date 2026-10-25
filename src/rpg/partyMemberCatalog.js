@@ -1,5 +1,6 @@
 import { calculatePlayerAttack, calculatePlayerDefense, BASE_PLAYER_MAX_HP } from './battleCalculator.js';
 import { statAllocationStats, SKILL_MP_COSTS } from './statAllocation.js';
+import { hasUnlimitedSkills, COMPANION_MAX_MP, COMPANION_SKILL_MP_COSTS } from './skillRules.js';
 import { SKILL_CATALOG } from './skillCatalog.js';
 import { GACHA_MEMBERS } from './gachaCatalog.js';
 
@@ -28,7 +29,7 @@ export function validatePartyMemberIds(ids, unlockedIds = null) {
 }
 const integer = (value) => Math.max(0, Math.floor(Number(value) || 0));
 const roleForMember = (memberId, member) => ({ guardian: 'Guardian', mage: 'Mage', healer: 'Healer' }[memberId] || member.role);
-export function buildTowerPartySnapshot(profile) {
+export function buildTowerPartySnapshot(profile, rules = {}) {
   const ids = validatePartyMemberIds(profile.partyMemberIds, profile.unlockedPartyMemberIds);
   const level = Math.max(1, integer(profile.level) || 1);
   const hero = {
@@ -48,6 +49,6 @@ export function buildTowerPartySnapshot(profile) {
           ? { maxHp: hero.maxHp * .95, attack: hero.attack * 1.20, defense: Math.max(0, hero.defense - 1) }
           : { maxHp: hero.maxHp * .95, attack: hero.attack * .85, defense: hero.defense + 1 };
     const multiplier = member.multiplier || 1;
-    return { memberId, name: member.name, role: member.role, maxHp: Math.round(stats.maxHp * multiplier) + (memberId === 'hero' ? growth.hpBonus : 0), ...(memberId === 'hero' ? { maxMp: growth.maxMp } : {}), attack: Math.round(stats.attack * multiplier), defense: Math.round(stats.defense * multiplier), skills: member.skillIds.map((id) => ({ ...partySkill(id), ...(memberId === 'hero' ? { mpCost: SKILL_MP_COSTS[id] } : {}), targetType: partySkill(id).targetType || (id === 'healing_light' ? 'single_ally' : id === 'guard_stance' ? 'self' : 'single_enemy') })) };
+    return { memberId, name: member.name, role: member.role, maxHp: Math.round(stats.maxHp * multiplier) + (memberId === 'hero' ? growth.hpBonus : 0), ...(memberId === 'hero' ? { maxMp: growth.maxMp } : hasUnlimitedSkills(rules) ? { maxMp: COMPANION_MAX_MP[role] } : {}), attack: Math.round(stats.attack * multiplier), defense: Math.round(stats.defense * multiplier), skills: member.skillIds.map((id) => ({ ...partySkill(id), ...(memberId === 'hero' || hasUnlimitedSkills(rules) ? { mpCost: SKILL_MP_COSTS[id] ?? COMPANION_SKILL_MP_COSTS[id] } : {}), targetType: partySkill(id).targetType || (id === 'healing_light' ? 'single_ally' : id === 'guard_stance' ? 'self' : 'single_enemy') })) };
   });
 }

@@ -1,3 +1,4 @@
+import { hasUnlimitedSkills } from './skillRules.js';
 import { levelForTotalExp } from './levelSystem.js';
 
 export const MAX_STAT_POINTS = 30;
@@ -23,14 +24,17 @@ export function statAllocationStats(profile) {
 }
 export const statAllocationCost = (before, after) => after.hp < before.hp || after.mp < before.mp ? STAT_REALLOCATION_GOLD : 0;
 export const hasMpRules = battle => battle?.mpRulesVersion === MP_RULES_VERSION;
+export const battleActorMp = (battle, actorId = 'hero') => actorId === 'hero' ? battle.playerMp : battle.memberMp?.[actorId];
+export const actorUsesMp = (battle, actorId = 'hero') => hasMpRules(battle) && (actorId === 'hero' || hasUnlimitedSkills(battle));
 export function battleMpCost(battle, skill, actorId = 'hero') {
-  if (!hasMpRules(battle) || actorId !== 'hero' || !skill) return 0;
+  if (!actorUsesMp(battle, actorId) || !skill) return 0;
   if (!Number.isInteger(skill.mpCost) || skill.mpCost < 0) fail('INVALID_MP_SNAPSHOT');
   return skill.mpCost;
 }
 export function consumeBattleMp(battle, skill, actorId = 'hero') {
-  if (!hasMpRules(battle) || actorId !== 'hero' || !skill) return {};
+  if (!actorUsesMp(battle, actorId) || !skill) return {};
   const cost = battleMpCost(battle, skill, actorId);
-  if (!Number.isInteger(battle.playerMp) || battle.playerMp < cost) fail('INSUFFICIENT_MP');
-  return { playerMp: battle.playerMp - cost };
+  const current = battleActorMp(battle, actorId);
+  if (!Number.isInteger(current) || current < cost) fail('INSUFFICIENT_MP');
+  return actorId === 'hero' ? { playerMp: current - cost } : { memberMp: { ...battle.memberMp, [actorId]: current - cost } };
 }

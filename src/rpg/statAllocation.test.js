@@ -55,7 +55,7 @@ describe('new battle HP/MP snapshots', () => {
   it('rejects MP shortage and exhausted uses, and does not spend MP on a normal attack or full heal', () => {
     const { battle } = start(), args = { profile: player(), actionId: 'a', now: 2 };
     expect(() => prepareBattleAttack({ ...args, battle: { ...battle, playerMp: 1 }, action: skillAction(battle, 'aqua_edge') })).toThrow('INSUFFICIENT_MP');
-    expect(() => prepareBattleAttack({ ...args, battle: { ...battle, skillUses: { aqua_edge: 2 } }, action: skillAction(battle, 'aqua_edge') })).toThrow('SKILL_NO_USES');
+    expect(() => prepareBattleAttack({ ...args, battle: { ...battle, skillRulesVersion: 1, skillUses: { aqua_edge: 2 } }, action: skillAction(battle, 'aqua_edge') })).toThrow('SKILL_NO_USES');
     expect(() => prepareBattleAttack({ ...args, battle, action: skillAction(battle, 'healing_light') })).toThrow('HEAL_NOT_NEEDED');
     expect(prepareBattleAttack({ ...args, battle }).battle.playerMp).toBe(14);
     expect(battle.playerMp).toBe(14);
@@ -71,7 +71,7 @@ describe('new battle HP/MP snapshots', () => {
     expect(battle.playerMp).toBe(14);
   });
   it.each([1,3,7,8,9])('does not introduce MP into saved schema %s', schemaVersion => {
-    const { battle } = start(); delete battle.mpRulesVersion; delete battle.playerMp;
+    const { battle } = start(); delete battle.skillRulesVersion; delete battle.mpRulesVersion; delete battle.playerMp;
     battle.schemaVersion = schemaVersion;
     const next = prepareBattleAttack({ battle, profile: player(), actionId: 'a', now: 2, action: skillAction(battle, 'aqua_edge') }).battle;
     expect(next).not.toHaveProperty('playerMp'); expect(next).not.toHaveProperty('mpRulesVersion');
