@@ -39,7 +39,7 @@ export default function LearningDashboard({ summary, onNavigate, studyGoals, onS
         </div>
         <div className="jh-hero__progress"><div role="progressbar" aria-label="今日の目標達成率" aria-valuenow={progress} aria-valuemin="0" aria-valuemax="100" style={{ width: `${progress}%` }}/></div>
         <div className="jh-hero__footer">
-          <p>{s.remaining ? `目標まであと ${fmt(s.remaining)}` : '今日の目標を達成しました'}</p>
+          <p>{s.remaining ? `目標まであと ${fmt(s.remaining)}` : '今日の目標達成！'}</p>
           <button type="button" className="jh-button jh-button--light" onClick={() => onNavigate('study')}>
             <BookOpen size={19} aria-hidden="true"/> 学習項目を開く <ArrowRight size={17} aria-hidden="true"/>
           </button>
@@ -53,10 +53,10 @@ export default function LearningDashboard({ summary, onNavigate, studyGoals, onS
         {plans.length ? <ul className="jh-plan-list">
           {plans.slice(0, 3).map(goal => <li key={goal.id}>
             <div className="jh-plan-list__line"><strong>{goal.name}</strong><span>{fmt(goal.seconds)} / {fmt(goal.targetSeconds)}</span></div>
-            <progress aria-label={`${goal.name}の達成率`} value={goal.barPercent} max="100"/>
+            <progress aria-label={`${goal.name}の今日の予定達成率`} value={goal.barPercent} max="100"/>
             <span className="jh-plan-list__sub">{goal.achieved ? '完了' : `あと ${fmt(goal.remaining)}`}</span>
           </li>)}
-        </ul> : <p className="jh-empty">今日の予定は未設定です。学習項目から始められます。</p>}
+        </ul> : <p className="jh-empty">今日は学習プランが設定されていません</p>}
         {plans.length > 3 && <p className="jh-muted">ほか{plans.length - 3}科目は目標設定で確認できます。</p>}
         {onSaveGoals && <details className="jh-details"><summary>目標と週間プランを編集 <ChevronRight size={16}/></summary><div className="jh-details__body"><StudyGoalEditor studyGoals={studyGoals} onSave={onSaveGoals}/></div></details>}
       </SectionCard>
@@ -75,7 +75,7 @@ export default function LearningDashboard({ summary, onNavigate, studyGoals, onS
         </div>
         <p className="jh-weekly-text">学習時間：<strong>{fmt(s.weekSeconds)}</strong> / {fmt(s.weeklyTargetSeconds)}</p>
         {s.achievement && <p className="jh-muted">次の実績：{s.achievement.name}（{s.achievement.progressText}）</p>}
-        <div className="jh-link-row"><TextLink onClick={() => onNavigate('weekly-report')}>週間レポート</TextLink><TextLink onClick={() => onNavigate('study-analytics')}>学習分析</TextLink></div>
+        <div className="jh-link-row"><TextLink onClick={() => onNavigate('weekly-report')}>週間レポートを見る</TextLink><TextLink onClick={() => onNavigate('study-analytics')}>学習分析</TextLink></div>
       </SectionCard>
 
       <SectionCard title="次の報酬" kicker="YOUR REWARDS" icon={Trophy}>
@@ -95,14 +95,14 @@ export default function LearningDashboard({ summary, onNavigate, studyGoals, onS
       </SectionCard>
 
       <SectionCard title="科目別の目標" kicker="SUBJECT GOALS" icon={BookOpen}>
-        {s.subjectGoals?.length ? <SubjectGoalProgress goals={s.subjectGoals}/> : <p className="jh-empty">科目別目標はまだありません。</p>}
+        {s.subjectGoals?.length ? <SubjectGoalProgress goals={s.subjectGoals.slice(0, 3)}/> : <p className="jh-empty">科目別目標はまだありません。</p>}
         <TextLink onClick={() => onNavigate('weekly-report')}>科目別目標を確認</TextLink>
       </SectionCard>
 
       <SectionCard title="最近の成果" kicker="STUDY RESULTS" icon={GraduationCap}>
         {s.latestGrade === undefined ? <p role="status">成績を確認しています…</p> : s.latestGrade ?
           <div className="jh-grade-summary"><strong>{s.latestGrade.name || 'テスト'}</strong><span>{s.latestGrade.date}</span><div>総合偏差値 <b>{Number.isFinite(s.latestGrade.average) ? s.latestGrade.average : '未登録'}</b></div></div> :
-          <p className="jh-empty">成績データはまだありません。</p>}
+          <p className="jh-empty">まだ成績の記録がありません。</p>}
         <TextLink onClick={() => onNavigate('tests')}>成績推移を見る</TextLink>
       </SectionCard>
     </div>
