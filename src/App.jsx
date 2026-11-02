@@ -1,3 +1,5 @@
+import GuiDialog from './components/layout/GuiDialog.jsx';
+import './styles/jh-design-system.css';
 import { saveCompanionGrowth } from './data/rpgCompanionGrowthRepository.js';
 import { SUBJECT_DEFS } from './subjectCatalog';
 import { useState, useEffect, useMemo, useRef, useCallback, lazy } from 'react';
@@ -112,7 +114,7 @@ const getTasksCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-
 const getTestsCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tests');
 const getStudySessionsCol = () => studySessionsCollection(db, FAMILY_ID);
 const getActiveTimerRef = () => activeTimerRef(db, FAMILY_ID);
-const APP_VERSION = 'v2.9.11';
+const APP_VERSION = 'v2.9.12';
 const isDocumentHidden = () => typeof document !== 'undefined' && document.hidden;
 // ==========================================
 // Constants & Master Data
@@ -445,7 +447,7 @@ const TodayTimeline = ({ tasks, sessions = null, liveSession = null, isSampleMod
         <p className="text-sm font-black text-slate-300">今日はまだ保存済みの学習記録がありません</p>
         <p className="mt-2 text-[10px] font-bold text-slate-300">START後、FINISHで保存するとここにタスクが出ます。</p>
       </div>) : (<>
-        <div className="relative w-full h-9 sm:h-11 bg-slate-50 rounded-full overflow-hidden flex items-center border border-slate-100 shadow-inner">
+        <div className="jh-timeline-track relative w-full h-12 bg-slate-50 rounded-full overflow-hidden flex items-center border border-slate-100 shadow-inner">
           {todayHistories.map((h, i) => {
               const leftPercent = Math.max(0, ((h.startedAt - displayMinTime) / totalDurationMs) * 100);
               const widthPercent = Math.max(2, Math.min(100 - leftPercent, ((h.endedAt - h.startedAt) / totalDurationMs) * 100));
@@ -482,8 +484,8 @@ const TodayTimeline = ({ tasks, sessions = null, liveSession = null, isSampleMod
         </div>
       </>)}
 
-      {selectedHistory && (<div className="fixed inset-0 z-[120] flex items-end justify-center bg-slate-900/50 p-0 sm:items-center sm:p-4" onClick={() => setSelectedHistory(null)}>
-        <div className="w-full max-w-md rounded-t-[2rem] bg-white p-6 shadow-2xl sm:rounded-[2rem]" onClick={(e) => e.stopPropagation()}>
+      {selectedHistory && (<GuiDialog className="fixed inset-0 z-[120] flex items-end justify-center bg-slate-900/50 p-0 sm:items-center sm:p-4" label="学習履歴の詳細" onClose={() => setSelectedHistory(null)} onClick={() => setSelectedHistory(null)}>
+        <div className="max-h-[90dvh] overflow-y-auto w-full max-w-md rounded-t-[2rem] bg-white p-6 shadow-2xl sm:rounded-[2rem]" onClick={(e) => e.stopPropagation()}>
           <div className="mb-4 flex items-start justify-between gap-4">
             <div>
               <div className="mb-2 flex flex-wrap items-center gap-1.5">
@@ -518,7 +520,7 @@ const TodayTimeline = ({ tasks, sessions = null, liveSession = null, isSampleMod
             長時間、計測の通信が途切れていました。タスク詳細で記録した時間を確認してください。
           </div>}
         </div>
-      </div>)}
+      </GuiDialog>)}
     </div>);
 };
 const StrictTimer = ({ task, isAnyOtherRunning, isSaving, canPause = true, canStart = true, canStop = false, onUpdate, onBreak, onSave }) => {
@@ -645,7 +647,7 @@ const StrictTimer = ({ task, isAnyOtherRunning, isSaving, canPause = true, canSt
             : !stale && task.isRunning && totalMinutes > LONG_SESSION_MINUTES
                 ? '長時間学習中です。疲れたら休憩してください。'
                 : null;
-    return (<div className="bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950 rounded-[2rem] p-6 sm:p-10 text-center shadow-2xl relative overflow-hidden border border-white/10 flex flex-col items-center justify-center">
+    return (<div className="jh-timer bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950 rounded-[2rem] p-6 sm:p-10 text-center shadow-2xl relative overflow-hidden border border-white/10 flex flex-col items-center justify-center">
       <div className="absolute -top-24 -right-24 w-56 h-56 bg-blue-500/20 rounded-full blur-3xl"/>
       <div className="absolute -bottom-28 -left-20 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl"/>
       <div className="mb-8 flex flex-col items-center justify-center w-full relative z-10">
@@ -854,6 +856,12 @@ export default function App() {
     const [isSampleMode, setIsSampleMode] = useState(false);
     const [isMobileView, setIsMobileView] = useState(false);
     const [activeTab, setActiveTab] = useState('daily');
+    const [dailySection, setDailySection] = useState('home');
+    useEffect(() => {
+      if (activeTab === 'daily' && dailySection === 'study') {
+        document.getElementById('study-items')?.scrollIntoView({ behavior: 'smooth' });
+      }
+    }, [activeTab, dailySection]);
     const [activeCategory, setActiveCategory] = useState('school');
     // カテゴリ連動用の選択中の教科State
     const [selectedSubjectId, setSelectedSubjectId] = useState('s_math');
@@ -1907,33 +1915,40 @@ export default function App() {
     </div>);
     return (<div className={isMobileView
             ? "min-h-screen bg-slate-800 p-4 sm:p-8 flex justify-center items-center font-sans selection:bg-blue-100"
-            : "min-h-screen bg-slate-50 text-slate-900 lg:pl-72 pb-24 lg:pb-0 font-sans selection:bg-blue-100 overflow-x-hidden text-left"}>
+            : "min-h-screen jh-shell text-slate-900 pb-24 lg:pb-0 font-sans selection:bg-blue-100 overflow-x-hidden text-left"}>
       {diagnosticPanel}
       {staleTimerNotice && <div className="fixed right-4 top-4 z-[150] max-w-sm rounded-2xl bg-slate-900 px-4 py-3 text-xs font-bold text-white shadow-2xl"><div>{staleTimerNotice}</div><button type="button" onClick={() => setStaleTimerNotice(null)} className="mt-2 text-[10px] font-black text-blue-200">閉じる</button></div>}
       <div className={isMobileView
-            ? "w-full max-w-[400px] h-[800px] bg-slate-50 rounded-[3rem] shadow-2xl relative overflow-hidden border-[12px] border-slate-900 text-slate-900 flex flex-col text-left"
+            ? "jh-shell jh-phone-frame w-full max-w-[400px] h-[800px] bg-slate-50 rounded-[3rem] shadow-2xl relative overflow-hidden border-[12px] border-slate-900 text-slate-900 flex flex-col text-left"
             : "w-full h-full contents"}>
         
         {/* --- Sidebar (PC) --- */}
         <aside className={isMobileView
             ? "hidden"
-            : DESKTOP_SIDEBAR_SCROLL_CLASS}>
+            : `${DESKTOP_SIDEBAR_SCROLL_CLASS} jh-sidebar`}>
           <div className="flex items-center gap-3 mb-4 text-left">
             <div className="bg-gradient-to-br from-blue-600 to-indigo-700 p-3 rounded-2xl text-white shadow-xl shadow-blue-200"><Trophy size={24}/></div>
-            <h1 className="text-xl font-black tracking-tighter leading-none uppercase">Level Up<br /><span className="text-blue-600 text-md uppercase leading-none">Study JH</span></h1>
+            <h1 className="text-xl font-black tracking-tight leading-none">STUDY JH<br /><span className="text-blue-600 text-xs font-semibold uppercase tracking-wider">Learning &amp; RPG</span></h1>
           </div>
           <div className="mb-8 rounded-2xl bg-slate-50 px-4 py-3 text-left ring-1 ring-slate-100">
             <div className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">Release</div>
             <div className="mt-1 flex items-center justify-between">
               <span className="text-sm font-black text-slate-800">{APP_VERSION}</span>
-              <span className="rounded-full bg-blue-100 px-2 py-1 text-[9px] font-black text-blue-700">Timer Sync</span>
+              <span className="rounded-full bg-blue-100 px-2 py-1 text-[9px] font-black text-blue-700">学習アプリ</span>
             </div>
           </div>
-          <nav className={DESKTOP_SIDEBAR_NAV_CLASS}>
-            {[{ id: 'daily', label: '学習記録', icon: Zap }, { id: 'stats', label: '実績分析', icon: BarChart2 }, { id: 'tests', label: '成績推移', icon: TrendingUp }, ...(!isSampleMode ? [{ id: 'rpg', label: 'RPG', icon: Trophy }] : []), ...(canReview ? [{ id: 'review', label: '確認', icon: CheckSquare }] : [])].map(item => (<button type="button" key={item.id} onClick={() => setActiveTab(item.id)} className={`w-full flex items-center gap-4 px-6 py-4 rounded-3xl font-black transition-all leading-none ${activeTab === item.id ? 'bg-blue-600 text-white shadow-2xl' : 'text-slate-400 hover:bg-slate-50'}`}>
-                <item.icon size={20}/> {item.label}{item.id === 'review' && reviewQueue.badgeCount > 0 && <span className="ml-auto rounded-full bg-rose-500 px-2 py-1 text-[10px] text-white">{reviewQueue.badgeCount}</span>}
-              </button>))}
-          </nav>
+          <nav className={DESKTOP_SIDEBAR_NAV_CLASS} aria-label="メインナビゲーション">
+             {[{ id: 'home', label: 'ホーム', icon: BookOpen }, { id: 'study', label: '学習管理', icon: Zap }, { id: 'stats', label: '実績分析', icon: BarChart2 }, { id: 'tests', label: '成績推移', icon: TrendingUp }, ...(!isSampleMode ? [{ id: 'rpg', label: 'RPG', icon: Trophy }] : []), ...(canReview ? [{ id: 'review', label: '履歴・確認', icon: CheckSquare }] : [])].map(item => {
+               const selected = item.id === 'home' ? activeTab === 'daily' && dailySection === 'home' : item.id === 'study' ? activeTab === 'daily' && dailySection === 'study' : activeTab === item.id;
+               return <button type="button" key={item.id} aria-current={selected ? 'page' : undefined} onClick={() => {
+                 if (item.id === 'study') { setActiveTab('daily'); setDailySection('study'); requestAnimationFrame(() => document.getElementById('study-items')?.scrollIntoView({ behavior: 'smooth' })); }
+                 else { setActiveTab(item.id === 'home' ? 'daily' : item.id); setDailySection('home'); document.getElementById('home-anchor')?.scrollIntoView({ behavior: 'smooth' }); }
+               }} className="jh-nav-item flex items-center gap-3 text-left">
+                 <item.icon size={19} aria-hidden="true"/><span>{item.label}</span>
+                 {item.id === 'review' && reviewQueue.badgeCount > 0 && <span className="ml-auto rounded-full bg-rose-500 px-2 py-1 text-xs text-white">{reviewQueue.badgeCount}</span>}
+               </button>;
+             })}
+           </nav>
           <button type="button" aria-label="サンプルモードを切り替える" title="サンプルモード" onClick={toggleSampleMode} className={`mt-8 w-full flex items-center justify-between p-4 rounded-2xl border-2 transition-all leading-none ${isSampleMode ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-slate-50 border-slate-100 text-slate-400'}`}>
             <span className="text-[10px] font-black uppercase tracking-wider leading-none">Sample Mode</span>
             <FlaskConical size={16}/>
@@ -1952,13 +1967,14 @@ export default function App() {
 
         {/* --- Mobile Header --- */}
         <header className={isMobileView
-            ? "bg-white border-b border-slate-100 p-4 sticky top-0 z-40 flex justify-between items-center px-6 leading-none shrink-0"
-            : "lg:hidden bg-white border-b border-slate-100 p-4 sticky top-0 z-40 flex justify-between items-center px-6 leading-none"}>
+            ? "jh-mobile-header bg-white border-b border-slate-100 p-4 sticky top-0 z-40 flex justify-between items-center px-6 leading-none shrink-0"
+            : "jh-mobile-header lg:hidden bg-white border-b border-slate-100 p-4 sticky top-0 z-40 flex justify-between items-center px-6 leading-none"}>
           <div className="flex items-center gap-2 leading-none text-left">
             <Trophy className="text-blue-600" size={20}/>
             <h1 className="text-sm font-black tracking-tighter uppercase leading-none">Study JH</h1>
           </div>
-          <div className="flex items-center">
+          <div className="flex items-center gap-2">
+            {canReview && !isSampleMode && <button type="button" className="jh-mobile-header__review" aria-label="履歴・確認" onClick={() => setActiveTab('review')}><CheckSquare size={19}/>{reviewQueue.badgeCount > 0 && <span className="jh-mobile-header__badge">{reviewQueue.badgeCount}</span>}</button>}
             {isSampleMode && isMobileView && (<button type="button" aria-label="PC表示に切り替える" title="PC表示" onClick={() => setIsMobileView(false)} className="p-2 rounded-xl bg-slate-100 text-slate-600 flex items-center gap-1 leading-none mr-2">
                 <Monitor size={14}/>
                 <span className="text-[9px] font-black uppercase">PC</span>
@@ -1972,13 +1988,13 @@ export default function App() {
 
         {/* --- Main Container --- */}
         <div className={isMobileView ? "flex-1 overflow-y-auto pb-24 no-scrollbar relative" : ""}>
-          <main className="p-4 sm:p-6 lg:p-10 max-w-6xl mx-auto space-y-6 sm:space-y-10">
-            {(activeTab === 'stats' || activeTab === 'tests') && (<div className="bg-white/80 backdrop-blur-xl p-4 sm:p-6 rounded-[2rem] shadow-sm border border-white flex flex-wrap items-center gap-4 justify-center lg:sticky lg:top-4 z-30 transition-all text-left">
-                  <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-xl shrink-0 overflow-hidden leading-none">
+          <main id="home-anchor" className="jh-shell__main p-4 sm:p-6 lg:p-10 max-w-6xl mx-auto space-y-6 sm:space-y-10">
+            {(activeTab === 'stats' || activeTab === 'tests') && (<div className="jh-period-filter bg-white/80 backdrop-blur-xl p-4 sm:p-6 rounded-[2rem] shadow-sm border border-white flex flex-wrap items-center gap-4 justify-center lg:sticky lg:top-4 z-30 transition-all text-left">
+                  <div className="jh-period-filter__dates flex items-center gap-2 bg-slate-50 p-2 rounded-xl shrink-0 overflow-hidden leading-none">
                      <CalendarIcon className="text-slate-400" size={14}/>
-                     <input type="date" value={activeTab === 'tests' ? testStartDate : startDate} onChange={e => activeTab === 'tests' ? setTestStartDate(e.target.value) : setStartDate(e.target.value)} className="bg-transparent border-none p-0 text-xs sm:text-sm font-black outline-none leading-none"/>
+                     <input aria-label="集計開始日" type="date" value={activeTab === 'tests' ? testStartDate : startDate} onChange={e => activeTab === 'tests' ? setTestStartDate(e.target.value) : setStartDate(e.target.value)} className="bg-transparent border-none p-0 text-xs sm:text-sm font-black outline-none leading-none"/>
                      <span className="text-slate-300 mx-1">/</span>
-                     <input type="date" value={activeTab === 'tests' ? testEndDate : endDate} onChange={e => activeTab === 'tests' ? setTestEndDate(e.target.value) : setEndDate(e.target.value)} className="bg-transparent border-none p-0 text-xs sm:text-sm font-black outline-none leading-none"/>
+                     <input aria-label="集計終了日" type="date" value={activeTab === 'tests' ? testEndDate : endDate} onChange={e => activeTab === 'tests' ? setTestEndDate(e.target.value) : setEndDate(e.target.value)} className="bg-transparent border-none p-0 text-xs sm:text-sm font-black outline-none leading-none"/>
                   </div>
                   <div className="flex gap-1 overflow-x-auto no-scrollbar whitespace-nowrap">
                      {(activeTab === 'tests' ? ['half', 'year', 'all'] : [7, 14, 30, 0]).map(period => (<button type="button" key={period} onClick={() => {
@@ -2011,9 +2027,12 @@ export default function App() {
                   </div>
                </div>)}
 
-            {activeTab === 'daily' && (<div className="space-y-8 animate-in fade-in duration-500">
-            {!isSampleMode && <LearningDashboard key={user?.uid || 'sample'} studyGoals={playerProfile.studyGoals} onSaveGoals={studyGoals => saveStudyGoals({ db, familyId: FAMILY_ID, studyGoals })} summary={dashboardSummary} onNavigate={tab => tab === 'study' ? document.getElementById('study-items')?.scrollIntoView({ behavior: 'smooth' }) : setActiveTab(tab)}/>}
-            <div id="study-items" />
+            {activeTab === 'daily' && (<div className="jh-learning-content space-y-8 animate-in fade-in duration-500">
+            {!isSampleMode && <LearningDashboard key={user?.uid || 'sample'} studyGoals={playerProfile.studyGoals} onSaveGoals={studyGoals => saveStudyGoals({ db, familyId: FAMILY_ID, studyGoals })} summary={dashboardSummary} onNavigate={tab => {
+               if (tab === 'study') { setActiveTab('daily'); setDailySection('study'); requestAnimationFrame(() => document.getElementById('study-items')?.scrollIntoView({ behavior: 'smooth' })); }
+               else { setDailySection('home'); setActiveTab(tab); }
+             }}/>}
+            <div id="study-anchor" />
             <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-slate-950 via-blue-950 to-indigo-700 p-4 sm:p-5 shadow-2xl shadow-blue-200/40 ring-1 ring-white/20 lg:sticky lg:top-4 z-30">
               <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full bg-blue-400/25 blur-2xl"/>
               <div className="relative z-10 flex items-center justify-between">
@@ -2121,7 +2140,7 @@ export default function App() {
                         const latestMonthlyTimestamp = monthlyHistories.length ? Math.max(...monthlyHistories.map((session) => session.segments?.at(-1)?.endedAt || 0)) : 0;
                         const taskLiveSession = getTaskLiveSession(liveSession, task.id);
                         const isTaskLive = Boolean(taskLiveSession);
-                        return (<div key={task.id} onClick={() => setSelectedTaskId(task.id)} className={`p-4 sm:p-6 rounded-[1.5rem] sm:rounded-[2rem] border shadow-sm hover:shadow-xl transition-all cursor-pointer relative overflow-hidden text-left group ${isTaskLive ? 'bg-gradient-to-br from-blue-600 to-indigo-800 text-white border-blue-400 shadow-blue-200' : 'bg-white border-slate-100'}`}>
+                        return (<div key={task.id} role="button" tabIndex={0} aria-label={`${task.title || '学習項目'}を開く`} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedTaskId(task.id); } }} onClick={() => setSelectedTaskId(task.id)} className={`jh-task-card p-4 sm:p-6 rounded-[1.5rem] sm:rounded-[2rem] border shadow-sm hover:shadow-xl transition-all cursor-pointer relative overflow-hidden text-left group ${isTaskLive ? 'bg-gradient-to-br from-blue-600 to-indigo-800 text-white border-blue-400 shadow-blue-200' : 'bg-white border-slate-100'}`}>
                                     <div className="flex justify-between items-start mb-2 sm:mb-3 text-left">
                                       <div className="flex items-center gap-1.5 sm:gap-2 leading-none text-left">
                                         <span className={`text-[8px] sm:text-[9px] font-black px-2 py-0.5 rounded-full leading-none ${CATEGORIES[task.categoryId.toUpperCase()].bg} ${CATEGORIES[task.categoryId.toUpperCase()].color}`}>{task.type === 'homework' ? '宿題' : '自習'}</span>
@@ -2148,7 +2167,7 @@ export default function App() {
             {activeTab === 'study-analytics' && <LazyPanel label="学習分析"><StudyAnalytics studyGoals={playerProfile.studyGoals} sessions={unifiedSessions} now={dashboardDay} ready={isSampleMode || (profileLoaded && dashboardLoaded.tasks && dashboardLoaded.sessions)} subjectDefinitions={SUBJECT_DEFS} onBack={() => setActiveTab('daily')} onNavigate={setActiveTab}/></LazyPanel>}
             {activeTab === 'monthly-calendar' && <LazyPanel label="月間カレンダー"><MonthlyStudyCalendar studyGoals={playerProfile.studyGoals} sessions={unifiedSessions} now={dashboardDay} ready={isSampleMode || (profileLoaded && dashboardLoaded.tasks && dashboardLoaded.sessions)} subjectDefinitions={SUBJECT_DEFS} onBack={() => setActiveTab('daily')}/></LazyPanel>}
             {activeTab === 'weekly-report' && <LazyPanel label="週間レポート"><WeeklyReport key={user?.uid || 'sample'} onSaveGoals={!isSampleMode && user ? studyGoals => saveStudyGoals({ db, familyId: FAMILY_ID, studyGoals }) : undefined} studyGoals={playerProfile.studyGoals} sessions={unifiedSessions} now={dashboardDay} ready={isSampleMode || (profileLoaded && dashboardLoaded.tasks && dashboardLoaded.sessions)} subjectDefinitions={SUBJECT_DEFS} onBack={() => setActiveTab('daily')}/></LazyPanel>}
-            {activeTab === 'stats' && (<div className="space-y-8 sm:space-y-10 animate-in slide-in-from-bottom-5 duration-500 text-center">
+            {activeTab === 'stats' && (<div className="jh-stats-view space-y-8 sm:space-y-10 animate-in slide-in-from-bottom-5 duration-500 text-center">
                 
                 {/* 追加: 当日の学習タイムラインを実績分析画面にも表示 */}
                  <TodayTimeline onOpenTimeReview={openTimeReview} studyGoals={playerProfile.studyGoals} goalsReady={isSampleMode || profileLoaded} tasks={tasks} sessions={unifiedSessions} liveSession={liveSession} isSampleMode={isSampleMode}/>
@@ -2195,7 +2214,7 @@ export default function App() {
                 </div>
               </div>)}
 
-            {activeTab === 'tests' && (<div className="space-y-8 sm:space-y-10 animate-in zoom-in-95 duration-500 pb-10 text-center text-left">
+            {activeTab === 'tests' && (<div className="jh-tests-view space-y-8 sm:space-y-10 animate-in zoom-in-95 duration-500 pb-10 text-center text-left">
                 <div className={`flex items-center gap-4 px-4 text-center leading-none text-center ${isMobileView ? 'flex-col' : 'flex-col sm:flex-row justify-between'}`}>
                   <h3 className="text-2xl sm:text-3xl font-black text-slate-800 tracking-tight flex items-center justify-center gap-2 leading-none text-center text-center">
                     <TrendingUp className="text-rose-500" size={26}/> 偏差値推移
@@ -2211,7 +2230,7 @@ export default function App() {
                   </div>
                   <div className="rounded-[1.5rem] bg-white border border-slate-100 p-4 sm:p-5 shadow-sm text-left">
                     <p className="text-[10px] sm:text-xs font-black text-slate-400 mb-2">前回差</p>
-                    <p className={`text-3xl sm:text-4xl font-black font-mono ${testSummary.delta == null ? 'text-slate-300' : testSummary.delta >= 0 ? 'text-rose-500' : 'text-blue-500'}`}>
+                    <p className={`text-3xl sm:text-4xl font-black font-mono ${testSummary.delta == null ? 'text-slate-300' : testSummary.delta >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
                       {testSummary.delta == null ? '-' : `${testSummary.delta > 0 ? '+' : ''}${testSummary.delta}`}
                     </p>
                   </div>
@@ -2274,7 +2293,7 @@ export default function App() {
                     <span className="text-xs font-black text-slate-400 leading-none text-left text-left">{filteredTests.length}回分</span>
                   </div>
                   <div className="overflow-x-auto overflow-y-hidden no-scrollbar text-left leading-none text-left">
-                    <table className="w-full text-left border-collapse min-w-[800px] leading-none text-left text-left">
+                    <table className="jh-test-table w-full text-left border-collapse min-w-[800px] leading-none text-left text-left">
                       <thead>
                         <tr className="bg-slate-50/80 text-xs font-black text-slate-400 tracking-widest border-b border-slate-100 text-left leading-none text-left">
                           <th className="px-6 py-4 sticky left-0 bg-slate-50/95 backdrop-blur-md z-10 text-left leading-none text-left">テスト名 / 日付</th>
@@ -2347,13 +2366,13 @@ export default function App() {
         <HistoryCorrectionModal key={`${historyCorrectionSession?.id || 'none'}-${historyCorrectionDecision}`} session={historyCorrectionSession} initialDecision={historyCorrectionDecision} busy={Boolean(historyCorrectionSession && reviewBusySessionIds[historyCorrectionSession.id])} error={reviewError} onClose={() => { if (!historyCorrectionSession || !reviewBusySessionIds[historyCorrectionSession.id]) { setHistoryCorrectionSession(null); setReviewError(null); } }} onSubmit={handleHistoryCorrection}/>
 
         {/* --- Modals --- */}
-        {isAddingTask && (<div className={modalOverlayClass}>
-             <div className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
+        {isAddingTask && (<GuiDialog className={modalOverlayClass} label="学習項目の追加" onClose={() => setIsAddingTask(false)}>
+             <div className="jh-modal-panel bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 flex flex-col">
                 <div className="p-6 border-b border-slate-50 flex justify-between items-center bg-slate-50/50 leading-none">
                    <h3 className="text-lg font-black tracking-tight text-center flex-1 leading-none text-center">学習項目の追加</h3>
                    <button type="button" aria-label="学習項目の追加を閉じる" title="閉じる" onClick={() => setIsAddingTask(false)} className="p-2 bg-white rounded-xl shadow-sm hover:bg-slate-50 transition leading-none text-left text-left"><X size={20}/></button>
                 </div>
-                <form onSubmit={handleAddTask} className="p-8 space-y-6 text-left leading-none text-left">
+                <form onSubmit={handleAddTask} className="min-h-0 overflow-y-auto p-8 space-y-6 text-left leading-none text-left">
                    <div className="text-left leading-none text-left text-left">
                       <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 ml-2 leading-none text-left text-left text-left">教科</label>
                       <select name="subjectId" value={selectedSubjectId} onChange={(e) => setSelectedSubjectId(e.target.value)} required className="w-full bg-slate-50 border-none rounded-xl p-4 font-black text-slate-800 appearance-none shadow-inner text-sm outline-none focus:ring-2 focus:ring-blue-600 leading-none">
@@ -2368,15 +2387,16 @@ export default function App() {
                              <div className="p-3 border-2 border-slate-100 rounded-xl text-center font-black text-xs peer-checked:border-blue-600 peer-checked:bg-blue-50 peer-checked:text-blue-600 transition leading-none">
                                {t === 'homework' ? '宿題' : '自習'}
                     </div>
+
+                           </label>))}
+                      </div>
+                   </div>
                     <div className="text-left leading-none">
                        <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 ml-2 leading-none">学習活動</label>
                        <select name="activityType" defaultValue="other" className="w-full bg-slate-50 border-none rounded-xl p-4 font-black text-slate-800 appearance-none shadow-inner text-sm outline-none focus:ring-2 focus:ring-blue-600 leading-none">
                          {ACTIVITY_TYPES.map(activity => <option key={activity.id} value={activity.id}>{activity.label}</option>)}
                        </select>
                     </div>
-                           </label>))}
-                      </div>
-                   </div>
                    <div className="text-left leading-none text-left text-left text-left">
                       <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 ml-2 leading-none text-left text-left text-left text-left">内容</label>
                       <input name="detail" required placeholder="例：数学ワーク P.40" className="w-full bg-slate-50 border-none rounded-xl p-4 font-black placeholder:text-slate-300 shadow-inner text-sm outline-none leading-none text-left"/>
@@ -2384,9 +2404,9 @@ export default function App() {
                    <button type="submit" className="w-full bg-blue-600 text-white font-black py-4 rounded-xl shadow-2xl active:scale-95 transition text-md uppercase leading-none">Add Task</button>
                 </form>
              </div>
-          </div>)}
+          </GuiDialog>)}
 
-        {selectedTaskId && (<div className={taskDetailOverlayClass}>
+        {selectedTaskId && (<GuiDialog className={taskDetailOverlayClass} label="学習項目の詳細" onClose={() => setSelectedTaskId(null)}>
              <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setSelectedTaskId(null)}/>
              <div className="relative bg-white w-full max-w-2xl rounded-t-[2.5rem] lg:rounded-[3rem] shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom-10 h-[90vh] max-h-[90vh]">
                 {(() => {
@@ -2407,7 +2427,7 @@ export default function App() {
                          </div>
                          <button type="button" aria-label="学習項目詳細を閉じる" title="閉じる" onClick={() => setSelectedTaskId(null)} className="p-3 bg-white rounded-2xl shadow-sm hover:bg-slate-50 transition shrink-0 text-left"><X size={24}/></button>
                       </div>
-                      <div className="flex-1 overflow-y-auto p-6 sm:p-10 space-y-10 no-scrollbar pb-32 text-left">
+                      <div className="jh-timer-content flex-1 overflow-y-auto p-6 sm:p-10 space-y-10 no-scrollbar pb-32 text-left">
                           <StrictTimer task={timerViewTask} isAnyOtherRunning={isSampleMode && isAnyTaskRunning && activeTimerTask?.id !== task.id && !task.isRunning} isSaving={isSavingRecord} canPause={activeTimerTask?.id !== task.id || activeTimerIsOwner} canStart={activeTimerTask?.id !== task.id || activeTimerIsOwner} canStop={isSampleMode || activeTimerTask?.id === task.id} onUpdate={handleTimerUpdate} onBreak={handleBreak} onSave={handleSaveRecord}/>
                           {activeTimerTask?.id === task.id && !activeTimerIsOwner && <div className="rounded-2xl bg-slate-50 p-3 text-xs font-bold text-slate-500">別の端末で開始された計測です。この端末から停止できます。</div>}
                          <div className="space-y-4 text-left">
@@ -2453,9 +2473,9 @@ export default function App() {
                     </>);
             })()}
              </div>
-          </div>)}
+          </GuiDialog>)}
 
-        {isAddingTest && (<div className={modalOverlayClass}>
+        {isAddingTest && (<GuiDialog className={modalOverlayClass} label="成績登録" onClose={() => { setIsAddingTest(false); setEditingTest(null); setTestFormError(null); }}>
              <div className="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 h-[85vh] flex flex-col text-left">
                 <div className="p-6 border-b border-slate-50 flex justify-between items-center bg-slate-50/50 shrink-0 text-left leading-none text-left text-left">
                    <h3 className="text-xl sm:text-2xl font-black tracking-tight text-center flex-1 leading-none text-center">偏差値登録</h3>
@@ -2493,14 +2513,20 @@ export default function App() {
                    <button type="submit" className="w-full bg-rose-500 text-white font-black py-5 rounded-2xl shadow-xl active:scale-95 transition text-lg leading-none mt-4 text-center">保存する</button>
                 </form>
              </div>
-          </div>)}
+          </GuiDialog>)}
 
         {/* --- Mobile Nav Bar --- */}
-        <nav className={isMobileView
-            ? "absolute bottom-0 left-0 right-0 bg-white/90 backdrop-blur-3xl border-t border-slate-100 flex justify-around p-3 pb-8 z-50 rounded-t-[1.75rem] shadow-2xl leading-none text-center"
-            : "lg:hidden fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-3xl border-t border-slate-100 flex justify-around p-3 pb-8 z-50 rounded-t-[1.75rem] shadow-2xl leading-none text-center"}>
-          {[{ id: 'daily', label: '学習記録', icon: Zap }, { id: 'stats', label: '実績分析', icon: BarChart2 }, { id: 'tests', label: '成績推移', icon: TrendingUp }, ...(!isSampleMode ? [{ id: 'rpg', label: 'RPG', icon: Trophy }] : []), ...(canReview ? [{ id: 'review', label: '確認', icon: CheckSquare }] : [])].map(item => (<button type="button" key={item.id} aria-label={item.label} title={item.label} onClick={() => setActiveTab(item.id)} className={`relative min-w-0 flex-1 p-2.5 sm:p-4 rounded-2xl transition-all duration-300 leading-none text-center ${activeTab === item.id ? 'bg-blue-600 text-white shadow-xl -translate-y-2 text-center' : 'text-slate-300 text-center'}`}><item.icon size={20}/>{item.id === 'review' && reviewQueue.badgeCount > 0 && <span className="absolute right-1 top-1 rounded-full bg-rose-500 px-1.5 py-0.5 text-[8px] text-white">{reviewQueue.badgeCount}</span>}<span className="mt-1 block text-[8px] font-black sm:hidden">{item.id === 'daily' ? '学習' : item.id === 'stats' ? '実績' : item.id === 'tests' ? '成績' : item.id === 'review' ? '確認' : 'RPG'}</span></button>))}
-        </nav>
+         <nav aria-label="モバイルナビゲーション" className={isMobileView
+             ? "jh-mobile-nav absolute bottom-0 left-0 right-0 bg-white z-50 flex justify-around"
+             : "jh-mobile-nav lg:hidden fixed bottom-0 left-0 right-0 bg-white z-50 flex justify-around"}>
+           {[{id:'home',label:'ホーム',icon:BookOpen},{id:'study',label:'学習',icon:Zap},{id:'stats',label:'分析',icon:BarChart2},{id:'tests',label:'成績',icon:TrendingUp}, ...(!isSampleMode?[{id:'rpg',label:'RPG',icon:Trophy}]:[])].map(item => {
+             const selected = item.id === 'home' ? activeTab === 'daily' && dailySection === 'home' : item.id === 'study' ? activeTab === 'daily' && dailySection === 'study' : activeTab === item.id;
+             return <button type="button" key={item.id} title={item.label} aria-label={item.label} aria-current={selected ? 'page' : undefined} className="jh-mobile-nav__item" onClick={() => {
+               if (item.id === 'study') {setActiveTab('daily'); setDailySection('study'); requestAnimationFrame(()=>document.getElementById('study-items')?.scrollIntoView({behavior:'smooth'}));}
+               else {setActiveTab(item.id === 'home' ? 'daily' : item.id);setDailySection('home');document.getElementById('home-anchor')?.scrollIntoView({behavior:'smooth'});}
+             }}><item.icon size={20} aria-hidden="true"/><span className="jh-mobile-nav__label">{item.label}</span></button>;
+           })}
+         </nav>
       </div>
     </div>);
 }

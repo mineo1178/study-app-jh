@@ -51,16 +51,27 @@ export default function RpgHub({ onSaveCompanionGrowth, onSaveSkillPanel, onChan
     loaderRef.current().then((ledgers) => { if (mountedRef.current) setEncyclopediaLedgers(ledgers); }).catch((error) => { if (mountedRef.current) setEncyclopediaError(error); }).finally(() => { if (mountedRef.current) setEncyclopediaLoading(false); });
   };
   const sections = [['battle', '戦闘'], ['party', 'パーティー'], ['stats', '能力育成'], ['job', '転職'], ['gacha', 'ガチャ'], ['alchemy', '錬金'], ['quest', 'クエスト'], ['achievements', '実績・称号'], ['shop', 'ショップ'], ['equipment', '装備'], ['materials', '素材'], ['encyclopedia', '図鑑']];
-  return <section className="space-y-6 animate-in fade-in duration-500">
-    <div>
-      <p className="text-[10px] font-black tracking-widest text-violet-600">STUDY ADVENTURE</p>
+  return <section className="jh-rpg space-y-6 animate-in fade-in duration-500">
+    <div className="jh-rpg__head">
+      <p className="jh-rpg__eyebrow font-black">STUDY ADVENTURE</p>
       <h1 className="text-2xl font-black text-slate-800">RPG</h1>
       {selectedTitle && <p className="mt-1 text-xs font-black text-violet-700">称号：{selectedTitle.name}</p>}
     </div>
     <RpgWalletPanel profile={profile}/>
-    <div className="grid grid-cols-2 rounded-2xl bg-slate-100 p-1 sm:grid-cols-3 lg:grid-cols-10">
-      {sections.map(([id, label]) => <button type="button" key={id} disabled={statPending} onClick={() => selectSection(id)} className={`rounded-xl py-3 text-sm font-black ${section === id ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500'}`}>{label}</button>)}
-    </div>
+    <nav aria-label="RPGの機能" className="jh-rpg__nav">
+      <div className="jh-rpg__group-label">主要メニュー</div>
+      <div className="jh-rpg__primary">
+        {sections.filter(([id]) => ['battle','party','stats','job'].includes(id)).map(([id,label]) =>
+          <button type="button" key={id} disabled={statPending} aria-pressed={section === id} onClick={() => selectSection(id)}>{label}</button>)}
+      </div>
+      <details className="jh-rpg__secondary" key={['battle','party','stats','job'].includes(section) ? 'primary' : section} open={!['battle','party','stats','job'].includes(section)}>
+        <summary>ショップ・図鑑・その他の機能（8項目）</summary>
+        <div className="jh-rpg__categories">
+          {sections.filter(([id]) => !['battle','party','stats','job'].includes(id)).map(([id,label]) =>
+            <button type="button" key={id} disabled={statPending} aria-pressed={section === id} onClick={() => selectSection(id)}>{label}</button>)}
+        </div>
+      </details>
+    </nav>
     {status && <div className={`rounded-xl px-4 py-3 text-sm font-bold ${status.kind === 'error' ? 'bg-rose-50 text-rose-700' : 'text-emerald-700'}`}>{status.message}</div>}
     {reviewing && <button type="button" disabled={Boolean(pendingAction || savingParty || statPending)} onClick={() => { setSection('battle'); setReviewing(false); }} className="rounded-xl bg-violet-100 px-4 py-3 text-sm font-black text-violet-800 disabled:opacity-50">準備を終えて戦闘画面へ戻る</button>}
     <BattleStartConfirmModal enemy={battleCandidate} profile={profile} towerProgress={towerProgress} starting={Boolean(startingEnemyId)} onCancel={onCancelBattleStart} onConfirm={confirmPreparation} onReview={reviewPreparation}/>
