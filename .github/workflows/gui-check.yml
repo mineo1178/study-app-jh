@@ -2,8 +2,6 @@ name: GUI refresh verification
 on:
   pull_request:
     branches: [main]
-  push:
-    branches: [codex/gui-refresh-p01]
 permissions:
   contents: read
 jobs:
