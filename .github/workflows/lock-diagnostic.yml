@@ -1,0 +1,20 @@
+name: Lockfile diagnostic (temporary)
+on:
+  push:
+    branches: [codex/gui-refresh-p01]
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+      - name: Show only missing hoisted package metadata
+        run: |
+          node -e "const p=require('./package-lock.json').packages; console.log('LOCKFILE_PATCH_START'); console.log(JSON.stringify({core:p['node_modules/@emnapi/core'],runtime:p['node_modules/@emnapi/runtime']},null,2)); console.log('LOCKFILE_PATCH_END');"
+          git diff --stat -- package-lock.json
