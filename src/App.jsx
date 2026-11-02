@@ -1,3 +1,4 @@
+import GuiDialog from './components/layout/GuiDialog.jsx';
 import './styles/jh-design-system.css';
 import { saveCompanionGrowth } from './data/rpgCompanionGrowthRepository.js';
 import { SUBJECT_DEFS } from './subjectCatalog';
@@ -113,7 +114,7 @@ const getTasksCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-
 const getTestsCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tests');
 const getStudySessionsCol = () => studySessionsCollection(db, FAMILY_ID);
 const getActiveTimerRef = () => activeTimerRef(db, FAMILY_ID);
-const APP_VERSION = 'v2.9.11';
+const APP_VERSION = 'v2.9.12';
 const isDocumentHidden = () => typeof document !== 'undefined' && document.hidden;
 // ==========================================
 // Constants & Master Data
@@ -446,7 +447,7 @@ const TodayTimeline = ({ tasks, sessions = null, liveSession = null, isSampleMod
         <p className="text-sm font-black text-slate-300">今日はまだ保存済みの学習記録がありません</p>
         <p className="mt-2 text-[10px] font-bold text-slate-300">START後、FINISHで保存するとここにタスクが出ます。</p>
       </div>) : (<>
-        <div className="relative w-full h-9 sm:h-11 bg-slate-50 rounded-full overflow-hidden flex items-center border border-slate-100 shadow-inner">
+        <div className="jh-timeline-track relative w-full h-12 bg-slate-50 rounded-full overflow-hidden flex items-center border border-slate-100 shadow-inner">
           {todayHistories.map((h, i) => {
               const leftPercent = Math.max(0, ((h.startedAt - displayMinTime) / totalDurationMs) * 100);
               const widthPercent = Math.max(2, Math.min(100 - leftPercent, ((h.endedAt - h.startedAt) / totalDurationMs) * 100));
@@ -483,8 +484,8 @@ const TodayTimeline = ({ tasks, sessions = null, liveSession = null, isSampleMod
         </div>
       </>)}
 
-      {selectedHistory && (<div className="fixed inset-0 z-[120] flex items-end justify-center bg-slate-900/50 p-0 sm:items-center sm:p-4" onClick={() => setSelectedHistory(null)}>
-        <div className="w-full max-w-md rounded-t-[2rem] bg-white p-6 shadow-2xl sm:rounded-[2rem]" onClick={(e) => e.stopPropagation()}>
+      {selectedHistory && (<GuiDialog className="fixed inset-0 z-[120] flex items-end justify-center bg-slate-900/50 p-0 sm:items-center sm:p-4" label="学習履歴の詳細" onClose={() => setSelectedHistory(null)} onClick={() => setSelectedHistory(null)}>
+        <div className="max-h-[90dvh] overflow-y-auto w-full max-w-md rounded-t-[2rem] bg-white p-6 shadow-2xl sm:rounded-[2rem]" onClick={(e) => e.stopPropagation()}>
           <div className="mb-4 flex items-start justify-between gap-4">
             <div>
               <div className="mb-2 flex flex-wrap items-center gap-1.5">
@@ -519,7 +520,7 @@ const TodayTimeline = ({ tasks, sessions = null, liveSession = null, isSampleMod
             長時間、計測の通信が途切れていました。タスク詳細で記録した時間を確認してください。
           </div>}
         </div>
-      </div>)}
+      </GuiDialog>)}
     </div>);
 };
 const StrictTimer = ({ task, isAnyOtherRunning, isSaving, canPause = true, canStart = true, canStop = false, onUpdate, onBreak, onSave }) => {
@@ -1918,7 +1919,7 @@ export default function App() {
       {diagnosticPanel}
       {staleTimerNotice && <div className="fixed right-4 top-4 z-[150] max-w-sm rounded-2xl bg-slate-900 px-4 py-3 text-xs font-bold text-white shadow-2xl"><div>{staleTimerNotice}</div><button type="button" onClick={() => setStaleTimerNotice(null)} className="mt-2 text-[10px] font-black text-blue-200">閉じる</button></div>}
       <div className={isMobileView
-            ? "jh-shell w-full max-w-[400px] h-[800px] bg-slate-50 rounded-[3rem] shadow-2xl relative overflow-hidden border-[12px] border-slate-900 text-slate-900 flex flex-col text-left"
+            ? "jh-shell jh-phone-frame w-full max-w-[400px] h-[800px] bg-slate-50 rounded-[3rem] shadow-2xl relative overflow-hidden border-[12px] border-slate-900 text-slate-900 flex flex-col text-left"
             : "w-full h-full contents"}>
         
         {/* --- Sidebar (PC) --- */}
@@ -1941,7 +1942,7 @@ export default function App() {
                const selected = item.id === 'home' ? activeTab === 'daily' && dailySection === 'home' : item.id === 'study' ? activeTab === 'daily' && dailySection === 'study' : activeTab === item.id;
                return <button type="button" key={item.id} aria-current={selected ? 'page' : undefined} onClick={() => {
                  if (item.id === 'study') { setActiveTab('daily'); setDailySection('study'); requestAnimationFrame(() => document.getElementById('study-items')?.scrollIntoView({ behavior: 'smooth' })); }
-                 else { setActiveTab(item.id === 'home' ? 'daily' : item.id); setDailySection('home'); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+                 else { setActiveTab(item.id === 'home' ? 'daily' : item.id); setDailySection('home'); document.getElementById('home-anchor')?.scrollIntoView({ behavior: 'smooth' }); }
                }} className="jh-nav-item flex items-center gap-3 text-left">
                  <item.icon size={19} aria-hidden="true"/><span>{item.label}</span>
                  {item.id === 'review' && reviewQueue.badgeCount > 0 && <span className="ml-auto rounded-full bg-rose-500 px-2 py-1 text-xs text-white">{reviewQueue.badgeCount}</span>}
@@ -1987,13 +1988,13 @@ export default function App() {
 
         {/* --- Main Container --- */}
         <div className={isMobileView ? "flex-1 overflow-y-auto pb-24 no-scrollbar relative" : ""}>
-          <main className="jh-shell__main p-4 sm:p-6 lg:p-10 max-w-6xl mx-auto space-y-6 sm:space-y-10">
-            {(activeTab === 'stats' || activeTab === 'tests') && (<div className="bg-white/80 backdrop-blur-xl p-4 sm:p-6 rounded-[2rem] shadow-sm border border-white flex flex-wrap items-center gap-4 justify-center lg:sticky lg:top-4 z-30 transition-all text-left">
-                  <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-xl shrink-0 overflow-hidden leading-none">
+          <main id="home-anchor" className="jh-shell__main p-4 sm:p-6 lg:p-10 max-w-6xl mx-auto space-y-6 sm:space-y-10">
+            {(activeTab === 'stats' || activeTab === 'tests') && (<div className="jh-period-filter bg-white/80 backdrop-blur-xl p-4 sm:p-6 rounded-[2rem] shadow-sm border border-white flex flex-wrap items-center gap-4 justify-center lg:sticky lg:top-4 z-30 transition-all text-left">
+                  <div className="jh-period-filter__dates flex items-center gap-2 bg-slate-50 p-2 rounded-xl shrink-0 overflow-hidden leading-none">
                      <CalendarIcon className="text-slate-400" size={14}/>
-                     <input type="date" value={activeTab === 'tests' ? testStartDate : startDate} onChange={e => activeTab === 'tests' ? setTestStartDate(e.target.value) : setStartDate(e.target.value)} className="bg-transparent border-none p-0 text-xs sm:text-sm font-black outline-none leading-none"/>
+                     <input aria-label="集計開始日" type="date" value={activeTab === 'tests' ? testStartDate : startDate} onChange={e => activeTab === 'tests' ? setTestStartDate(e.target.value) : setStartDate(e.target.value)} className="bg-transparent border-none p-0 text-xs sm:text-sm font-black outline-none leading-none"/>
                      <span className="text-slate-300 mx-1">/</span>
-                     <input type="date" value={activeTab === 'tests' ? testEndDate : endDate} onChange={e => activeTab === 'tests' ? setTestEndDate(e.target.value) : setEndDate(e.target.value)} className="bg-transparent border-none p-0 text-xs sm:text-sm font-black outline-none leading-none"/>
+                     <input aria-label="集計終了日" type="date" value={activeTab === 'tests' ? testEndDate : endDate} onChange={e => activeTab === 'tests' ? setTestEndDate(e.target.value) : setEndDate(e.target.value)} className="bg-transparent border-none p-0 text-xs sm:text-sm font-black outline-none leading-none"/>
                   </div>
                   <div className="flex gap-1 overflow-x-auto no-scrollbar whitespace-nowrap">
                      {(activeTab === 'tests' ? ['half', 'year', 'all'] : [7, 14, 30, 0]).map(period => (<button type="button" key={period} onClick={() => {
@@ -2365,13 +2366,13 @@ export default function App() {
         <HistoryCorrectionModal key={`${historyCorrectionSession?.id || 'none'}-${historyCorrectionDecision}`} session={historyCorrectionSession} initialDecision={historyCorrectionDecision} busy={Boolean(historyCorrectionSession && reviewBusySessionIds[historyCorrectionSession.id])} error={reviewError} onClose={() => { if (!historyCorrectionSession || !reviewBusySessionIds[historyCorrectionSession.id]) { setHistoryCorrectionSession(null); setReviewError(null); } }} onSubmit={handleHistoryCorrection}/>
 
         {/* --- Modals --- */}
-        {isAddingTask && (<div className={modalOverlayClass}>
-             <div className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
+        {isAddingTask && (<GuiDialog className={modalOverlayClass} label="学習項目の追加" onClose={() => setIsAddingTask(false)}>
+             <div className="jh-modal-panel bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 flex flex-col">
                 <div className="p-6 border-b border-slate-50 flex justify-between items-center bg-slate-50/50 leading-none">
                    <h3 className="text-lg font-black tracking-tight text-center flex-1 leading-none text-center">学習項目の追加</h3>
                    <button type="button" aria-label="学習項目の追加を閉じる" title="閉じる" onClick={() => setIsAddingTask(false)} className="p-2 bg-white rounded-xl shadow-sm hover:bg-slate-50 transition leading-none text-left text-left"><X size={20}/></button>
                 </div>
-                <form onSubmit={handleAddTask} className="p-8 space-y-6 text-left leading-none text-left">
+                <form onSubmit={handleAddTask} className="min-h-0 overflow-y-auto p-8 space-y-6 text-left leading-none text-left">
                    <div className="text-left leading-none text-left text-left">
                       <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 ml-2 leading-none text-left text-left text-left">教科</label>
                       <select name="subjectId" value={selectedSubjectId} onChange={(e) => setSelectedSubjectId(e.target.value)} required className="w-full bg-slate-50 border-none rounded-xl p-4 font-black text-slate-800 appearance-none shadow-inner text-sm outline-none focus:ring-2 focus:ring-blue-600 leading-none">
@@ -2386,15 +2387,16 @@ export default function App() {
                              <div className="p-3 border-2 border-slate-100 rounded-xl text-center font-black text-xs peer-checked:border-blue-600 peer-checked:bg-blue-50 peer-checked:text-blue-600 transition leading-none">
                                {t === 'homework' ? '宿題' : '自習'}
                     </div>
+
+                           </label>))}
+                      </div>
+                   </div>
                     <div className="text-left leading-none">
                        <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 ml-2 leading-none">学習活動</label>
                        <select name="activityType" defaultValue="other" className="w-full bg-slate-50 border-none rounded-xl p-4 font-black text-slate-800 appearance-none shadow-inner text-sm outline-none focus:ring-2 focus:ring-blue-600 leading-none">
                          {ACTIVITY_TYPES.map(activity => <option key={activity.id} value={activity.id}>{activity.label}</option>)}
                        </select>
                     </div>
-                           </label>))}
-                      </div>
-                   </div>
                    <div className="text-left leading-none text-left text-left text-left">
                       <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 ml-2 leading-none text-left text-left text-left text-left">内容</label>
                       <input name="detail" required placeholder="例：数学ワーク P.40" className="w-full bg-slate-50 border-none rounded-xl p-4 font-black placeholder:text-slate-300 shadow-inner text-sm outline-none leading-none text-left"/>
@@ -2402,9 +2404,9 @@ export default function App() {
                    <button type="submit" className="w-full bg-blue-600 text-white font-black py-4 rounded-xl shadow-2xl active:scale-95 transition text-md uppercase leading-none">Add Task</button>
                 </form>
              </div>
-          </div>)}
+          </GuiDialog>)}
 
-        {selectedTaskId && (<div className={taskDetailOverlayClass}>
+        {selectedTaskId && (<GuiDialog className={taskDetailOverlayClass} label="学習項目の詳細" onClose={() => setSelectedTaskId(null)}>
              <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setSelectedTaskId(null)}/>
              <div className="relative bg-white w-full max-w-2xl rounded-t-[2.5rem] lg:rounded-[3rem] shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom-10 h-[90vh] max-h-[90vh]">
                 {(() => {
@@ -2471,9 +2473,9 @@ export default function App() {
                     </>);
             })()}
              </div>
-          </div>)}
+          </GuiDialog>)}
 
-        {isAddingTest && (<div className={modalOverlayClass}>
+        {isAddingTest && (<GuiDialog className={modalOverlayClass} label="成績登録" onClose={() => { setIsAddingTest(false); setEditingTest(null); setTestFormError(null); }}>
              <div className="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 h-[85vh] flex flex-col text-left">
                 <div className="p-6 border-b border-slate-50 flex justify-between items-center bg-slate-50/50 shrink-0 text-left leading-none text-left text-left">
                    <h3 className="text-xl sm:text-2xl font-black tracking-tight text-center flex-1 leading-none text-center">偏差値登録</h3>
@@ -2511,7 +2513,7 @@ export default function App() {
                    <button type="submit" className="w-full bg-rose-500 text-white font-black py-5 rounded-2xl shadow-xl active:scale-95 transition text-lg leading-none mt-4 text-center">保存する</button>
                 </form>
              </div>
-          </div>)}
+          </GuiDialog>)}
 
         {/* --- Mobile Nav Bar --- */}
          <nav aria-label="モバイルナビゲーション" className={isMobileView
@@ -2521,7 +2523,7 @@ export default function App() {
              const selected = item.id === 'home' ? activeTab === 'daily' && dailySection === 'home' : item.id === 'study' ? activeTab === 'daily' && dailySection === 'study' : activeTab === item.id;
              return <button type="button" key={item.id} title={item.label} aria-label={item.label} aria-current={selected ? 'page' : undefined} className="jh-mobile-nav__item" onClick={() => {
                if (item.id === 'study') {setActiveTab('daily'); setDailySection('study'); requestAnimationFrame(()=>document.getElementById('study-items')?.scrollIntoView({behavior:'smooth'}));}
-               else {setActiveTab(item.id === 'home' ? 'daily' : item.id);setDailySection('home');window.scrollTo({top:0,behavior:'smooth'});}
+               else {setActiveTab(item.id === 'home' ? 'daily' : item.id);setDailySection('home');document.getElementById('home-anchor')?.scrollIntoView({behavior:'smooth'});}
              }}><item.icon size={20} aria-hidden="true"/><span className="jh-mobile-nav__label">{item.label}</span></button>;
            })}
          </nav>

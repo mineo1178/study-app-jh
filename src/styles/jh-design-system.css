@@ -145,3 +145,35 @@
 @media(prefers-reduced-motion:reduce) {
   .jh-shell *, .jh-shell *::before,.jh-shell *::after {animation-duration:.01ms!important; transition-duration:.01ms!important; scroll-behavior:auto!important;}
 }
+
+/* Audit fixes: retain the approved layout while making compact controls usable. */
+.jh-shell :is(.jh-mobile-header,.jh-learning-content,.jh-tests-view,.jh-period-filter,.jh-dialog) button {min-width:44px; min-height:44px;}
+.jh-shell .jh-timer button {min-height:48px;}
+.jh-shell .jh-period-filter input {min-height:44px; min-width:0;}
+.jh-shell .jh-period-filter__dates {max-width:100%; flex-wrap:wrap; justify-content:center;}
+.jh-shell #study-items {scroll-margin-top:88px;}
+.jh-shell #home-anchor {scroll-margin-top:72px;}
+.jh-shell .jh-modal-panel {max-height:calc(100dvh - 2rem);}
+.jh-shell .jh-dialog :is(input,select,textarea) {min-height:44px;}
+.jh-shell .jh-dialog input[type="radio"] {min-height:0;}
+@media(min-width:1024px){
+  .jh-shell #study-items {scroll-margin-top:160px;}
+  .jh-shell #home-anchor {scroll-margin-top:0;}
+}
+
+.jh-shell .jh-rpg button {min-height:44px; min-width:44px;}
+.jh-shell .jh-timeline-track button {min-width:0;}
+.jh-shell.jh-phone-frame {padding-left:0;}
+.jh-shell.jh-phone-frame .jh-modal-panel {max-height:calc(100% - 2rem);}
+.jh-shell .jh-dialog label:has(> input[type="radio"]) > div {min-height:44px; display:flex; align-items:center; justify-content:center;}
+.jh-shell .jh-dialog input[type="radio"]:focus-visible + div {outline:3px solid #7c98f4; outline-offset:3px;}
+
+.jh-shell [aria-label="曜日選択"] {grid-template-columns:repeat(auto-fit,minmax(44px,1fr));}
+.jh-shell .jh-test-table button {scroll-margin-block:96px;}
+@media(max-width:639px){
+  .jh-shell .jh-test-table :is(th,td):first-child {position:static;}
+}
+
+@media(max-width:360px){
+  .jh-shell .jh-dialog form > .grid.grid-cols-2 {grid-template-columns:minmax(0,1fr);}
+}
