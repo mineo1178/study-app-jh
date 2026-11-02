@@ -18,7 +18,7 @@ export default function MonthlyStudyCalendar({ sessions, now, ready, studyGoals,
   const selectedDate = selection.date || (calendar.month === index.currentMonth ? index.today : `${calendar.month}-01`);
   const day = calendar.days?.find(item => item.date === selectedDate);
   const navigate = direction => setSelection({ month: moveCalendarMonth(calendar.month,direction,index.currentMonth), date: null });
-  return <section aria-label="月間学習カレンダー" className="mx-auto max-w-3xl min-w-0 space-y-4 text-left">
+  return <section aria-label="月間学習カレンダー" className="jh-report mx-auto max-w-5xl min-w-0 space-y-4 text-left">
     <header className={card}><h1 className="text-xl font-black">月間学習カレンダー</h1><p className="mt-2 text-sm text-slate-500">確定した有効な学習記録から、月と日ごとの学習を振り返れます。</p><button type="button" className={`${button} mt-3`} onClick={onBack}>ダッシュボードへ戻る</button></header>
     {calendar.status === 'loading' ? <div className={card} role="status">学習記録を読み込み中です…</div> : <>
       <div className={card}>
