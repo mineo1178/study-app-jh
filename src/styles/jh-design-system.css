@@ -83,6 +83,8 @@
 .jh-reward-list li {display:flex; align-items:flex-start; gap:10px; padding:6px 0; color:#52617b; font-size:13px;}
 .jh-reward-list svg {color:#bd8f40; flex-shrink:0; margin-top:2px;}
 .jh-reward-list strong {color:var(--jh-ink);}
+.jh-rpg-summary {margin-top:13px; padding:12px 14px; border-radius:12px; background:#f7f5fc; color:#46516e; font-size:13px; line-height:1.7;}
+.jh-rpg-summary p+p {margin-top:4px;}
 .jh-grade-summary {display:flex; align-items:baseline; flex-wrap:wrap; gap:4px 8px;}
 .jh-grade-summary>strong {font-size:16px; font-weight:800;}
 .jh-grade-summary>span {color:var(--jh-muted); font-size:12px;}
