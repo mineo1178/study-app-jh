@@ -84,6 +84,13 @@ export default function LearningDashboard({ summary, onNavigate, studyGoals, onS
           s.rewardProgress?.goals?.length ? <ul className="jh-reward-list">{s.rewardProgress.goals.map(goal =>
             <li key={goal.id}><Sparkles size={17} aria-hidden="true"/><span><strong>{goal.name}</strong>：{goal.available ? goal.id === 'gacha' ? 'ガチャできます' : '装備を入手できます' : goal.requirements.filter(r => r.remaining > 0).map(r => `あと${r.remaining}${r.unit}`).join('・')}</span></li>
           )}</ul> : <p className="jh-empty">次の報酬はありません。</p>}
+        <div className="jh-rpg-summary" aria-label="現在のRPG進行">
+          {s.rpg ? <>
+            <p>{s.rpg.campaign}</p>
+            <p>{s.rpg.tower}</p>
+            <p>{s.rpg.weekly}</p>
+          </> : <p role="status">RPGの進行を確認しています…</p>}
+        </div>
         <TextLink onClick={() => onNavigate('rpg')}>RPGで詳細を見る</TextLink>
       </SectionCard>
 
