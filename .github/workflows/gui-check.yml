@@ -1,0 +1,40 @@
+name: GUI refresh verification
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [codex/gui-refresh-p01]
+permissions:
+  contents: read
+jobs:
+  app-checks:
+    name: Vitest, ESLint, Vite build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run lint
+      - run: npm run build
+      - run: git diff --check ${{ github.event.pull_request.base.sha || github.event.before }} HEAD
+  firestore-rules:
+    name: Firestore Emulator Rules regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - run: npm ci
+      - run: npm run test:rules
