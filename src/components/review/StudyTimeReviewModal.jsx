@@ -1,3 +1,4 @@
+import GuiDialog from '../layout/GuiDialog.jsx';
 import { useState } from 'react';
 import { formatHms } from '../../data/studySessionSelectors.js';
 import { durationFieldsFromSeconds, durationSecondsFromFields, isDurationCorrectionAllowed } from '../../review/manualReviewUi.js';
@@ -11,7 +12,7 @@ export default function StudyTimeReviewModal({ session, subjectLabel, busy = fal
   const allowed = isDurationCorrectionAllowed(session.recordedSeconds, seconds);
   const submit = (targetSeconds) => onSubmit({ session, targetSeconds });
   const intervals = session.timeReview.originalSegments || session.segments || [];
-  return <div className="fixed inset-0 z-[180] flex items-end justify-center bg-slate-900/60 sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-label="学習時間の確認">
+  return <GuiDialog onClose={() => { if (!busy) onClose?.(); }} label="学習時間の確認" className="fixed inset-0 z-[180] flex items-end justify-center bg-slate-900/60 sm:items-center sm:p-4">
     <div className="max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-t-[2rem] bg-white p-5 shadow-2xl sm:rounded-[2rem] sm:p-6">
       <h2 className="text-xl font-black text-slate-800">学習時間の確認</h2>
       <p className="mt-3 text-sm font-bold leading-relaxed text-slate-600">アプリを操作していない時間があったため、実際に勉強した時間を確認してください。</p>
@@ -39,5 +40,5 @@ export default function StudyTimeReviewModal({ session, subjectLabel, busy = fal
         <button type="button" disabled={busy} onClick={onClose} className="min-h-11 w-full rounded-xl p-3 text-sm font-bold text-slate-500 disabled:opacity-50">後で確認</button>
       </div>
     </div>
-  </div>;
+  </GuiDialog>;
 }
