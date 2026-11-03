@@ -140,14 +140,14 @@ describe('new-start balance and existing snapshot compatibility', () => {
     expect(next.battle.enemySnapshots).toEqual(snapshots.enemySnapshots);
     expect(next.battle.partySnapshot).toEqual(snapshots.partySnapshot);
     expect(start.battle.enemyStates[0].hp).toBe(legacyStats.maxHp);
-    expect(boss.rulesVersion).toBe(4);
+    expect(boss.rulesVersion).toBe(5);
     expect(boss.reward).toEqual(oldBoss.reward);
   });
   it('preserves costs and XP scaling while generating new Tower encounters', () => {
     const tenth = buildTowerEncounter({ floor: 10 });
     expect(tenth.energyCost).toBe(3);
     expect(tenth.expReward).toBe(tenth.enemies.reduce((sum, enemy) => sum + enemy.expReward, 0));
-    expect(tenth.rulesVersion).toBe(5);
+    expect(tenth.rulesVersion).toBe(6);
     expect(buildTowerEncounter({ floor: 60 }).enemies[0].attack).toBeGreaterThan(tenth.enemies[0].attack);
   });
 });
