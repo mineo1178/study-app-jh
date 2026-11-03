@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import baseline from '../../test/fixtures/rpg-v2.9.9-tower.json';
+import v2911 from '../../test/fixtures/rpg-v2.9.13-before-enemies.json';
 import { buildTowerEncounter, buildTowerEnemy } from './towerCatalog.js';
 import { ENEMY_CATALOG } from './enemyCatalog.js';
 import { calculateEnemyActionDamage } from './battleCalculator.js';
@@ -10,12 +11,12 @@ import { BALANCE_PLAYERS, BALANCE_SCENARIOS, simulateBattle } from '../../script
 import { preparePartyBattleResult } from '../data/rpgBattleRepository.js';
 
 const withoutVersion = encounter => JSON.parse(JSON.stringify(encounter, (key,value) => key === 'rulesVersion' ? undefined : value));
-describe('v2.9.10 Tower growth', () => {
+describe('v2.9.10 historical growth and current Tower compatibility', () => {
   it.each(Array.from({length:20},(_,i)=>i+1))('preserves the entire floor %s encounter except the rule version', floor => {
     expect(withoutVersion(buildTowerEncounter({floor}))).toEqual(withoutVersion(baseline.encounters[floor]));
   });
   it.each([21,30,40,41,50,60,61,80,81,100])('strengthens every enemy at floor %s while preserving counts, EXP and energy', floor => {
-    const before=baseline.encounters[floor], after=buildTowerEncounter({floor});
+    const before=baseline.encounters[floor], after=v2911.find(t=>t.floor===floor).encounter;
     expect(after.rulesVersion).toBe(5);
     expect(after.enemies).toHaveLength(before.enemies.length);
     expect(after.expReward).toBe(before.expReward);
@@ -44,7 +45,7 @@ describe('v2.9.10 Tower growth', () => {
   });
   it('preserves the 54 purchasable hero panels',()=>expect(Object.keys(SKILL_PANEL_CATALOG).filter(id=>id!=='start')).toHaveLength(54));
   it.each(baseline.regression)('keeps Campaign / Weekly combat unchanged: $id', row=> {
-    expect(simulateBattle(BALANCE_PLAYERS.trained,BALANCE_SCENARIOS.find(s=>s.id===row.id),'strategy',{mpRules:true,skillRules:true,jobRules:true})).toEqual(row.result);
+    expect(simulateBattle(BALANCE_PLAYERS.trained,(row.id.startsWith('weekly_') ? v2911.find(t=>t.id===row.id) : BALANCE_SCENARIOS.find(s=>s.id===row.id)),'strategy',{mpRules:true,skillRules:true,jobRules:true})).toEqual(row.result);
   });
   it.each(baseline.battles)('resumes frozen rules 4 battle $battle.battleId through completion', fixture=> {
     let battle=JSON.parse(JSON.stringify(fixture.battle));
