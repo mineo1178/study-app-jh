@@ -1,8 +1,14 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { gunzipSync } from 'node:zlib';
-import { verifyBalanceData, readBalanceData, writeBalanceData, sha256 } from './balanceData.js';
+import { verifyBalanceData, readBalanceData, writeBalanceData, sha256, canonicalGzip } from './balanceData.js';
 const manifest = verifyBalanceData();
+for (const entry of manifest.files) {
+  const archived = readFileSync(entry.path + '.gz');
+  assert.equal(archived[9],255,'canonical gzip OS');
+  assert.equal(archived.readUInt32LE(4),0,'no variable gzip timestamp');
+  assert.equal(sha256(canonicalGzip(gunzipSync(archived))),entry.gzipSha256,'deterministic repack');
+}
 const original = {
   'docs/rpg-v2.9.13-comparison.json': ['20deffe0342ee5ddf8fad7c477a3e16f6b1e8885911098493034101035f99cd0',13587788],
   'docs/rpg-v2.9.13-summary.json': ['bc4403aa5862204e326e0190badd61cdade2ad7be091b55576625cacae1904df',2316270],
