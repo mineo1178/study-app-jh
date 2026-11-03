@@ -1,5 +1,6 @@
 /* global process */
-import { writeFileSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
+import { writeBalanceData } from './balanceData.js';
 import { pathToFileURL } from 'node:url';
 import assert from 'node:assert/strict';
 import { BALANCE_PLAYERS, simulateBattle } from './simulateBattleBalance.js';
@@ -101,5 +102,5 @@ export function measureEnemyBalance() {
   return { selected:'medium', verifiedImplementation:process.argv.includes('--verify-after'), baseline:'1ef9b8e01b85ebd0f90602caa9e6eb5445a2311b', candidates:CANDIDATES, columns, policies:['strategy','normal'], targets, rows };
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  writeFileSync('docs/rpg-v2.9.13-comparison.json',JSON.stringify(measureEnemyBalance()));
+  writeBalanceData('docs/rpg-v2.9.13-comparison.json',measureEnemyBalance());
 }

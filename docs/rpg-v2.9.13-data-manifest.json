@@ -1,0 +1,27 @@
+{
+  "originalCommit": "e14d6d8bc2afd027f9b0aec602480cad413fd88b",
+  "encoding": "UTF-8 JSON / gzip level 9; raw SHA256 is platform-independent",
+  "files": [
+    {
+      "path": "docs/rpg-v2.9.13-comparison.json",
+      "rawBytes": 13587788,
+      "gzipBytes": 1078568,
+      "rawSha256": "20deffe0342ee5ddf8fad7c477a3e16f6b1e8885911098493034101035f99cd0",
+      "gzipSha256": "901ed7491941edbd4f91862e580146f72cb2e0f9a8a0427660500bb4b22d07dd"
+    },
+    {
+      "path": "docs/rpg-v2.9.13-summary.json",
+      "rawBytes": 2316270,
+      "gzipBytes": 115485,
+      "rawSha256": "bc4403aa5862204e326e0190badd61cdade2ad7be091b55576625cacae1904df",
+      "gzipSha256": "a9fda3c8dff524721b6e83ee5eb78f103ca47b6601d5274e12df1048d5f8c641"
+    },
+    {
+      "path": "docs/rpg-v2.9.13-tower40-investigation.json",
+      "rawBytes": 10600664,
+      "gzipBytes": 217040,
+      "rawSha256": "c2791764e2baffb3266ca6b4aba262c670589abc883a9e2332dc289cc12bcf03",
+      "gzipSha256": "fad6ecba0eaed069aca1b6a3d70e112fa0567f909e1d2845c9c549b6f720d47b"
+    }
+  ]
+}

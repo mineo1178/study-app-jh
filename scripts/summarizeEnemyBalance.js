@@ -1,7 +1,8 @@
 /* global process */
 import { readFileSync, writeFileSync } from 'node:fs';
+import { readBalanceData, writeBalanceData } from './balanceData.js';
 import { candidateTarget } from './measureEnemyBalance.js';
-const report=JSON.parse(readFileSync('docs/rpg-v2.9.13-comparison.json'));
+const report=readBalanceData('docs/rpg-v2.9.13-comparison.json');
 const stats = values => { const sorted=[...values].sort((a,b)=>a-b); return { min:sorted[0], median:sorted[Math.floor(sorted.length/2)], max:sorted.at(-1) }; };
 const metrics = results => ({ wins:results.filter(r=>r[0]==='won').length, conditions:results.length, ...Object.fromEntries(report.columns.slice(1).map((name,i)=>[name,stats(results.map(r=>r[i+1]))])) });
 const groups=new Map();
@@ -11,7 +12,7 @@ for(const row of report.rows) {
  groups.get(key).push(row);
 }
 const summary=[...groups].map(([key,rows])=>({ dimensions:JSON.parse(key), candidates:Object.fromEntries(Object.keys(report.candidates).map(c=>[c,Object.fromEntries(report.policies.map((p,i)=>[p,metrics(rows.map(r=>r.results[c][i]))]))])) }));
-writeFileSync('docs/rpg-v2.9.13-summary.json',JSON.stringify({ dimensions:['matrix','level','target','build','equipment'], selected:'medium', summary }));
+writeBalanceData('docs/rpg-v2.9.13-summary.json',{ dimensions:['matrix','level','target','build','equipment'], selected:'medium', summary });
 const range = s => s.min===s.max?String(s.min):`${s.min}–${s.max}`;
 const wins = s => `${s.wins}/${s.conditions}`;
 const selected = (matrix,level,target,build='balanced')=>summary.find(s=>JSON.stringify(s.dimensions)===JSON.stringify([matrix,level,target,build,'equipped']));
