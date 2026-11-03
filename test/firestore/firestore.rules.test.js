@@ -399,14 +399,14 @@ describe('v2.9.10 Tower snapshot transactions',()=>{
   expect((await attackBattle(args)).applied).toBe(false);
   expect((await getDoc(ref(userDb(),battlePath))).data()).toEqual(saved);
  });
- it('starts rules 5 from the latest floor, and charges energy once',async()=>{
+ it('starts rules 6 from the latest floor, and charges energy once',async()=>{
   const fixture=towerV4.battles[1],floor=60,battleId='tower-rules-5';
   await seedDoc(appPath(appFamilyId,'rpg','playerProfile'),{...fixture.profile,activeBattleId:null});
   await seedDoc(appPath(appFamilyId,'rpgProgress','current'),{campaignCompleted:true});
   await seedDoc(appPath(appFamilyId,'rpgTowerProgress','current'),{currentFloor:floor,highestFloor:floor-1});
   const args={db:userDb(),familyId:appFamilyId,battleId};
   const result=await startTowerBattle(args);
-  expect(result.battle.towerRulesVersion).toBe(5);
+  expect(result.battle.towerRulesVersion).toBe(6);
   expect(result.battle.enemySnapshots.map(e=>[e.maxHp,e.attack])).toEqual(buildTowerEncounter({floor}).enemies.map(e=>[e.maxHp,e.attack]));
   expect((await startTowerBattle(args)).applied).toBe(false);
   const profile=(await getDoc(ref(userDb(),appPath(appFamilyId,'rpg','playerProfile')))).data();

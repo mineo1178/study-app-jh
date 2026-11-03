@@ -1,0 +1,28 @@
+name: Combined GUI and RPG balance verification
+on:
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  measure-and-verify:
+    if: github.head_ref == 'integration/gui-rpg-v2913'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.11.1'
+          cache: npm
+      - run: npm ci
+      - name: Reproduce and verify v2.9.13 balance data
+        run: |
+          node scripts/checkBalanceData.js
+          node scripts/measureEnemyBalance.js --verify-after
+          node scripts/summarizeEnemyBalance.js
+          node scripts/investigateTower40.js
+          node scripts/checkBalanceData.js
+          git diff --exit-code -- docs/rpg-v2.9.13-data-manifest.json 'docs/rpg-v2.9.13-*.json.gz'
