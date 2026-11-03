@@ -1,0 +1,289 @@
+{
+  "base": "1ef9b8e01b85ebd0f90602caa9e6eb5445a2311b",
+  "head": "7649834c9e3c27f5eba07302bb30de2c30b73216",
+  "parents": [
+    "8d53c122c8bd33f4468e7235171e6f92abe61861",
+    "0dc611ed7b61b4b3162e8ffd331a535df9af70ed"
+  ],
+  "rows": [
+    {
+      "source": "GUI",
+      "path": ".github/workflows/gui-check.yml",
+      "expected": "37e28f5a602d6bf60bb246e7861b7911b51c1ecf",
+      "actual": "37e28f5a602d6bf60bb246e7861b7911b51c1ecf",
+      "match": true
+    },
+    {
+      "source": "GUI",
+      "path": "package-lock.json",
+      "expected": "6a67f07315faa6733ade707753fc798ddf27c84d",
+      "actual": "6a67f07315faa6733ade707753fc798ddf27c84d",
+      "match": true
+    },
+    {
+      "source": "GUI",
+      "path": "src/components/layout/GuiDialog.jsx",
+      "expected": "32079da5811723726687fd58fd0966db6b53644a",
+      "actual": "32079da5811723726687fd58fd0966db6b53644a",
+      "match": true
+    },
+    {
+      "source": "GUI",
+      "path": "src/components/review/HistoryCorrectionModal.jsx",
+      "expected": "17a5fe247faf57d190d6e3cf704b8a8bfbc0612f",
+      "actual": "17a5fe247faf57d190d6e3cf704b8a8bfbc0612f",
+      "match": true
+    },
+    {
+      "source": "GUI",
+      "path": "src/components/review/ManualReviewPanel.jsx",
+      "expected": "e3d2ea0079fbe80d6278d2b68e847459ebd466c0",
+      "actual": "e3d2ea0079fbe80d6278d2b68e847459ebd466c0",
+      "match": true
+    },
+    {
+      "source": "GUI",
+      "path": "src/components/review/StudyTimeReviewModal.jsx",
+      "expected": "0793792ab0abe5e669930f2bbd02c9daf5ba2a2e",
+      "actual": "0793792ab0abe5e669930f2bbd02c9daf5ba2a2e",
+      "match": true
+    },
+    {
+      "source": "GUI",
+      "path": "src/components/rpg/CompanionGrowthPanel.jsx",
+      "expected": "d3cf3d73add5af939a668ededa94a6816b675007",
+      "actual": "d3cf3d73add5af939a668ededa94a6816b675007",
+      "match": true
+    },
+    {
+      "source": "GUI",
+      "path": "src/components/rpg/RpgHub.jsx",
+      "expected": "f551042b3a6fe751b7773bd595e737940d598f60",
+      "actual": "f551042b3a6fe751b7773bd595e737940d598f60",
+      "match": true
+    },
+    {
+      "source": "GUI",
+      "path": "src/components/study/LearningDashboard.jsx",
+      "expected": "a3e3158748b1483f70f8a3b98841ecb9c5658c32",
+      "actual": "a3e3158748b1483f70f8a3b98841ecb9c5658c32",
+      "match": true
+    },
+    {
+      "source": "GUI",
+      "path": "src/components/study/MonthlyStudyCalendar.jsx",
+      "expected": "3d5cbb076fc7b3054ef600ddd8d064a54f67b382",
+      "actual": "3d5cbb076fc7b3054ef600ddd8d064a54f67b382",
+      "match": true
+    },
+    {
+      "source": "GUI",
+      "path": "src/components/study/StudyAnalytics.jsx",
+      "expected": "e4abb7567c58e803c3312c1264503d1859c91cca",
+      "actual": "e4abb7567c58e803c3312c1264503d1859c91cca",
+      "match": true
+    },
+    {
+      "source": "GUI",
+      "path": "src/components/study/WeeklyReport.jsx",
+      "expected": "b6fae8ac1739b6c4bee3a6923348bcba7db43a7b",
+      "actual": "b6fae8ac1739b6c4bee3a6923348bcba7db43a7b",
+      "match": true
+    },
+    {
+      "source": "GUI",
+      "path": "src/styles/jh-design-system.css",
+      "expected": "5ef738e37102aac9d1ba6c6875149ed28b356dc5",
+      "actual": "5ef738e37102aac9d1ba6c6875149ed28b356dc5",
+      "match": true
+    },
+    {
+      "source": "GUI",
+      "path": "test/manual/gui-audit.html",
+      "expected": "d0a260978338e8bbafc88b817c6530c6d461520f",
+      "actual": "d0a260978338e8bbafc88b817c6530c6d461520f",
+      "match": true
+    },
+    {
+      "source": "GUI",
+      "path": "test/manual/gui-audit.jsx",
+      "expected": "34b9a3446979f346580b1bee22b1abfc7848926d",
+      "actual": "34b9a3446979f346580b1bee22b1abfc7848926d",
+      "match": true
+    },
+    {
+      "source": "RPG",
+      "path": ".github/workflows/rpg-balance-v2913.yml",
+      "expected": "3f1eb4da8fd5d05216ac10d7320f837a6ec40b7d",
+      "actual": "3f1eb4da8fd5d05216ac10d7320f837a6ec40b7d",
+      "match": true
+    },
+    {
+      "source": "RPG",
+      "path": ".gitignore",
+      "expected": "dd10db1f59445181b7af7beab57b9f5a2c93a973",
+      "actual": "dd10db1f59445181b7af7beab57b9f5a2c93a973",
+      "match": true
+    },
+    {
+      "source": "RPG",
+      "path": "docs/rpg-v2.9.13-comparison.json.gz",
+      "expected": "133fe4ec5594264ac3db5dbe4c1460a1c1fcaebf",
+      "actual": "133fe4ec5594264ac3db5dbe4c1460a1c1fcaebf",
+      "match": true
+    },
+    {
+      "source": "RPG",
+      "path": "docs/rpg-v2.9.13-data-manifest.json",
+      "expected": "cac73d41f6c0f65a645370410d0450c2b66eeb55",
+      "actual": "cac73d41f6c0f65a645370410d0450c2b66eeb55",
+      "match": true
+    },
+    {
+      "source": "RPG",
+      "path": "docs/rpg-v2.9.13-review-response.md",
+      "expected": "55b9f655e144f9ce0d977e190412d4238469a45b",
+      "actual": "55b9f655e144f9ce0d977e190412d4238469a45b",
+      "match": true
+    },
+    {
+      "source": "RPG",
+      "path": "docs/rpg-v2.9.13-summary.json.gz",
+      "expected": "ef5801bf8b810d35f61590af746f0f3e10b145c4",
+      "actual": "ef5801bf8b810d35f61590af746f0f3e10b145c4",
+      "match": true
+    },
+    {
+      "source": "RPG",
+      "path": "docs/rpg-v2.9.13-tower40-investigation.json.gz",
+      "expected": "fa9ee783d2e4e25930973218350c7466006f2b4a",
+      "actual": "fa9ee783d2e4e25930973218350c7466006f2b4a",
+      "match": true
+    },
+    {
+      "source": "RPG",
+      "path": "docs/rpg-v2.9.13-verification.md",
+      "expected": "14697466a1a4e57729563075c737b18c098fe96b",
+      "actual": "14697466a1a4e57729563075c737b18c098fe96b",
+      "match": true
+    },
+    {
+      "source": "RPG",
+      "path": "scripts/balanceData.js",
+      "expected": "e43e0ac4635e9855455bb47617b1fa19b3ff40c7",
+      "actual": "e43e0ac4635e9855455bb47617b1fa19b3ff40c7",
+      "match": true
+    },
+    {
+      "source": "RPG",
+      "path": "scripts/checkBalanceData.js",
+      "expected": "941f4568354350a07d15c9b634459142409494dd",
+      "actual": "941f4568354350a07d15c9b634459142409494dd",
+      "match": true
+    },
+    {
+      "source": "RPG",
+      "path": "scripts/investigateTower40.js",
+      "expected": "4811c44a222ddc97343d533b0ccf779fe73f06ff",
+      "actual": "4811c44a222ddc97343d533b0ccf779fe73f06ff",
+      "match": true
+    },
+    {
+      "source": "RPG",
+      "path": "scripts/measureEnemyBalance.js",
+      "expected": "8bc3b657c6b3c47012e6847e46e96ed02209d391",
+      "actual": "8bc3b657c6b3c47012e6847e46e96ed02209d391",
+      "match": true
+    },
+    {
+      "source": "RPG",
+      "path": "scripts/summarizeEnemyBalance.js",
+      "expected": "035f896858515a53bc2b3283c10349ecc6312ad9",
+      "actual": "035f896858515a53bc2b3283c10349ecc6312ad9",
+      "match": true
+    },
+    {
+      "source": "RPG",
+      "path": "src/data/rpgTowerBattle.test.js",
+      "expected": "8fb1df03d59dc18631f250574448ced5afd2fbbf",
+      "actual": "8fb1df03d59dc18631f250574448ced5afd2fbbf",
+      "match": true
+    },
+    {
+      "source": "RPG",
+      "path": "src/rpg/battleBalance.test.js",
+      "expected": "3b4efbf7e0d10140dd8c2c70ac6f239cf4fe3c5e",
+      "actual": "3b4efbf7e0d10140dd8c2c70ac6f239cf4fe3c5e",
+      "match": true
+    },
+    {
+      "source": "RPG",
+      "path": "src/rpg/difficultyRelief.test.js",
+      "expected": "9e7e07fa9b6458ffce99b9d634536ba2ed3e1701",
+      "actual": "9e7e07fa9b6458ffce99b9d634536ba2ed3e1701",
+      "match": true
+    },
+    {
+      "source": "RPG",
+      "path": "src/rpg/enemyBalanceV2913.test.js",
+      "expected": "54e80739495e17b9e47c0082fc8f9555bfbb651c",
+      "actual": "54e80739495e17b9e47c0082fc8f9555bfbb651c",
+      "match": true
+    },
+    {
+      "source": "RPG",
+      "path": "src/rpg/towerCatalog.js",
+      "expected": "6f0f2f3c2bf059baddf4559f0eeba830592964f0",
+      "actual": "6f0f2f3c2bf059baddf4559f0eeba830592964f0",
+      "match": true
+    },
+    {
+      "source": "RPG",
+      "path": "src/rpg/towerGrowth.test.js",
+      "expected": "2f3c3f20f500d77be9ec8287bc8453cf5c8c9cc2",
+      "actual": "2f3c3f20f500d77be9ec8287bc8453cf5c8c9cc2",
+      "match": true
+    },
+    {
+      "source": "RPG",
+      "path": "src/rpg/weeklyBossCatalog.js",
+      "expected": "9857d3abcd87e1acbb879c54b1240e568e0b9582",
+      "actual": "9857d3abcd87e1acbb879c54b1240e568e0b9582",
+      "match": true
+    },
+    {
+      "source": "RPG",
+      "path": "test/firestore/firestore.rules.test.js",
+      "expected": "289be53a3b9b7d5e40c55f33214a3aaaa5f5d770",
+      "actual": "289be53a3b9b7d5e40c55f33214a3aaaa5f5d770",
+      "match": true
+    },
+    {
+      "source": "RPG",
+      "path": "test/fixtures/rpg-v2.9.13-before-enemies.json",
+      "expected": "3cdf6cf8412759b318e8619aeecb924d56dffb40",
+      "actual": "3cdf6cf8412759b318e8619aeecb924d56dffb40",
+      "match": true
+    }
+  ],
+  "appMatchesGuiExceptVersion": true,
+  "unchanged": [
+    {
+      "path": "src/data/rewardCorrectionRepository.js",
+      "match": true
+    },
+    {
+      "path": "src/data/rewardLedgerRepository.js",
+      "match": true
+    },
+    {
+      "path": "src/data/activeTimerRepository.js",
+      "match": true
+    },
+    {
+      "path": "firestore.rules",
+      "match": true
+    }
+  ],
+  "totalChangedFiles": 39
+}

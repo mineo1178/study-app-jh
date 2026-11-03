@@ -1,0 +1,478 @@
+[
+  {
+    "loser": 3,
+    "loserAttempts": 1,
+    "ledgerRead": {
+      "seq": 36,
+      "revision": 1,
+      "status": "reversal_pending",
+      "adjustmentId": "audit-session-revision-1"
+    },
+    "winner": {
+      "seq": 55,
+      "id": 4,
+      "attempts": 1
+    },
+    "adjustmentRead": {
+      "seq": 56,
+      "status": "applied",
+      "adjustmentId": "audit-session-revision-1"
+    },
+    "error": {
+      "seq": 58,
+      "code": "PENDING_CORRECTION_INVALID"
+    },
+    "final": [
+      {
+        "path": "families/oomine-study-2026/apps/junior-high/studySessions/audit-session",
+        "data": {
+          "timerId": "audit-session",
+          "rewardPolicyVersion": "rpg-reward-v1",
+          "taskId": "math",
+          "taskSnapshot": {
+            "categoryId": null,
+            "subjectId": "s_math",
+            "activityType": "problem_solving",
+            "title": "",
+            "type": "self"
+          },
+          "date": "1970-01-01",
+          "segments": [
+            {
+              "startedAt": 1000000,
+              "endedAt": 4600000,
+              "durationSeconds": 3600
+            }
+          ],
+          "breaks": [],
+          "validation": {
+            "status": "valid",
+            "reasonCodes": [],
+            "validationVersion": 1
+          },
+          "memo": "",
+          "legacySource": null,
+          "createdAt": 4600000,
+          "id": "audit-session",
+          "recordedSeconds": 1200,
+          "correction": {
+            "revision": 1,
+            "correctionId": "audit-correction",
+            "reason": "manual",
+            "requestedAt": 1793687961461,
+            "requestedBy": "audit-reviewer",
+            "before": {
+              "recordedSeconds": 3600,
+              "validationStatus": "valid"
+            },
+            "after": {
+              "recordedSeconds": 1200,
+              "validationStatus": "valid"
+            }
+          },
+          "updatedAt": 1793687961461
+        }
+      },
+      {
+        "path": "families/oomine-study-2026/apps/junior-high/rewardLedger/audit-session",
+        "data": {
+          "schemaVersion": 1,
+          "studySessionId": "audit-session",
+          "timerId": "audit-session",
+          "rewardPolicyVersion": "rpg-reward-v1",
+          "basis": {
+            "recordedSeconds": 3600,
+            "subjectId": "s_math",
+            "categoryId": null,
+            "activityType": "problem_solving"
+          },
+          "rewards": {
+            "gold": 60,
+            "battleEnergy": 4,
+            "material": {
+              "key": "iron",
+              "quantity": 6
+            }
+          },
+          "status": "applied",
+          "appliedAt": 1793687961084,
+          "reversal": null,
+          "revision": 1,
+          "effectiveRewards": {
+            "gold": 20,
+            "battleEnergy": 1,
+            "material": {
+              "key": "iron",
+              "quantity": 2
+            }
+          },
+          "correctionStatus": "applied",
+          "lastCorrectionId": "audit-correction",
+          "pendingCorrection": null,
+          "lastResolvedBy": "audit-reviewer",
+          "lastResolvedAt": 1793687961566
+        }
+      },
+      {
+        "path": "families/oomine-study-2026/apps/junior-high/rpg/playerProfile",
+        "data": {
+          "schemaVersion": 6,
+          "gold": 0,
+          "battleEnergy": 1,
+          "materials": {
+            "iron": 2,
+            "wisdom_scroll": 0,
+            "mana_rune": 0,
+            "mineral": 0,
+            "history_seal": 0,
+            "logic_core": 0,
+            "vitality": 0,
+            "resonance": 0,
+            "craft_cloth": 0,
+            "general_essence": 0
+          },
+          "ownedEquipment": {},
+          "equipped": {
+            "weapon": null,
+            "armor": null,
+            "accessory": null
+          },
+          "totalExp": 0,
+          "level": 1,
+          "statAllocation": {
+            "hp": 0,
+            "mp": 0
+          },
+          "jobId": "adventurer",
+          "skillPanel": {
+            "unlockedNodeIds": [],
+            "revision": 0
+          },
+          "companionGrowth": {},
+          "activeBattleId": null,
+          "partyMemberIds": [
+            "hero",
+            "guardian",
+            "mage"
+          ],
+          "unlockedPartyMemberIds": [
+            "hero",
+            "guardian",
+            "mage",
+            "healer"
+          ],
+          "gacha": {
+            "ticketBalances": {
+              "normal": 0,
+              "silver": 0,
+              "gold": 0,
+              "premium": 0
+            },
+            "starFragments": 0,
+            "drawsSinceSrPlus": 0,
+            "drawsSinceSsr": 0,
+            "alchemyItems": {},
+            "recentDraws": []
+          },
+          "weeklyBoss": {
+            "clearedWeekIds": [],
+            "totalClears": 0,
+            "lastClearedAt": null,
+            "lastBossId": null
+          },
+          "selectedTitleId": null,
+          "updatedAt": 1793687961566
+        }
+      },
+      {
+        "path": "families/oomine-study-2026/apps/junior-high/rewardIntegrity/current",
+        "data": {
+          "schemaVersion": 1,
+          "pendingSessionIds": [],
+          "updatedAt": 1793687961566
+        }
+      },
+      {
+        "path": "families/oomine-study-2026/apps/junior-high/rewardAdjustmentLedger/audit-session-revision-1",
+        "data": {
+          "schemaVersion": 1,
+          "type": "reward_correction",
+          "rewardPolicyVersion": "rpg-reward-v1",
+          "adjustmentId": "audit-session-revision-1",
+          "studySessionId": "audit-session",
+          "revision": 1,
+          "beforeReward": {
+            "gold": 60,
+            "battleEnergy": 4,
+            "material": {
+              "key": "iron",
+              "quantity": 6
+            }
+          },
+          "targetReward": {
+            "gold": 20,
+            "battleEnergy": 1,
+            "material": {
+              "key": "iron",
+              "quantity": 2
+            }
+          },
+          "deduction": {
+            "gold": 40,
+            "battleEnergy": 3,
+            "material": {
+              "key": "iron",
+              "quantity": 4
+            }
+          },
+          "status": "applied",
+          "reason": "manual",
+          "requestedAt": 1793687961461,
+          "requestedBy": "audit-reviewer",
+          "appliedAt": 1793687961566,
+          "appliedBy": "audit-reviewer",
+          "resolvedAt": 1793687961566,
+          "resolvedBy": "audit-reviewer"
+        }
+      }
+    ]
+  },
+  {
+    "loser": 13,
+    "loserAttempts": 1,
+    "ledgerRead": {
+      "seq": 194,
+      "revision": 1,
+      "status": "reversal_pending",
+      "adjustmentId": "audit-session-revision-1"
+    },
+    "winner": {
+      "seq": 212,
+      "id": 14,
+      "attempts": 1
+    },
+    "adjustmentRead": {
+      "seq": 213,
+      "status": "applied",
+      "adjustmentId": "audit-session-revision-1"
+    },
+    "error": {
+      "seq": 215,
+      "code": "PENDING_CORRECTION_INVALID"
+    },
+    "final": [
+      {
+        "path": "families/oomine-study-2026/apps/junior-high/studySessions/audit-session",
+        "data": {
+          "timerId": "audit-session",
+          "rewardPolicyVersion": "rpg-reward-v2",
+          "taskId": "math",
+          "taskSnapshot": {
+            "categoryId": null,
+            "subjectId": "s_math",
+            "activityType": "problem_solving",
+            "title": "",
+            "type": "self"
+          },
+          "date": "1970-01-01",
+          "segments": [
+            {
+              "startedAt": 1000000,
+              "endedAt": 4600000,
+              "durationSeconds": 3600
+            }
+          ],
+          "breaks": [],
+          "validation": {
+            "status": "valid",
+            "reasonCodes": [],
+            "validationVersion": 1
+          },
+          "memo": "",
+          "legacySource": null,
+          "createdAt": 4600000,
+          "id": "audit-session",
+          "recordedSeconds": 1200,
+          "correction": {
+            "revision": 1,
+            "correctionId": "audit-correction",
+            "reason": "manual",
+            "requestedAt": 1793687963353,
+            "requestedBy": "audit-reviewer",
+            "before": {
+              "recordedSeconds": 3600,
+              "validationStatus": "valid"
+            },
+            "after": {
+              "recordedSeconds": 1200,
+              "validationStatus": "valid"
+            }
+          },
+          "updatedAt": 1793687963353
+        }
+      },
+      {
+        "path": "families/oomine-study-2026/apps/junior-high/rewardLedger/audit-session",
+        "data": {
+          "schemaVersion": 1,
+          "studySessionId": "audit-session",
+          "timerId": "audit-session",
+          "rewardPolicyVersion": "rpg-reward-v2",
+          "basis": {
+            "recordedSeconds": 3600,
+            "subjectId": "s_math",
+            "categoryId": null,
+            "activityType": "problem_solving"
+          },
+          "rewards": {
+            "gold": 6000,
+            "battleEnergy": 4,
+            "material": {
+              "key": "iron",
+              "quantity": 6
+            }
+          },
+          "status": "applied",
+          "appliedAt": 1793687963307,
+          "reversal": null,
+          "revision": 1,
+          "effectiveRewards": {
+            "gold": 2000,
+            "battleEnergy": 1,
+            "material": {
+              "key": "iron",
+              "quantity": 2
+            }
+          },
+          "correctionStatus": "applied",
+          "lastCorrectionId": "audit-correction",
+          "pendingCorrection": null,
+          "lastResolvedBy": "audit-reviewer",
+          "lastResolvedAt": 1793687963433
+        }
+      },
+      {
+        "path": "families/oomine-study-2026/apps/junior-high/rpg/playerProfile",
+        "data": {
+          "schemaVersion": 6,
+          "gold": 0,
+          "battleEnergy": 1,
+          "materials": {
+            "iron": 2,
+            "wisdom_scroll": 0,
+            "mana_rune": 0,
+            "mineral": 0,
+            "history_seal": 0,
+            "logic_core": 0,
+            "vitality": 0,
+            "resonance": 0,
+            "craft_cloth": 0,
+            "general_essence": 0
+          },
+          "ownedEquipment": {},
+          "equipped": {
+            "weapon": null,
+            "armor": null,
+            "accessory": null
+          },
+          "totalExp": 0,
+          "level": 1,
+          "statAllocation": {
+            "hp": 0,
+            "mp": 0
+          },
+          "jobId": "adventurer",
+          "skillPanel": {
+            "unlockedNodeIds": [],
+            "revision": 0
+          },
+          "companionGrowth": {},
+          "activeBattleId": null,
+          "partyMemberIds": [
+            "hero",
+            "guardian",
+            "mage"
+          ],
+          "unlockedPartyMemberIds": [
+            "hero",
+            "guardian",
+            "mage",
+            "healer"
+          ],
+          "gacha": {
+            "ticketBalances": {
+              "normal": 0,
+              "silver": 0,
+              "gold": 0,
+              "premium": 0
+            },
+            "starFragments": 0,
+            "drawsSinceSrPlus": 0,
+            "drawsSinceSsr": 0,
+            "alchemyItems": {},
+            "recentDraws": []
+          },
+          "weeklyBoss": {
+            "clearedWeekIds": [],
+            "totalClears": 0,
+            "lastClearedAt": null,
+            "lastBossId": null
+          },
+          "selectedTitleId": null,
+          "updatedAt": 1793687963433
+        }
+      },
+      {
+        "path": "families/oomine-study-2026/apps/junior-high/rewardIntegrity/current",
+        "data": {
+          "schemaVersion": 1,
+          "pendingSessionIds": [],
+          "updatedAt": 1793687963433
+        }
+      },
+      {
+        "path": "families/oomine-study-2026/apps/junior-high/rewardAdjustmentLedger/audit-session-revision-1",
+        "data": {
+          "schemaVersion": 1,
+          "type": "reward_correction",
+          "rewardPolicyVersion": "rpg-reward-v2",
+          "adjustmentId": "audit-session-revision-1",
+          "studySessionId": "audit-session",
+          "revision": 1,
+          "beforeReward": {
+            "gold": 6000,
+            "battleEnergy": 4,
+            "material": {
+              "key": "iron",
+              "quantity": 6
+            }
+          },
+          "targetReward": {
+            "gold": 2000,
+            "battleEnergy": 1,
+            "material": {
+              "key": "iron",
+              "quantity": 2
+            }
+          },
+          "deduction": {
+            "gold": 4000,
+            "battleEnergy": 3,
+            "material": {
+              "key": "iron",
+              "quantity": 4
+            }
+          },
+          "status": "applied",
+          "reason": "manual",
+          "requestedAt": 1793687963353,
+          "requestedBy": "audit-reviewer",
+          "appliedAt": 1793687963433,
+          "appliedBy": "audit-reviewer",
+          "resolvedAt": 1793687963433,
+          "resolvedBy": "audit-reviewer"
+        }
+      }
+    ]
+  }
+]

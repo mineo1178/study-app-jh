@@ -1,0 +1,687 @@
+{
+  "base": "7649834c9e3c27f5eba07302bb30de2c30b73216",
+  "emulator": "127.0.0.1:8085",
+  "results": [
+    {
+      "id": "isolated-1",
+      "args": [
+        "--testNamePattern",
+        "keeps insufficient correction pending and retries its stored deduction once under contention"
+      ],
+      "expected": 2,
+      "started": "2026-11-03T02:12:28.573Z",
+      "ended": "2026-11-03T02:12:34.042Z",
+      "exitCode": 0,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 69,
+      "failures": []
+    },
+    {
+      "id": "isolated-2",
+      "args": [
+        "--testNamePattern",
+        "keeps insufficient correction pending and retries its stored deduction once under contention"
+      ],
+      "expected": 2,
+      "started": "2026-11-03T02:12:34.042Z",
+      "ended": "2026-11-03T02:12:37.842Z",
+      "exitCode": 0,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 69,
+      "failures": []
+    },
+    {
+      "id": "isolated-3",
+      "args": [
+        "--testNamePattern",
+        "keeps insufficient correction pending and retries its stored deduction once under contention"
+      ],
+      "expected": 2,
+      "started": "2026-11-03T02:12:37.843Z",
+      "ended": "2026-11-03T02:12:42.472Z",
+      "exitCode": 0,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 69,
+      "failures": []
+    },
+    {
+      "id": "isolated-4",
+      "args": [
+        "--testNamePattern",
+        "keeps insufficient correction pending and retries its stored deduction once under contention"
+      ],
+      "expected": 2,
+      "started": "2026-11-03T02:12:42.474Z",
+      "ended": "2026-11-03T02:12:46.724Z",
+      "exitCode": 0,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 69,
+      "failures": []
+    },
+    {
+      "id": "isolated-5",
+      "args": [
+        "--testNamePattern",
+        "keeps insufficient correction pending and retries its stored deduction once under contention"
+      ],
+      "expected": 2,
+      "started": "2026-11-03T02:12:46.724Z",
+      "ended": "2026-11-03T02:12:50.621Z",
+      "exitCode": 0,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 69,
+      "failures": []
+    },
+    {
+      "id": "isolated-6",
+      "args": [
+        "--testNamePattern",
+        "keeps insufficient correction pending and retries its stored deduction once under contention"
+      ],
+      "expected": 2,
+      "started": "2026-11-03T02:12:50.622Z",
+      "ended": "2026-11-03T02:12:55.905Z",
+      "exitCode": 0,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 69,
+      "failures": []
+    },
+    {
+      "id": "isolated-7",
+      "args": [
+        "--testNamePattern",
+        "keeps insufficient correction pending and retries its stored deduction once under contention"
+      ],
+      "expected": 2,
+      "started": "2026-11-03T02:12:55.905Z",
+      "ended": "2026-11-03T02:13:00.833Z",
+      "exitCode": 0,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 69,
+      "failures": []
+    },
+    {
+      "id": "isolated-8",
+      "args": [
+        "--testNamePattern",
+        "keeps insufficient correction pending and retries its stored deduction once under contention"
+      ],
+      "expected": 2,
+      "started": "2026-11-03T02:13:00.834Z",
+      "ended": "2026-11-03T02:13:05.281Z",
+      "exitCode": 0,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 69,
+      "failures": []
+    },
+    {
+      "id": "isolated-9",
+      "args": [
+        "--testNamePattern",
+        "keeps insufficient correction pending and retries its stored deduction once under contention"
+      ],
+      "expected": 2,
+      "started": "2026-11-03T02:13:05.282Z",
+      "ended": "2026-11-03T02:13:09.819Z",
+      "exitCode": 0,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 69,
+      "failures": []
+    },
+    {
+      "id": "isolated-10",
+      "args": [
+        "--testNamePattern",
+        "keeps insufficient correction pending and retries its stored deduction once under contention"
+      ],
+      "expected": 2,
+      "started": "2026-11-03T02:13:09.820Z",
+      "ended": "2026-11-03T02:13:13.861Z",
+      "exitCode": 0,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 69,
+      "failures": []
+    },
+    {
+      "id": "isolated-11",
+      "args": [
+        "--testNamePattern",
+        "keeps insufficient correction pending and retries its stored deduction once under contention"
+      ],
+      "expected": 2,
+      "started": "2026-11-03T02:13:13.861Z",
+      "ended": "2026-11-03T02:13:18.048Z",
+      "exitCode": 0,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 69,
+      "failures": []
+    },
+    {
+      "id": "isolated-12",
+      "args": [
+        "--testNamePattern",
+        "keeps insufficient correction pending and retries its stored deduction once under contention"
+      ],
+      "expected": 2,
+      "started": "2026-11-03T02:13:18.049Z",
+      "ended": "2026-11-03T02:13:22.323Z",
+      "exitCode": 0,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 69,
+      "failures": []
+    },
+    {
+      "id": "isolated-13",
+      "args": [
+        "--testNamePattern",
+        "keeps insufficient correction pending and retries its stored deduction once under contention"
+      ],
+      "expected": 2,
+      "started": "2026-11-03T02:13:22.324Z",
+      "ended": "2026-11-03T02:13:26.706Z",
+      "exitCode": 0,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 69,
+      "failures": []
+    },
+    {
+      "id": "isolated-14",
+      "args": [
+        "--testNamePattern",
+        "keeps insufficient correction pending and retries its stored deduction once under contention"
+      ],
+      "expected": 2,
+      "started": "2026-11-03T02:13:26.707Z",
+      "ended": "2026-11-03T02:13:30.237Z",
+      "exitCode": 0,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 69,
+      "failures": []
+    },
+    {
+      "id": "isolated-15",
+      "args": [
+        "--testNamePattern",
+        "keeps insufficient correction pending and retries its stored deduction once under contention"
+      ],
+      "expected": 2,
+      "started": "2026-11-03T02:13:30.237Z",
+      "ended": "2026-11-03T02:13:34.224Z",
+      "exitCode": 0,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 69,
+      "failures": []
+    },
+    {
+      "id": "isolated-16",
+      "args": [
+        "--testNamePattern",
+        "keeps insufficient correction pending and retries its stored deduction once under contention"
+      ],
+      "expected": 2,
+      "started": "2026-11-03T02:13:34.224Z",
+      "ended": "2026-11-03T02:13:38.232Z",
+      "exitCode": 0,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 69,
+      "failures": []
+    },
+    {
+      "id": "isolated-17",
+      "args": [
+        "--testNamePattern",
+        "keeps insufficient correction pending and retries its stored deduction once under contention"
+      ],
+      "expected": 2,
+      "started": "2026-11-03T02:13:38.233Z",
+      "ended": "2026-11-03T02:13:42.329Z",
+      "exitCode": 0,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 69,
+      "failures": []
+    },
+    {
+      "id": "isolated-18",
+      "args": [
+        "--testNamePattern",
+        "keeps insufficient correction pending and retries its stored deduction once under contention"
+      ],
+      "expected": 2,
+      "started": "2026-11-03T02:13:42.330Z",
+      "ended": "2026-11-03T02:13:45.585Z",
+      "exitCode": 1,
+      "passed": 1,
+      "failed": 1,
+      "skipped": 69,
+      "failures": [
+        {
+          "name": "versioned reward real transactions rpg-reward-v2 keeps insufficient correction pending and retries its stored deduction once under contention",
+          "messages": [
+            "Error: PENDING_CORRECTION_INVALID\n    at correctionFailure (C:/dev/study-app-jh-release-audit/src/data/rewardCorrectionRepository.js:8:51)\n    at C:/dev/study-app-jh-release-audit/src/data/rewardCorrectionRepository.js:238:87\n    at processTicksAndRejections (node:internal/process/task_queues:103:5)"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "isolated-19",
+      "args": [
+        "--testNamePattern",
+        "keeps insufficient correction pending and retries its stored deduction once under contention"
+      ],
+      "expected": 2,
+      "started": "2026-11-03T02:13:45.586Z",
+      "ended": "2026-11-03T02:13:50.053Z",
+      "exitCode": 0,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 69,
+      "failures": []
+    },
+    {
+      "id": "isolated-20",
+      "args": [
+        "--testNamePattern",
+        "keeps insufficient correction pending and retries its stored deduction once under contention"
+      ],
+      "expected": 2,
+      "started": "2026-11-03T02:13:50.054Z",
+      "ended": "2026-11-03T02:13:54.417Z",
+      "exitCode": 0,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 69,
+      "failures": []
+    },
+    {
+      "id": "full-1",
+      "args": [],
+      "expected": 71,
+      "started": "2026-11-03T02:13:54.418Z",
+      "ended": "2026-11-03T02:15:03.864Z",
+      "exitCode": 0,
+      "passed": 71,
+      "failed": 0,
+      "skipped": 0,
+      "failures": []
+    },
+    {
+      "id": "full-2",
+      "args": [],
+      "expected": 71,
+      "started": "2026-11-03T02:15:03.864Z",
+      "ended": "2026-11-03T02:16:10.923Z",
+      "exitCode": 0,
+      "passed": 71,
+      "failed": 0,
+      "skipped": 0,
+      "failures": []
+    },
+    {
+      "id": "full-3",
+      "args": [],
+      "expected": 71,
+      "started": "2026-11-03T02:16:10.924Z",
+      "ended": "2026-11-03T02:17:19.441Z",
+      "exitCode": 0,
+      "passed": 71,
+      "failed": 0,
+      "skipped": 0,
+      "failures": []
+    },
+    {
+      "id": "full-4",
+      "args": [],
+      "expected": 71,
+      "started": "2026-11-03T02:17:19.442Z",
+      "ended": "2026-11-03T02:18:28.365Z",
+      "exitCode": 0,
+      "passed": 71,
+      "failed": 0,
+      "skipped": 0,
+      "failures": []
+    },
+    {
+      "id": "full-5",
+      "args": [],
+      "expected": 71,
+      "started": "2026-11-03T02:18:28.366Z",
+      "ended": "2026-11-03T02:19:34.620Z",
+      "exitCode": 0,
+      "passed": 71,
+      "failed": 0,
+      "skipped": 0,
+      "failures": []
+    },
+    {
+      "id": "full-6",
+      "args": [],
+      "expected": 71,
+      "started": "2026-11-03T02:19:34.621Z",
+      "ended": "2026-11-03T02:20:44.661Z",
+      "exitCode": 0,
+      "passed": 71,
+      "failed": 0,
+      "skipped": 0,
+      "failures": []
+    },
+    {
+      "id": "full-7",
+      "args": [],
+      "expected": 71,
+      "started": "2026-11-03T02:20:44.662Z",
+      "ended": "2026-11-03T02:21:54.191Z",
+      "exitCode": 1,
+      "passed": 70,
+      "failed": 1,
+      "skipped": 0,
+      "failures": [
+        {
+          "name": "versioned reward real transactions rpg-reward-v2 keeps insufficient correction pending and retries its stored deduction once under contention",
+          "messages": [
+            "Error: PENDING_CORRECTION_INVALID\n    at correctionFailure (C:/dev/study-app-jh-release-audit/src/data/rewardCorrectionRepository.js:8:51)\n    at C:/dev/study-app-jh-release-audit/src/data/rewardCorrectionRepository.js:238:87\n    at processTicksAndRejections (node:internal/process/task_queues:103:5)"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "full-8",
+      "args": [],
+      "expected": 71,
+      "started": "2026-11-03T02:21:54.192Z",
+      "ended": "2026-11-03T02:23:00.290Z",
+      "exitCode": 1,
+      "passed": 70,
+      "failed": 1,
+      "skipped": 0,
+      "failures": [
+        {
+          "name": "versioned reward real transactions rpg-reward-v2 keeps insufficient correction pending and retries its stored deduction once under contention",
+          "messages": [
+            "Error: PENDING_CORRECTION_INVALID\n    at correctionFailure (C:/dev/study-app-jh-release-audit/src/data/rewardCorrectionRepository.js:8:51)\n    at C:/dev/study-app-jh-release-audit/src/data/rewardCorrectionRepository.js:238:87\n    at processTicksAndRejections (node:internal/process/task_queues:103:5)"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "full-9",
+      "args": [],
+      "expected": 71,
+      "started": "2026-11-03T02:23:00.290Z",
+      "ended": "2026-11-03T02:24:09.034Z",
+      "exitCode": 0,
+      "passed": 71,
+      "failed": 0,
+      "skipped": 0,
+      "failures": []
+    },
+    {
+      "id": "full-10",
+      "args": [],
+      "expected": 71,
+      "started": "2026-11-03T02:24:09.035Z",
+      "ended": "2026-11-03T02:25:16.719Z",
+      "exitCode": 0,
+      "passed": 71,
+      "failed": 0,
+      "skipped": 0,
+      "failures": []
+    },
+    {
+      "id": "full-11",
+      "args": [],
+      "expected": 71,
+      "started": "2026-11-03T02:25:16.720Z",
+      "ended": "2026-11-03T02:26:25.314Z",
+      "exitCode": 1,
+      "passed": 70,
+      "failed": 1,
+      "skipped": 0,
+      "failures": [
+        {
+          "name": "versioned reward real transactions rpg-reward-v1 keeps insufficient correction pending and retries its stored deduction once under contention",
+          "messages": [
+            "Error: PENDING_CORRECTION_INVALID\n    at correctionFailure (C:/dev/study-app-jh-release-audit/src/data/rewardCorrectionRepository.js:8:51)\n    at C:/dev/study-app-jh-release-audit/src/data/rewardCorrectionRepository.js:238:87\n    at processTicksAndRejections (node:internal/process/task_queues:103:5)"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "full-12",
+      "args": [],
+      "expected": 71,
+      "started": "2026-11-03T02:26:25.315Z",
+      "ended": "2026-11-03T02:27:32.255Z",
+      "exitCode": 1,
+      "passed": 70,
+      "failed": 1,
+      "skipped": 0,
+      "failures": [
+        {
+          "name": "versioned reward real transactions rpg-reward-v2 keeps insufficient correction pending and retries its stored deduction once under contention",
+          "messages": [
+            "Error: PENDING_CORRECTION_INVALID\n    at correctionFailure (C:/dev/study-app-jh-release-audit/src/data/rewardCorrectionRepository.js:8:51)\n    at C:/dev/study-app-jh-release-audit/src/data/rewardCorrectionRepository.js:238:87\n    at processTicksAndRejections (node:internal/process/task_queues:103:5)"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "full-13",
+      "args": [],
+      "expected": 71,
+      "started": "2026-11-03T02:27:32.256Z",
+      "ended": "2026-11-03T02:28:38.742Z",
+      "exitCode": 0,
+      "passed": 71,
+      "failed": 0,
+      "skipped": 0,
+      "failures": []
+    },
+    {
+      "id": "full-14",
+      "args": [],
+      "expected": 71,
+      "started": "2026-11-03T02:28:38.743Z",
+      "ended": "2026-11-03T02:29:49.771Z",
+      "exitCode": 0,
+      "passed": 71,
+      "failed": 0,
+      "skipped": 0,
+      "failures": []
+    },
+    {
+      "id": "full-15",
+      "args": [],
+      "expected": 71,
+      "started": "2026-11-03T02:29:49.771Z",
+      "ended": "2026-11-03T02:30:58.606Z",
+      "exitCode": 0,
+      "passed": 71,
+      "failed": 0,
+      "skipped": 0,
+      "failures": []
+    },
+    {
+      "id": "full-16",
+      "args": [],
+      "expected": 71,
+      "started": "2026-11-03T02:30:58.607Z",
+      "ended": "2026-11-03T02:32:07.397Z",
+      "exitCode": 0,
+      "passed": 71,
+      "failed": 0,
+      "skipped": 0,
+      "failures": []
+    },
+    {
+      "id": "full-17",
+      "args": [],
+      "expected": 71,
+      "started": "2026-11-03T02:32:07.397Z",
+      "ended": "2026-11-03T02:33:17.821Z",
+      "exitCode": 0,
+      "passed": 71,
+      "failed": 0,
+      "skipped": 0,
+      "failures": []
+    },
+    {
+      "id": "full-18",
+      "args": [],
+      "expected": 71,
+      "started": "2026-11-03T02:33:17.822Z",
+      "ended": "2026-11-03T02:34:26.739Z",
+      "exitCode": 0,
+      "passed": 71,
+      "failed": 0,
+      "skipped": 0,
+      "failures": []
+    },
+    {
+      "id": "full-19",
+      "args": [],
+      "expected": 71,
+      "started": "2026-11-03T02:34:26.740Z",
+      "ended": "2026-11-03T02:35:31.123Z",
+      "exitCode": 0,
+      "passed": 71,
+      "failed": 0,
+      "skipped": 0,
+      "failures": []
+    },
+    {
+      "id": "full-20",
+      "args": [],
+      "expected": 71,
+      "started": "2026-11-03T02:35:31.124Z",
+      "ended": "2026-11-03T02:36:38.150Z",
+      "exitCode": 0,
+      "passed": 71,
+      "failed": 0,
+      "skipped": 0,
+      "failures": []
+    },
+    {
+      "id": "shuffle-1701",
+      "args": [
+        "--sequence.shuffle",
+        "--sequence.seed",
+        "1701"
+      ],
+      "expected": 71,
+      "seed": 1701,
+      "started": "2026-11-03T02:36:38.151Z",
+      "ended": "2026-11-03T02:37:43.678Z",
+      "exitCode": 1,
+      "passed": 70,
+      "failed": 1,
+      "skipped": 0,
+      "failures": [
+        {
+          "name": "versioned reward real transactions rpg-reward-v1 keeps insufficient correction pending and retries its stored deduction once under contention",
+          "messages": [
+            "Error: PENDING_CORRECTION_INVALID\n    at correctionFailure (C:/dev/study-app-jh-release-audit/src/data/rewardCorrectionRepository.js:8:51)\n    at C:/dev/study-app-jh-release-audit/src/data/rewardCorrectionRepository.js:238:87\n    at processTicksAndRejections (node:internal/process/task_queues:103:5)"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "shuffle-1702",
+      "args": [
+        "--sequence.shuffle",
+        "--sequence.seed",
+        "1702"
+      ],
+      "expected": 71,
+      "seed": 1702,
+      "started": "2026-11-03T02:37:43.679Z",
+      "ended": "2026-11-03T02:38:48.993Z",
+      "exitCode": 1,
+      "passed": 70,
+      "failed": 1,
+      "skipped": 0,
+      "failures": [
+        {
+          "name": "versioned reward real transactions rpg-reward-v2 keeps insufficient correction pending and retries its stored deduction once under contention",
+          "messages": [
+            "Error: PENDING_CORRECTION_INVALID\n    at correctionFailure (C:/dev/study-app-jh-release-audit/src/data/rewardCorrectionRepository.js:8:51)\n    at C:/dev/study-app-jh-release-audit/src/data/rewardCorrectionRepository.js:238:87\n    at processTicksAndRejections (node:internal/process/task_queues:103:5)"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "shuffle-1703",
+      "args": [
+        "--sequence.shuffle",
+        "--sequence.seed",
+        "1703"
+      ],
+      "expected": 71,
+      "seed": 1703,
+      "started": "2026-11-03T02:38:48.994Z",
+      "ended": "2026-11-03T02:39:58.445Z",
+      "exitCode": 1,
+      "passed": 70,
+      "failed": 1,
+      "skipped": 0,
+      "failures": [
+        {
+          "name": "versioned reward real transactions rpg-reward-v1 keeps insufficient correction pending and retries its stored deduction once under contention",
+          "messages": [
+            "Error: PENDING_CORRECTION_INVALID\n    at correctionFailure (C:/dev/study-app-jh-release-audit/src/data/rewardCorrectionRepository.js:8:51)\n    at C:/dev/study-app-jh-release-audit/src/data/rewardCorrectionRepository.js:238:87\n    at processTicksAndRejections (node:internal/process/task_queues:103:5)"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "shuffle-1704",
+      "args": [
+        "--sequence.shuffle",
+        "--sequence.seed",
+        "1704"
+      ],
+      "expected": 71,
+      "seed": 1704,
+      "started": "2026-11-03T02:39:58.446Z",
+      "ended": "2026-11-03T02:41:01.991Z",
+      "exitCode": 0,
+      "passed": 71,
+      "failed": 0,
+      "skipped": 0,
+      "failures": []
+    },
+    {
+      "id": "shuffle-1705",
+      "args": [
+        "--sequence.shuffle",
+        "--sequence.seed",
+        "1705"
+      ],
+      "expected": 71,
+      "seed": 1705,
+      "started": "2026-11-03T02:41:01.992Z",
+      "ended": "2026-11-03T02:42:06.692Z",
+      "exitCode": 0,
+      "passed": 71,
+      "failed": 0,
+      "skipped": 0,
+      "failures": []
+    }
+  ]
+}

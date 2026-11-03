@@ -1,0 +1,58 @@
+{
+  "head": "7649834c9e3c27f5eba07302bb30de2c30b73216",
+  "files": [
+    {
+      "path": "repeat-summary.json",
+      "bytes": 19727,
+      "sha256": "35a984b8b1b46afe169ae5c278edeb3b31fea7650873b91789e802d49a350a34"
+    },
+    {
+      "path": "trace-results-confirmed.json",
+      "bytes": 2314,
+      "sha256": "8ad8d75e876589d5985c6edc4a607cece6cec2457b65dd5d6b2cb0b40b173bc4"
+    },
+    {
+      "path": "transaction-trace-confirmed.jsonl",
+      "bytes": 132728,
+      "sha256": "397a4be9b783e54b43c6b83efbd724ff7adaa13829c45188bf5ad8d1cb7f13ca"
+    },
+    {
+      "path": "causal-sequences.json",
+      "bytes": 13119,
+      "sha256": "da76525f526d59ef7df0c695cac1735d0c7539fb18b90201f00425933ca30de8"
+    },
+    {
+      "path": "diagnostic-final-states.jsonl",
+      "bytes": 12068,
+      "sha256": "9e12d2b0ee11046d4a50918cf593a6c2ab8b999b9a6121804e89438a6e911b7c"
+    },
+    {
+      "path": "integration-diff.json",
+      "bytes": 9131,
+      "sha256": "bc767c3cc797bd15bf515a838c97f41769c70a8c0308b0792ef0629a337bb23c"
+    },
+    {
+      "path": "preview-pc.png",
+      "bytes": 95384,
+      "sha256": "29d634af99f42e27aaad941223eeac5b059e085935b41a762040d466a61271cd"
+    },
+    {
+      "path": "preview-mobile.png",
+      "bytes": 38718,
+      "sha256": "4f5b94394fec2c363ec507e824851fb3cbb95bf7e50803db8a90e3a85e00c8d0"
+    },
+    {
+      "path": "vercel-production-settings.png",
+      "bytes": 108040,
+      "sha256": "3237c5128c85924425b6f1ea2699cfdaba0a62405d8edc23d2f254ef7b3ece1c"
+    },
+    {
+      "path": "run-evidence.json.gz",
+      "bytes": 238225,
+      "sha256": "555f1db18678861bf842eaca4b8b9bde752b0af7aebe3c74e330ab87ae5fd446",
+      "rawBytes": 4057928,
+      "rawSha256": "2493886df26eaf45cb2ea392948a1f5e988f2d854933cda6a4354d96c581094e",
+      "entries": 150
+    }
+  ]
+}
