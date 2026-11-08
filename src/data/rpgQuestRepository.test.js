@@ -11,9 +11,9 @@ describe('quest claim transaction', () => {
     expect(() => prepareQuestClaim({ profile: {}, progress: {}, questState: {}, questId: 'first_equipment', now: 1 })).toThrow('QUEST_NOT_COMPLETED');
     const profile = { gold: 4, battleEnergy: 1, totalExp: 90, materials: { iron: 5 }, ownedEquipment: { iron_sword: {} } };
     const change = prepareQuestClaim({ profile, progress: {}, questState: {}, questId: 'first_equipment', now: 2 });
-    expect(change.profile).toMatchObject({ gold: 24, battleEnergy: 1, totalExp: 90, materials: { iron: 5 } });
+    expect(change.profile).toMatchObject({ gold: 154, battleEnergy: 1, totalExp: 90, materials: { iron: 5 } });
     expect(change.questState.claimedQuestIds).toEqual(['first_equipment']);
-    expect(change.ledger).toMatchObject({ type: 'quest_claim', questId: 'first_equipment', reward: { gold: 20, battleEnergy: 0 } });
+    expect(change.ledger).toMatchObject({ type: 'quest_claim', questId: 'first_equipment', reward: { gold: 150, battleEnergy: 0 } });
     [change.profile, change.questState, change.ledger, change.result].forEach((payload) => expect(findUndefinedPaths(payload)).toEqual([]));
   });
   it('uses a deterministic ledger to prevent duplicate cross-device claims', async () => {
@@ -22,9 +22,9 @@ describe('quest claim transaction', () => {
     firestore.docs.set(profilePath, { gold: 0, battleEnergy: 0, ownedEquipment: { iron_sword: {} }, materials: { iron: 5 } });
     const first = await claimQuestReward({ db: {}, familyId: 'family', questId: 'first_equipment' });
     const second = await claimQuestReward({ db: {}, familyId: 'family', questId: 'first_equipment' });
-    expect(first).toMatchObject({ applied: true, questId: 'first_equipment', reward: { gold: 20, battleEnergy: 0 } });
+    expect(first).toMatchObject({ applied: true, questId: 'first_equipment', reward: { gold: 150, battleEnergy: 0 } });
     expect(second).toEqual({ applied: false, reason: 'QUEST_ALREADY_CLAIMED' });
-    expect(firestore.docs.get(profilePath)).toMatchObject({ gold: 20, battleEnergy: 0, materials: { iron: 5 } });
+    expect(firestore.docs.get(profilePath)).toMatchObject({ gold: 150, battleEnergy: 0, materials: { iron: 5 } });
     expect(firestore.docs.get('families/family/apps/junior-high/rpgQuestState/current').claimedQuestIds).toEqual(['first_equipment']);
     expect(firestore.docs.get('families/family/apps/junior-high/rpgQuestLedger/quest-claim-first_equipment')).toMatchObject({ type: 'quest_claim' });
   });

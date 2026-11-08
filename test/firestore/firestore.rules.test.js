@@ -1,3 +1,4 @@
+import { purchaseGachaTicket, drawGacha } from '../../src/data/rpgGachaRepository.js';
 import { saveCompanionGrowth } from '../../src/data/rpgCompanionGrowthRepository.js';
 import { startWeeklyBossBattle } from '../../src/data/rpgBattleRepository.js';
 import towerV4 from '../fixtures/rpg-v2.9.9-tower.json';
@@ -279,7 +280,7 @@ describe('job change emulator transactions',()=>{
   });
 });
 
-describe.each([['rpg-reward-v1',1],['rpg-reward-v2',100]])('versioned reward real transactions %s',(policy,rate)=>{
+describe.each([['rpg-reward-v1',1],['rpg-reward-v2',100],['rpg-reward-v3',150]])('versioned reward real transactions %s',(policy,rate)=>{
   const profilePath=appPath(appFamilyId,'rpg','playerProfile');
   const task={id:'math',subjectId:'s_math',activityType:'problem_solving'};
   const makeSession=(seconds,id='reward-policy')=>buildFinishedTimerSession({...buildActiveTimer({task,timerId:id,ownerClientId:'a',now:1000000}),rewardPolicyVersion:policy},task,{endAt:1000000+seconds*1000,staleProof:null});
@@ -327,9 +328,9 @@ describe.each([['rpg-reward-v1',1],['rpg-reward-v2',100]])('versioned reward rea
 describe('reward policy start/finish rollover transaction',()=>{
   it('captures new policy at START while completing an old missing-policy timer at the old rate',async()=>{
     const task={id:'math',subjectId:'s_math',activityType:'problem_solving'},args={db:userDb(),familyId:appFamilyId,task,ownerClientId:'a',now:1000000};
-    const timer=await startActiveTimer({...args,timerId:'new-rate'});expect(timer.rewardPolicyVersion).toBe('rpg-reward-v2');
-    const result=await finishActiveTimer({...args,timerId:'new-rate',endAt:2800000,staleProof:null});expect(result.session.recordedSeconds).toBe(1800);expect(result.session.rewardPolicyVersion).toBe('rpg-reward-v2');
-    const grant=await applyStudySessionReward({...args,session:{...result.session,id:'new-rate'}});expect(grant.rewards.gold).toBe(3000);
+    const timer=await startActiveTimer({...args,timerId:'new-rate'});expect(timer.rewardPolicyVersion).toBe('rpg-reward-v3');
+    const result=await finishActiveTimer({...args,timerId:'new-rate',endAt:2800000,staleProof:null});expect(result.session.recordedSeconds).toBe(1800);expect(result.session.rewardPolicyVersion).toBe('rpg-reward-v3');
+    const grant=await applyStudySessionReward({...args,session:{...result.session,id:'new-rate'}});expect(grant.rewards.gold).toBe(4500);
     const old={...timer,timerId:'old-rate'};delete old.rewardPolicyVersion;await seedDoc(appPath(appFamilyId,'activeTimers','current'),old);
     const finished=await finishActiveTimer({...args,timerId:'old-rate',endAt:2800000,staleProof:null});expect(finished.session.rewardPolicyVersion).toBe('rpg-reward-v1');
     expect((await applyStudySessionReward({...args,session:{...finished.session,id:'old-rate'}})).rewards.gold).toBe(30);
@@ -422,7 +423,7 @@ describe('v2.9.10 Tower snapshot transactions',()=>{
   await seedDoc(appPath(appFamilyId,'rpgTowerProgress','current'),{currentFloor:floor,highestFloor:floor-1});
   const args={db:userDb(),familyId:appFamilyId,battleId};
   const result=await startTowerBattle(args);
-  expect(result.battle.towerRulesVersion).toBe(6);
+  expect(result.battle.towerRulesVersion).toBe(7);
   expect(result.battle.enemySnapshots.map(e=>[e.maxHp,e.attack])).toEqual(buildTowerEncounter({floor}).enemies.map(e=>[e.maxHp,e.attack]));
   expect((await startTowerBattle(args)).applied).toBe(false);
   const profile=(await getDoc(ref(userDb(),appPath(appFamilyId,'rpg','playerProfile')))).data();
@@ -506,3 +507,18 @@ describe('v2.9.11 companion growth real transactions', () => {
     await expect(saveCompanionGrowth({ ...args('mage'), actionId: 'during' })).rejects.toThrow('COMPANION_CHANGE_DURING_BATTLE');
   });
 });
+
+it('charges and draws once across clients while retaining owned gear and gacha materials', async () => {
+  const profilePath = appPath(appFamilyId, 'rpg', 'playerProfile');
+  await seedDoc(profilePath, { gold: 6050, ownedEquipment: { iron_sword: {} }, gacha: { alchemyItems: { alchemy_dust: 2 } } });
+  const request = { familyId: appFamilyId, ticketType: 'normal' };
+  const replay = (operation, actionId) => Promise.all(['a', 'b'].map(uid => operation({ ...request, actionId, db: userDb(uid) })));
+  const purchases = await replay(purchaseGachaTicket, 'buy-normal');
+  expect(purchases.filter(result => result.applied)).toHaveLength(1);
+  const draws = await replay(drawGacha, 'draw-normal');
+  expect(draws.filter(result => result.applied)).toHaveLength(1);
+  const saved = (await getDoc(ref(userDb(), profilePath))).data();
+  expect(saved).toMatchObject({ gold: 50, ownedEquipment: { iron_sword: {} }, gacha: { ticketBalances: { normal: 0 } } });
+  expect(saved.gacha.alchemyItems.alchemy_dust).toBeGreaterThanOrEqual(2);
+  expect(saved.gacha.recentDraws).toHaveLength(1);
+}, 15000);

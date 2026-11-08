@@ -1,8 +1,8 @@
 export const TICKET_TYPES = Object.freeze(['normal', 'silver', 'gold', 'premium']);
-export const TICKET_PRICES = Object.freeze({ normal: 120, silver: 300, gold: 600, premium: 1200 });
-export const GACHA_RATES = Object.freeze({ normal: { N: 75, R: 22, SR: 3, SSR: 0 }, silver: { N: 45, R: 40, SR: 14, SSR: 1 }, gold: { N: 15, R: 45, SR: 32, SSR: 8 }, premium: { N: 0, R: 30, SR: 50, SSR: 20 } });
+export const TICKET_PRICES = Object.freeze({ normal: 6000, silver: 12000, gold: 24000, premium: 42000 });
+export const GACHA_RATES = Object.freeze({ normal: { N: 70, R: 24, SR: 5, SSR: 1 }, silver: { N: 43, R: 40, SR: 15, SSR: 2 }, gold: { N: 15, R: 45, SR: 32, SSR: 8 }, premium: { N: 0, R: 30, SR: 50, SSR: 20 } });
 export const MEMBER_RATES = Object.freeze({ N: 0, R: 60, SR: 70, SSR: 80 });
-export const FRAGMENTS_BY_RARITY = Object.freeze({ R: 10, SR: 30, SSR: 100 });
+export const FRAGMENTS_BY_RARITY = Object.freeze({ R: 12, SR: 36, SSR: 120 });
 export const ALCHEMY_ITEMS = Object.freeze({
   alchemy_dust: { id: 'alchemy_dust', name: '錬金粉', rarity: 'N' }, hard_stone: { id: 'hard_stone', name: '硬化石', rarity: 'N' }, magic_herb: { id: 'magic_herb', name: '魔力草', rarity: 'N' }, tough_thread: { id: 'tough_thread', name: '強化糸', rarity: 'N' },
   silver_ore: { id: 'silver_ore', name: '銀鉱石', rarity: 'R' }, magic_crystal: { id: 'magic_crystal', name: '魔晶石', rarity: 'R' }, spirit_thread: { id: 'spirit_thread', name: '精霊糸', rarity: 'R' }, beast_hide: { id: 'beast_hide', name: '魔獣皮', rarity: 'R' },

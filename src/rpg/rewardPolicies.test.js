@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { calculateStudyReward, isStudySessionRewardEligible } from './rewardCalculator.js';
-import { REWARD_POLICY_VERSION, LEGACY_REWARD_POLICY_VERSION } from './rewardConfig.js';
+import { REWARD_POLICY_VERSION, PREVIOUS_REWARD_POLICY_VERSION, LEGACY_REWARD_POLICY_VERSION } from './rewardConfig.js';
 import { buildActiveTimer, buildFinishedTimerSession, buildStaleTimerInvalidSession } from '../data/activeTimerRepository.js';
 import { prepareRewardCorrection, preparePendingRewardCorrectionRetry } from '../data/rewardCorrectionRepository.js';
 import { prepareStudyRewardReversal, prepareCanonicalStudySessionReward } from '../data/rewardLedgerRepository.js';
-const policies=[[LEGACY_REWARD_POLICY_VERSION,1],[REWARD_POLICY_VERSION,100]];
+const policies=[[LEGACY_REWARD_POLICY_VERSION,1],[PREVIOUS_REWARD_POLICY_VERSION,100],[REWARD_POLICY_VERSION,150]];
 const session=(policy,seconds=3600)=>({id:'policy',recordedSeconds:seconds,rewardPolicyVersion:policy,validation:{status:'valid',reasonCodes:[]},taskSnapshot:{subjectId:'s_math',activityType:'problem_solving'}});
 const ledger=policy=>({studySessionId:'policy',rewardPolicyVersion:policy,status:'applied',rewards:calculateStudyReward(session(policy))});
 const profile=()=>({gold:10000,battleEnergy:10,materials:{iron:10},custom:{keep:true}});
@@ -32,13 +32,13 @@ describe.each(policies)('reward policy %s', (policy,rate)=>{
 });
 describe('policy rollover and old data',()=>{
   const task={id:'math',subjectId:'s_math',activityType:'problem_solving'};
-  it('captures v2 at start and retains v1 on old in-progress timers across version upgrades',()=>{
+  it('captures v3 at start and retains older policies on old in-progress timers across version upgrades',()=>{
     const timer=buildActiveTimer({task,timerId:'rollover',ownerClientId:'a',now:1000000});expect(timer.rewardPolicyVersion).toBe(REWARD_POLICY_VERSION);
-    for(const policy of [undefined,LEGACY_REWARD_POLICY_VERSION,REWARD_POLICY_VERSION]) {
+    for(const policy of [undefined,LEGACY_REWARD_POLICY_VERSION,PREVIOUS_REWARD_POLICY_VERSION,REWARD_POLICY_VERSION]) {
       const saved=JSON.parse(JSON.stringify({...timer,rewardPolicyVersion:policy}));
       const finished=buildFinishedTimerSession(saved,task,{endAt:2800000,staleProof:null});
       expect(finished.rewardPolicyVersion).toBe(policy||LEGACY_REWARD_POLICY_VERSION);expect(finished.recordedSeconds).toBe(1800);
-      expect(calculateStudyReward(finished).gold).toBe(policy===REWARD_POLICY_VERSION?3000:30);
+      expect(calculateStudyReward(finished).gold).toBe(policy===REWARD_POLICY_VERSION?4500:policy===PREVIOUS_REWARD_POLICY_VERSION?3000:30);
       const invalid=buildStaleTimerInvalidSession(saved,task,2800000);expect(invalid.rewardPolicyVersion).toBe(policy||LEGACY_REWARD_POLICY_VERSION);expect(isStudySessionRewardEligible(invalid)).toBe(false);
     }
   });

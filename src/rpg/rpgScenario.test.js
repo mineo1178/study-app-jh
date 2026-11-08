@@ -87,7 +87,7 @@ describe('RPG campaign scenario', () => {
 
     const firstBoss = winBattle({ profile, progress, enemy: BOSS_CATALOG.orc_chief, battleId: 'orc-chief', battleKind: 'boss', chapter: chapter1, bossId: 'orc_chief', updatedAt: now + 200 });
     expect(firstBoss.final.battle).toMatchObject({ status: 'won', victory: { bossClear: { firstClear: true, chapterAfter: 'chapter_2' } } });
-    expect(firstBoss.final.profile).toMatchObject({ activeBattleId: null, gold: 150, materials: { iron: 5, wisdom_scroll: 13 } });
+    expect(firstBoss.final.profile).toMatchObject({ activeBattleId: null, gold: 450, materials: { iron: 5, wisdom_scroll: 13 } });
     profile = firstBoss.final.profile;
     progress = firstBoss.final.progress;
     payloads.push(firstBoss.start.battle, firstBoss.start.ledger, firstBoss.start.profile, firstBoss.final.battle, firstBoss.final.attackLedger, firstBoss.final.victoryLedger, firstBoss.final.bossClearLedger, profile, progress);
@@ -110,7 +110,7 @@ describe('RPG campaign scenario', () => {
     profile = finalBoss.final.profile;
     progress = finalBoss.final.progress;
     payloads.push(finalBoss.start.battle, finalBoss.start.ledger, finalBoss.start.profile, finalBoss.final.battle, finalBoss.final.attackLedger, finalBoss.final.victoryLedger, finalBoss.final.bossClearLedger, profile, progress);
-    expect(finalBoss.final.battle.victory.bossClear).toMatchObject({ chapterAfter: null, firstClear: true, reward: { gold: 250, materials: { mineral: 5, logic_core: 3 } } });
+    expect(finalBoss.final.battle.victory.bossClear).toMatchObject({ chapterAfter: null, firstClear: true, reward: { gold: 750, materials: { mineral: 5, logic_core: 3 } } });
     expect(progress).toMatchObject({ currentChapterId: 'chapter_2', normalWins: 4, completedChapterIds: ['chapter_1', 'chapter_2'], campaignCompleted: true });
     expect(new Set(progress.completedChapterIds).size).toBe(progress.completedChapterIds.length);
     expect(profile.activeBattleId).toBeNull();

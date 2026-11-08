@@ -7,11 +7,11 @@ import MaterialExchangeConfirmModal from './MaterialExchangeConfirmModal.jsx';
 import { RESOURCE_SHOP_CATALOG } from '../../rpg/resourceShopCatalog.js';
 const profile={ gold: 1000, materials: { iron: 10 } };
 describe('commerce rendering', () => {
-  it('shows all three shop categories, six sale buttons, and 12 alchemy-only labels without 0 GOLD prices', () => {
+  it('shows all three shop categories, six sale buttons, and 16 alchemy-only labels without 0 GOLD prices', () => {
     const html=renderToStaticMarkup(<RpgShop profile={profile}/>);
     expect(html).toContain('学習素材'); expect(html).toContain('錬金素材');
     expect((html.match(/>購入する</g)||[])).toHaveLength(6);
-    expect((html.match(/>錬金専用</g)||[])).toHaveLength(12);
+    expect((html.match(/>錬金専用</g)||[])).toHaveLength(16);
     expect(html).not.toMatch(/>0 GOLD</);
   });
   it('shows three exchange categories and disables an unselected recipe', () => {

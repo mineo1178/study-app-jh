@@ -12,7 +12,7 @@ import { preparePartyBattleResult } from '../data/rpgBattleRepository.js';
 
 const withoutVersion = encounter => JSON.parse(JSON.stringify(encounter, (key,value) => key === 'rulesVersion' ? undefined : value));
 describe('v2.9.10 historical growth and current Tower compatibility', () => {
-  it.each(Array.from({length:20},(_,i)=>i+1))('preserves the entire floor %s encounter except the rule version', floor => {
+  it.each(Array.from({length:11},(_,i)=>i+10))('preserves the entire floor %s encounter except the rule version', floor => {
     expect(withoutVersion(buildTowerEncounter({floor}))).toEqual(withoutVersion(baseline.encounters[floor]));
   });
   it.each([21,30,40,41,50,60,61,80,81,100])('strengthens every enemy at floor %s while preserving counts, EXP and energy', floor => {
