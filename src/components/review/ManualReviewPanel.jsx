@@ -6,7 +6,7 @@ const subject = (session) => session.taskSnapshot?.subjectId || session.subjectI
 
 export default function ManualReviewPanel({ queue, profile, studySessions = [], ledgersBySessionId = {}, busySessionIds = {}, message = null, onOpenCorrection, onRetry, onOpenTimeReview, subjectLabel }) {
   const { pendingReviewSessions, pendingCorrectionSessionIds } = queue;
-  return <div className="space-y-6 animate-in fade-in duration-300">
+  return <div className="jh-history-review space-y-6 animate-in fade-in duration-300">
     {message && <p className="rounded-2xl bg-amber-50 p-4 text-sm font-bold text-amber-800">{message}</p>}
     <section className="rounded-[2rem] border border-amber-100 bg-amber-50/70 p-5 sm:p-7">
       <div className="flex items-center gap-3"><AlertTriangle className="text-amber-600"/><div><h2 className="font-black text-slate-800">要確認の学習記録</h2><p className="text-xs font-bold text-slate-500">学習した時間を確認して、記録を確定してください。</p></div></div>
@@ -20,7 +20,7 @@ export default function ManualReviewPanel({ queue, profile, studySessions = [], 
             <button type="button" disabled={Boolean(busySessionIds[session.id])} onClick={() => onOpenTimeReview(session)} className="mt-4 min-h-11 w-full rounded-xl bg-amber-600 py-3 text-sm font-black text-white disabled:opacity-50">学習時間を確認</button>
           </div>
           : <div key={session.id} className="rounded-2xl bg-white p-4 shadow-sm">
-          <div className="flex flex-wrap items-start justify-between gap-3"><div><div className="text-sm font-black text-slate-800">{taskTitle(session)}</div><div className="mt-1 text-xs font-bold text-slate-500">{session.date || '日付不明'} / {subject(session)} / {session.taskSnapshot?.activityType || 'other'} / {formatHms(session.recordedSeconds)}</div></div><span className="rounded-full bg-amber-100 px-2 py-1 text-[10px] font-black text-amber-700">pending_review</span></div>
+          <div className="flex flex-wrap items-start justify-between gap-3"><div><div className="text-sm font-black text-slate-800">{taskTitle(session)}</div><div className="mt-1 text-xs font-bold text-slate-500">{session.date || '日付不明'} / {subject(session)} / {session.taskSnapshot?.activityType || 'other'} / {formatHms(session.recordedSeconds)}</div></div><span className="rounded-full bg-amber-100 px-2 py-1 text-[10px] font-black text-amber-700">要確認</span></div>
           <div className="mt-3 text-xs font-bold text-slate-600">理由: {(session.validation?.reasonCodes || []).join(', ') || 'なし'}</div>
           <details className="mt-3 rounded-xl bg-slate-50 p-3 text-xs text-slate-600"><summary className="cursor-pointer font-black">監査情報を表示</summary><pre className="mt-2 overflow-x-auto whitespace-pre-wrap">{JSON.stringify({ segments: session.segments || [], legacySource: session.legacySource || null, migrationReview: session.migrationReview || null, manualReview: session.manualReview || null }, null, 2)}</pre></details>
           <button type="button" disabled={Boolean(busySessionIds[session.id])} onClick={() => onOpenCorrection(session, 'valid')} className="mt-4 w-full rounded-xl bg-amber-600 py-3 text-sm font-black text-white disabled:opacity-50">確認して確定</button>

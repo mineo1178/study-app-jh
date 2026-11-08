@@ -1,0 +1,100 @@
+name: RPG balance v2.9.13 review
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+permissions:
+  contents: read
+concurrency:
+  group: rpg-balance-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  quality:
+    if: github.event.pull_request.number == 3 && github.head_ref == 'codex/rpg-balance-v2913'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.11.1'
+          cache: npm
+      - run: npm ci
+      - name: Vitest (all 1470 tests)
+        run: |
+          npm test -- --reporter=default --reporter=json --outputFile=vitest-results.json
+          node -e "const r=require('./vitest-results.json'); if(r.numPassedTests!==1470 || r.numFailedTests || r.numPendingTests) process.exit(1)"
+      - run: npm run lint
+      - run: npm run build
+      - name: Diff check against PR base
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: git diff --check "$BASE_SHA" HEAD
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: rpg-v2913-vitest
+          path: vitest-results.json
+          if-no-files-found: warn
+  firestore-rules:
+    if: github.event.pull_request.number == 3 && github.head_ref == 'codex/rpg-balance-v2913'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      NO_COLOR: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.11.1'
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - run: npm ci
+      - name: Rules (71 tests, fresh isolated demo Emulator)
+        shell: bash
+        run: |
+          set -o pipefail
+          java -version
+          npm run test:rules 2>&1 | tee rules-results.log
+          grep -E 'Tests[[:space:]]+71 passed' rules-results.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: rpg-v2913-rules
+          path: |
+            rules-results.log
+            firestore-debug.log
+          if-no-files-found: warn
+  measurements:
+    if: github.event.pull_request.number == 3 && github.head_ref == 'codex/rpg-balance-v2913'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.11.1'
+          cache: npm
+      - run: npm ci
+      - name: Verify archived bytes, regenerate all original conditions, and investigate Tower 40
+        run: |
+          node scripts/checkBalanceData.js
+          node scripts/measureEnemyBalance.js --verify-after
+          node scripts/summarizeEnemyBalance.js
+          node scripts/investigateTower40.js
+          node scripts/checkBalanceData.js
+          git diff --exit-code -- docs/rpg-v2.9.13-data-manifest.json 'docs/rpg-v2.9.13-*.json.gz'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rpg-v2913-measurements
+          compression-level: 0
+          path: |
+            docs/rpg-v2.9.13-*.json.gz
+            docs/rpg-v2.9.13-data-manifest.json
+            docs/rpg-v2.9.13*verification.md
+            docs/rpg-v2.9.13-review-response.md

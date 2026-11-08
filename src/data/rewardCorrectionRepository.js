@@ -235,7 +235,13 @@ export async function retryPendingRewardCorrection({ db, familyId, sessionId, re
     if (!pending?.adjustmentId) throw correctionFailure('PENDING_CORRECTION_INVALID');
     const adjustmentReference = rewardAdjustmentLedgerRef(db, familyId, pending.adjustmentId);
     const adjustmentSnap = await transaction.get(adjustmentReference);
-    if (!adjustmentSnap.exists() || adjustmentSnap.data().status !== 'pending') throw correctionFailure('PENDING_CORRECTION_INVALID');
+    if (!adjustmentSnap.exists() || adjustmentSnap.data().status !== 'pending') {
+      // A concurrent retry may have resolved the ledger after our first read.
+      // Re-reading lets the SDK detect that version change and retry; genuine
+      // inconsistent records still fail with the original business error.
+      await transaction.get(ledgerReference);
+      throw correctionFailure('PENDING_CORRECTION_INVALID');
+    }
     const change = preparePendingRewardCorrectionRetry({ sessionId, ledger, adjustment: adjustmentSnap.data(), profile: profileSnap.exists() ? profileSnap.data() : {}, integrity: integritySnap.exists() ? integritySnap.data() : {}, reviewerUid: reviewerId, now });
     if (!change.applied) return change;
     transaction.set(profileReference, change.profile);

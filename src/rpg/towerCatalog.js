@@ -1,7 +1,7 @@
 import { ENEMY_CATALOG } from './enemyCatalog.js';
 import { BOSS_CATALOG } from './bossCatalog.js';
 
-export const TOWER_RULES_VERSION = 5;
+export const TOWER_RULES_VERSION = 6;
 export const TOWER_BOSS_INTERVAL = 10;
 const number = (value) => Math.max(0, Number(value) || 0);
 export const isTowerBossFloor = (floor) => Number.isInteger(Number(floor)) && Number(floor) > 0 && Number(floor) % TOWER_BOSS_INTERVAL === 0;
@@ -26,6 +26,8 @@ export function buildTowerEnemy({ floor, baseEnemy }) {
   const baseAttack = bossBase ? Math.max(10, base.attack) : base.attack + 4;
   const normalHpRelief = !bossBase && safeFloor > 3 ? 0.96 : 1;
   const normalAttackRelief = !bossBase && safeFloor > 3 ? 0.95 : 1;
+  // Add pressure only in the easy middle floors; preserve floors 1-20 and 60+.
+  const midFloorGrowth = Math.max(0, 1 - Math.abs(safeFloor - 40) / 20);
   const expMultiplier = 1 + tier * 0.15;
   return {
     id: `tower-${boss ? 'boss' : 'normal'}-${safeFloor}-${base.id}`,
@@ -33,8 +35,8 @@ export function buildTowerEnemy({ floor, baseEnemy }) {
     element: base.element,
     weaknesses: [...(base.weaknesses || [])],
     resistances: [...(base.resistances || [])],
-    maxHp: scaled(baseHp, hpMultiplier * normalHpRelief * (1 + 0.4 * highFloorGrowth)),
-    attack: scaled(baseAttack, attackMultiplier * (bossBase ? 0.70 : normalAttackRelief) * (1 + 0.2 * highFloorGrowth)),
+    maxHp: scaled(baseHp, hpMultiplier * normalHpRelief * (1 + 0.4 * highFloorGrowth) * (1 + 0.2 * midFloorGrowth)),
+    attack: scaled(baseAttack, attackMultiplier * (bossBase ? 0.70 : normalAttackRelief) * (1 + 0.2 * highFloorGrowth) * (1 + 0.08 * midFloorGrowth)),
     expReward: scaled(base.expReward, expMultiplier),
     energyCost: boss ? 3 : 1,
     actionPattern: [...(base.actionPattern || [])],

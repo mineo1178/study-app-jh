@@ -14,7 +14,7 @@ export default function StudyAnalytics({ sessions, now, ready, studyGoals, subje
   const data = useMemo(() => deriveStudyAnalytics(index,now,period,studyGoals),[index,now,period,studyGoals]);
   const guidance = useMemo(() => deriveStudyGuidance(index,data,studyGoals,subjectDefinitions),[index,data,studyGoals,subjectDefinitions]);
   const maxWeek = Math.max(1,...(data.weeks || []).map(week => week.seconds));
-  return <section aria-label="学習分析" className="mx-auto max-w-3xl min-w-0 space-y-4 text-left">
+  return <section aria-label="学習分析" className="jh-report mx-auto max-w-5xl min-w-0 space-y-4 text-left">
     <header className={card}><h1 className="text-xl font-black">学習分析</h1><p className="mt-2 text-sm text-slate-500">確定した有効な学習記録から、数週間の学習時間と日数を確認できます。</p><button type="button" className={`${button} mt-3`} onClick={onBack}>ダッシュボードへ戻る</button></header>
     {data.status === 'loading' ? <div role="status" className={card}>学習記録を読み込み中です…</div> : <>
       <div className={card}><h2 className="text-lg font-black">次の一歩</h2><p className="mt-2 text-xs text-slate-500">目標までの残りと、確定した学習記録から見えるヒントです。</p>{guidance.length ? <ul className="mt-3 space-y-3">{guidance.map(item => <li key={item.id} className="min-w-0 rounded-xl bg-slate-50 p-3"><p className="break-words text-sm font-bold [overflow-wrap:anywhere]">{item.title}</p>{item.tab && onNavigate && <button type="button" className={`${button} mt-2 max-w-full`} onClick={() => onNavigate(item.tab)}>{item.tab === 'daily' ? 'ダッシュボードで確認' : '週間レポートで確認'}</button>}</li>)}</ul> : <p className="mt-3 text-sm">今は追加のヒントはありません。目標や学習記録が更新されると、ここに表示されます。</p>}</div>

@@ -41,7 +41,7 @@ function GrowthEditor({ profile, memberId, onSave, locked, onPendingChange }) {
     } catch (error) { setMessage(errors[error.code || error.message] || '保存に失敗しました。同じ操作を再送できます。'); }
     finally { saving.current = false; setPending(false); onPendingChange?.(false); }
   };
-  return <section className="min-w-0 space-y-4 rounded-2xl border-2 border-violet-300 bg-white p-3 sm:p-5" aria-label={member.name + 'の個別育成'}>
+  return <section className="jh-companion-growth min-w-0 space-y-4 rounded-2xl border-2 border-violet-300 bg-white p-3 sm:p-5" aria-label={member.name + 'の個別育成'}>
     <h2 ref={heading} tabIndex={-1} className="text-xl font-black">{member.name}の個別育成</h2><p>{member.element || (memberId === 'mage' ? '火' : memberId === 'healer' ? '水' : '地')}属性 ・ {member.rarity || '通常仲間'}</p><p className="font-bold">得意分野：{definition.specialty}</p>
     <p className="text-sm">各仲間が独立してLv−1、最大20pt・20SPを獲得します。能力はHP+3／MP+2／攻撃+1／防御+1。主人公のポイント・SPは使いません。</p>
     <p className="font-bold" aria-live="polite">能力：残り{state.remaining}pt ／ {state.earned}pt SP：残り{state.remainingSp}SP ／ {state.earned}SP</p>

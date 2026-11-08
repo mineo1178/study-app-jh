@@ -22,3 +22,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Reproducible RPG reports are tracked as gzip with SHA256 manifests.
+/docs/rpg-v2.9.13-comparison.json
+/docs/rpg-v2.9.13-summary.json
+/docs/rpg-v2.9.13-tower40-investigation.json
+/vitest-results.json

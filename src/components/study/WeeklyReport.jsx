@@ -20,7 +20,7 @@ export default function WeeklyReport({ sessions, now, ready, subjectDefinitions,
     { key: 'subjectCount', name: '教科数', format: value => `${value}教科`, difference: value => `${signed(value)}教科` },
     { key: 'count', name: '記録数', format: value => `${value}回`, difference: value => `${signed(value)}回` },
   ];
-  return <section aria-label="週間レポート" className="min-w-0 space-y-4 text-left">
+  return <section aria-label="週間レポート" className="jh-report min-w-0 space-y-4 text-left">
     <header className={card}>
       <h1 className="text-xl font-black text-slate-800">週間レポート</h1>
       <p className="mt-2 text-sm leading-relaxed text-slate-500">学習時間や教科のバランスを振り返れます。先週との違いも確認して、次の1週間に活かしましょう。確定した有効な学習記録を表示します。</p>

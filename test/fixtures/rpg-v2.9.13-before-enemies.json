@@ -1,0 +1,6672 @@
+[
+  {
+    "id": "tower-1",
+    "floor": 1,
+    "encounter": {
+      "floor": 1,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 20,
+      "enemies": [
+        {
+          "id": "tower-normal-1-slime",
+          "name": "塔のスライム",
+          "element": "water",
+          "weaknesses": [
+            "fire"
+          ],
+          "resistances": [
+            "water"
+          ],
+          "maxHp": 30,
+          "attack": 7,
+          "expReward": 20,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 1,
+            "tier": 0,
+            "boss": false
+          },
+          "enemyId": "slime",
+          "enemyInstanceId": "tower-1-e1-slime"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-2",
+    "floor": 2,
+    "encounter": {
+      "floor": 2,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 35,
+      "enemies": [
+        {
+          "id": "tower-normal-2-goblin",
+          "name": "塔のゴブリン",
+          "element": "fire",
+          "weaknesses": [
+            "lightning"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 41,
+          "attack": 9,
+          "expReward": 35,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 2,
+            "tier": 0,
+            "boss": false
+          },
+          "enemyId": "goblin",
+          "enemyInstanceId": "tower-2-e1-goblin"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-3",
+    "floor": 3,
+    "encounter": {
+      "floor": 3,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 70,
+      "enemies": [
+        {
+          "id": "tower-normal-3-stone_golem",
+          "name": "塔のストーンゴーレム",
+          "element": "earth",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "lightning"
+          ],
+          "maxHp": 64,
+          "attack": 12,
+          "expReward": 70,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 3,
+            "tier": 0,
+            "boss": false
+          },
+          "enemyId": "stone_golem",
+          "enemyInstanceId": "tower-3-e1-stone_golem"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-4",
+    "floor": 4,
+    "encounter": {
+      "floor": 4,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 55,
+      "enemies": [
+        {
+          "id": "tower-normal-4-slime",
+          "name": "塔のスライム",
+          "element": "water",
+          "weaknesses": [
+            "fire"
+          ],
+          "resistances": [
+            "water"
+          ],
+          "maxHp": 34,
+          "attack": 8,
+          "expReward": 20,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 4,
+            "tier": 0,
+            "boss": false
+          },
+          "enemyId": "slime",
+          "enemyInstanceId": "tower-4-e1-slime"
+        },
+        {
+          "id": "tower-normal-4-goblin",
+          "name": "塔のゴブリン",
+          "element": "fire",
+          "weaknesses": [
+            "lightning"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 44,
+          "attack": 10,
+          "expReward": 35,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 4,
+            "tier": 0,
+            "boss": false
+          },
+          "enemyId": "goblin",
+          "enemyInstanceId": "tower-4-e2-goblin"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-5",
+    "floor": 5,
+    "encounter": {
+      "floor": 5,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 105,
+      "enemies": [
+        {
+          "id": "tower-normal-5-goblin",
+          "name": "塔のゴブリン",
+          "element": "fire",
+          "weaknesses": [
+            "lightning"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 46,
+          "attack": 10,
+          "expReward": 35,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 5,
+            "tier": 0,
+            "boss": false
+          },
+          "enemyId": "goblin",
+          "enemyInstanceId": "tower-5-e1-goblin"
+        },
+        {
+          "id": "tower-normal-5-stone_golem",
+          "name": "塔のストーンゴーレム",
+          "element": "earth",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "lightning"
+          ],
+          "maxHp": 68,
+          "attack": 12,
+          "expReward": 70,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 5,
+            "tier": 0,
+            "boss": false
+          },
+          "enemyId": "stone_golem",
+          "enemyInstanceId": "tower-5-e2-stone_golem"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-6",
+    "floor": 6,
+    "encounter": {
+      "floor": 6,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 90,
+      "enemies": [
+        {
+          "id": "tower-normal-6-stone_golem",
+          "name": "塔のストーンゴーレム",
+          "element": "earth",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "lightning"
+          ],
+          "maxHp": 71,
+          "attack": 13,
+          "expReward": 70,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 6,
+            "tier": 0,
+            "boss": false
+          },
+          "enemyId": "stone_golem",
+          "enemyInstanceId": "tower-6-e1-stone_golem"
+        },
+        {
+          "id": "tower-normal-6-slime",
+          "name": "塔のスライム",
+          "element": "water",
+          "weaknesses": [
+            "fire"
+          ],
+          "resistances": [
+            "water"
+          ],
+          "maxHp": 37,
+          "attack": 8,
+          "expReward": 20,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 6,
+            "tier": 0,
+            "boss": false
+          },
+          "enemyId": "slime",
+          "enemyInstanceId": "tower-6-e2-slime"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-7",
+    "floor": 7,
+    "encounter": {
+      "floor": 7,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 125,
+      "enemies": [
+        {
+          "id": "tower-normal-7-slime",
+          "name": "塔のスライム",
+          "element": "water",
+          "weaknesses": [
+            "fire"
+          ],
+          "resistances": [
+            "water"
+          ],
+          "maxHp": 39,
+          "attack": 8,
+          "expReward": 20,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 7,
+            "tier": 0,
+            "boss": false
+          },
+          "enemyId": "slime",
+          "enemyInstanceId": "tower-7-e1-slime"
+        },
+        {
+          "id": "tower-normal-7-goblin",
+          "name": "塔のゴブリン",
+          "element": "fire",
+          "weaknesses": [
+            "lightning"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 51,
+          "attack": 11,
+          "expReward": 35,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 7,
+            "tier": 0,
+            "boss": false
+          },
+          "enemyId": "goblin",
+          "enemyInstanceId": "tower-7-e2-goblin"
+        },
+        {
+          "id": "tower-normal-7-stone_golem",
+          "name": "塔のストーンゴーレム",
+          "element": "earth",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "lightning"
+          ],
+          "maxHp": 74,
+          "attack": 13,
+          "expReward": 70,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 7,
+            "tier": 0,
+            "boss": false
+          },
+          "enemyId": "stone_golem",
+          "enemyInstanceId": "tower-7-e3-stone_golem"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-8",
+    "floor": 8,
+    "encounter": {
+      "floor": 8,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 125,
+      "enemies": [
+        {
+          "id": "tower-normal-8-goblin",
+          "name": "塔のゴブリン",
+          "element": "fire",
+          "weaknesses": [
+            "lightning"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 53,
+          "attack": 11,
+          "expReward": 35,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 8,
+            "tier": 0,
+            "boss": false
+          },
+          "enemyId": "goblin",
+          "enemyInstanceId": "tower-8-e1-goblin"
+        },
+        {
+          "id": "tower-normal-8-stone_golem",
+          "name": "塔のストーンゴーレム",
+          "element": "earth",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "lightning"
+          ],
+          "maxHp": 78,
+          "attack": 14,
+          "expReward": 70,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 8,
+            "tier": 0,
+            "boss": false
+          },
+          "enemyId": "stone_golem",
+          "enemyInstanceId": "tower-8-e2-stone_golem"
+        },
+        {
+          "id": "tower-normal-8-slime",
+          "name": "塔のスライム",
+          "element": "water",
+          "weaknesses": [
+            "fire"
+          ],
+          "resistances": [
+            "water"
+          ],
+          "maxHp": 41,
+          "attack": 9,
+          "expReward": 20,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 8,
+            "tier": 0,
+            "boss": false
+          },
+          "enemyId": "slime",
+          "enemyInstanceId": "tower-8-e3-slime"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-9",
+    "floor": 9,
+    "encounter": {
+      "floor": 9,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 125,
+      "enemies": [
+        {
+          "id": "tower-normal-9-stone_golem",
+          "name": "塔のストーンゴーレム",
+          "element": "earth",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "lightning"
+          ],
+          "maxHp": 81,
+          "attack": 14,
+          "expReward": 70,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 9,
+            "tier": 0,
+            "boss": false
+          },
+          "enemyId": "stone_golem",
+          "enemyInstanceId": "tower-9-e1-stone_golem"
+        },
+        {
+          "id": "tower-normal-9-slime",
+          "name": "塔のスライム",
+          "element": "water",
+          "weaknesses": [
+            "fire"
+          ],
+          "resistances": [
+            "water"
+          ],
+          "maxHp": 43,
+          "attack": 9,
+          "expReward": 20,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 9,
+            "tier": 0,
+            "boss": false
+          },
+          "enemyId": "slime",
+          "enemyInstanceId": "tower-9-e2-slime"
+        },
+        {
+          "id": "tower-normal-9-goblin",
+          "name": "塔のゴブリン",
+          "element": "fire",
+          "weaknesses": [
+            "lightning"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 55,
+          "attack": 12,
+          "expReward": 35,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 9,
+            "tier": 0,
+            "boss": false
+          },
+          "enemyId": "goblin",
+          "enemyInstanceId": "tower-9-e3-goblin"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-10",
+    "floor": 10,
+    "encounter": {
+      "floor": 10,
+      "rulesVersion": 5,
+      "energyCost": 3,
+      "expReward": 155,
+      "enemies": [
+        {
+          "id": "tower-boss-10-orc_chief",
+          "name": "塔のオークチーフ",
+          "element": "fire",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 74,
+          "attack": 10,
+          "expReward": 120,
+          "energyCost": 3,
+          "actionPattern": [
+            "normal_attack",
+            "normal_attack",
+            "orc_heavy_strike"
+          ],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 10,
+            "tier": 0,
+            "boss": true
+          },
+          "enemyId": "orc_chief",
+          "enemyInstanceId": "tower-10-e1-orc_chief"
+        },
+        {
+          "id": "tower-boss-10-goblin",
+          "name": "塔のゴブリン",
+          "element": "fire",
+          "weaknesses": [
+            "lightning"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 58,
+          "attack": 12,
+          "expReward": 35,
+          "energyCost": 3,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 10,
+            "tier": 0,
+            "boss": true
+          },
+          "enemyId": "goblin",
+          "enemyInstanceId": "tower-10-e2-goblin"
+        }
+      ],
+      "boss": true
+    }
+  },
+  {
+    "id": "tower-11",
+    "floor": 11,
+    "encounter": {
+      "floor": 11,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 40,
+      "enemies": [
+        {
+          "id": "tower-normal-11-goblin",
+          "name": "塔のゴブリン",
+          "element": "fire",
+          "weaknesses": [
+            "lightning"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 61,
+          "attack": 13,
+          "expReward": 40,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 11,
+            "tier": 1,
+            "boss": false
+          },
+          "enemyId": "goblin",
+          "enemyInstanceId": "tower-11-e1-goblin"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-12",
+    "floor": 12,
+    "encounter": {
+      "floor": 12,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 81,
+      "enemies": [
+        {
+          "id": "tower-normal-12-stone_golem",
+          "name": "塔のストーンゴーレム",
+          "element": "earth",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "lightning"
+          ],
+          "maxHp": 92,
+          "attack": 16,
+          "expReward": 81,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 12,
+            "tier": 1,
+            "boss": false
+          },
+          "enemyId": "stone_golem",
+          "enemyInstanceId": "tower-12-e1-stone_golem"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-13",
+    "floor": 13,
+    "encounter": {
+      "floor": 13,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 23,
+      "enemies": [
+        {
+          "id": "tower-normal-13-slime",
+          "name": "塔のスライム",
+          "element": "water",
+          "weaknesses": [
+            "fire"
+          ],
+          "resistances": [
+            "water"
+          ],
+          "maxHp": 50,
+          "attack": 10,
+          "expReward": 23,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 13,
+            "tier": 1,
+            "boss": false
+          },
+          "enemyId": "slime",
+          "enemyInstanceId": "tower-13-e1-slime"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-14",
+    "floor": 14,
+    "encounter": {
+      "floor": 14,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 121,
+      "enemies": [
+        {
+          "id": "tower-normal-14-goblin",
+          "name": "塔のゴブリン",
+          "element": "fire",
+          "weaknesses": [
+            "lightning"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 68,
+          "attack": 14,
+          "expReward": 40,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 14,
+            "tier": 1,
+            "boss": false
+          },
+          "enemyId": "goblin",
+          "enemyInstanceId": "tower-14-e1-goblin"
+        },
+        {
+          "id": "tower-normal-14-stone_golem",
+          "name": "塔のストーンゴーレム",
+          "element": "earth",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "lightning"
+          ],
+          "maxHp": 99,
+          "attack": 17,
+          "expReward": 81,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 14,
+            "tier": 1,
+            "boss": false
+          },
+          "enemyId": "stone_golem",
+          "enemyInstanceId": "tower-14-e2-stone_golem"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-15",
+    "floor": 15,
+    "encounter": {
+      "floor": 15,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 104,
+      "enemies": [
+        {
+          "id": "tower-normal-15-stone_golem",
+          "name": "塔のストーンゴーレム",
+          "element": "earth",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "lightning"
+          ],
+          "maxHp": 102,
+          "attack": 17,
+          "expReward": 81,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 15,
+            "tier": 1,
+            "boss": false
+          },
+          "enemyId": "stone_golem",
+          "enemyInstanceId": "tower-15-e1-stone_golem"
+        },
+        {
+          "id": "tower-normal-15-slime",
+          "name": "塔のスライム",
+          "element": "water",
+          "weaknesses": [
+            "fire"
+          ],
+          "resistances": [
+            "water"
+          ],
+          "maxHp": 54,
+          "attack": 11,
+          "expReward": 23,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 15,
+            "tier": 1,
+            "boss": false
+          },
+          "enemyId": "slime",
+          "enemyInstanceId": "tower-15-e2-slime"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-16",
+    "floor": 16,
+    "encounter": {
+      "floor": 16,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 63,
+      "enemies": [
+        {
+          "id": "tower-normal-16-slime",
+          "name": "塔のスライム",
+          "element": "water",
+          "weaknesses": [
+            "fire"
+          ],
+          "resistances": [
+            "water"
+          ],
+          "maxHp": 55,
+          "attack": 11,
+          "expReward": 23,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 16,
+            "tier": 1,
+            "boss": false
+          },
+          "enemyId": "slime",
+          "enemyInstanceId": "tower-16-e1-slime"
+        },
+        {
+          "id": "tower-normal-16-goblin",
+          "name": "塔のゴブリン",
+          "element": "fire",
+          "weaknesses": [
+            "lightning"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 72,
+          "attack": 14,
+          "expReward": 40,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 16,
+            "tier": 1,
+            "boss": false
+          },
+          "enemyId": "goblin",
+          "enemyInstanceId": "tower-16-e2-goblin"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-17",
+    "floor": 17,
+    "encounter": {
+      "floor": 17,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 144,
+      "enemies": [
+        {
+          "id": "tower-normal-17-goblin",
+          "name": "塔のゴブリン",
+          "element": "fire",
+          "weaknesses": [
+            "lightning"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 74,
+          "attack": 15,
+          "expReward": 40,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 17,
+            "tier": 1,
+            "boss": false
+          },
+          "enemyId": "goblin",
+          "enemyInstanceId": "tower-17-e1-goblin"
+        },
+        {
+          "id": "tower-normal-17-stone_golem",
+          "name": "塔のストーンゴーレム",
+          "element": "earth",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "lightning"
+          ],
+          "maxHp": 109,
+          "attack": 18,
+          "expReward": 81,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 17,
+            "tier": 1,
+            "boss": false
+          },
+          "enemyId": "stone_golem",
+          "enemyInstanceId": "tower-17-e2-stone_golem"
+        },
+        {
+          "id": "tower-normal-17-slime",
+          "name": "塔のスライム",
+          "element": "water",
+          "weaknesses": [
+            "fire"
+          ],
+          "resistances": [
+            "water"
+          ],
+          "maxHp": 57,
+          "attack": 12,
+          "expReward": 23,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 17,
+            "tier": 1,
+            "boss": false
+          },
+          "enemyId": "slime",
+          "enemyInstanceId": "tower-17-e3-slime"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-18",
+    "floor": 18,
+    "encounter": {
+      "floor": 18,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 144,
+      "enemies": [
+        {
+          "id": "tower-normal-18-stone_golem",
+          "name": "塔のストーンゴーレム",
+          "element": "earth",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "lightning"
+          ],
+          "maxHp": 112,
+          "attack": 19,
+          "expReward": 81,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 18,
+            "tier": 1,
+            "boss": false
+          },
+          "enemyId": "stone_golem",
+          "enemyInstanceId": "tower-18-e1-stone_golem"
+        },
+        {
+          "id": "tower-normal-18-slime",
+          "name": "塔のスライム",
+          "element": "water",
+          "weaknesses": [
+            "fire"
+          ],
+          "resistances": [
+            "water"
+          ],
+          "maxHp": 59,
+          "attack": 12,
+          "expReward": 23,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 18,
+            "tier": 1,
+            "boss": false
+          },
+          "enemyId": "slime",
+          "enemyInstanceId": "tower-18-e2-slime"
+        },
+        {
+          "id": "tower-normal-18-goblin",
+          "name": "塔のゴブリン",
+          "element": "fire",
+          "weaknesses": [
+            "lightning"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 77,
+          "attack": 15,
+          "expReward": 40,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 18,
+            "tier": 1,
+            "boss": false
+          },
+          "enemyId": "goblin",
+          "enemyInstanceId": "tower-18-e3-goblin"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-19",
+    "floor": 19,
+    "encounter": {
+      "floor": 19,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 144,
+      "enemies": [
+        {
+          "id": "tower-normal-19-slime",
+          "name": "塔のスライム",
+          "element": "water",
+          "weaknesses": [
+            "fire"
+          ],
+          "resistances": [
+            "water"
+          ],
+          "maxHp": 61,
+          "attack": 12,
+          "expReward": 23,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 19,
+            "tier": 1,
+            "boss": false
+          },
+          "enemyId": "slime",
+          "enemyInstanceId": "tower-19-e1-slime"
+        },
+        {
+          "id": "tower-normal-19-goblin",
+          "name": "塔のゴブリン",
+          "element": "fire",
+          "weaknesses": [
+            "lightning"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 79,
+          "attack": 16,
+          "expReward": 40,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 19,
+            "tier": 1,
+            "boss": false
+          },
+          "enemyId": "goblin",
+          "enemyInstanceId": "tower-19-e2-goblin"
+        },
+        {
+          "id": "tower-normal-19-stone_golem",
+          "name": "塔のストーンゴーレム",
+          "element": "earth",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "lightning"
+          ],
+          "maxHp": 115,
+          "attack": 19,
+          "expReward": 81,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 19,
+            "tier": 1,
+            "boss": false
+          },
+          "enemyId": "stone_golem",
+          "enemyInstanceId": "tower-19-e3-stone_golem"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-20",
+    "floor": 20,
+    "encounter": {
+      "floor": 20,
+      "rulesVersion": 5,
+      "energyCost": 3,
+      "expReward": 311,
+      "enemies": [
+        {
+          "id": "tower-boss-20-ancient_golem",
+          "name": "塔のエンシェントゴーレム",
+          "element": "earth",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "lightning"
+          ],
+          "maxHp": 144,
+          "attack": 13,
+          "expReward": 207,
+          "energyCost": 3,
+          "actionPattern": [
+            "normal_attack",
+            "golem_rock_crush",
+            "normal_attack",
+            "golem_earthquake"
+          ],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 20,
+            "tier": 1,
+            "boss": true
+          },
+          "enemyId": "ancient_golem",
+          "enemyInstanceId": "tower-20-e1-ancient_golem"
+        },
+        {
+          "id": "tower-boss-20-stone_golem",
+          "name": "塔のストーンゴーレム",
+          "element": "earth",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "lightning"
+          ],
+          "maxHp": 118,
+          "attack": 20,
+          "expReward": 81,
+          "energyCost": 3,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 20,
+            "tier": 1,
+            "boss": true
+          },
+          "enemyId": "stone_golem",
+          "enemyInstanceId": "tower-20-e2-stone_golem"
+        },
+        {
+          "id": "tower-boss-20-slime",
+          "name": "塔のスライム",
+          "element": "water",
+          "weaknesses": [
+            "fire"
+          ],
+          "resistances": [
+            "water"
+          ],
+          "maxHp": 62,
+          "attack": 12,
+          "expReward": 23,
+          "energyCost": 3,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 20,
+            "tier": 1,
+            "boss": true
+          },
+          "enemyId": "slime",
+          "enemyInstanceId": "tower-20-e3-slime"
+        }
+      ],
+      "boss": true
+    }
+  },
+  {
+    "id": "tower-21",
+    "floor": 21,
+    "encounter": {
+      "floor": 21,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 91,
+      "enemies": [
+        {
+          "id": "tower-normal-21-stone_golem",
+          "name": "塔のストーンゴーレム",
+          "element": "earth",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "lightning"
+          ],
+          "maxHp": 126,
+          "attack": 21,
+          "expReward": 91,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 21,
+            "tier": 2,
+            "boss": false
+          },
+          "enemyId": "stone_golem",
+          "enemyInstanceId": "tower-21-e1-stone_golem"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-22",
+    "floor": 22,
+    "encounter": {
+      "floor": 22,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 26,
+      "enemies": [
+        {
+          "id": "tower-normal-22-slime",
+          "name": "塔のスライム",
+          "element": "water",
+          "weaknesses": [
+            "fire"
+          ],
+          "resistances": [
+            "water"
+          ],
+          "maxHp": 68,
+          "attack": 13,
+          "expReward": 26,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 22,
+            "tier": 2,
+            "boss": false
+          },
+          "enemyId": "slime",
+          "enemyInstanceId": "tower-22-e1-slime"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-23",
+    "floor": 23,
+    "encounter": {
+      "floor": 23,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 46,
+      "enemies": [
+        {
+          "id": "tower-normal-23-goblin",
+          "name": "塔のゴブリン",
+          "element": "fire",
+          "weaknesses": [
+            "lightning"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 91,
+          "attack": 18,
+          "expReward": 46,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 23,
+            "tier": 2,
+            "boss": false
+          },
+          "enemyId": "goblin",
+          "enemyInstanceId": "tower-23-e1-goblin"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-24",
+    "floor": 24,
+    "encounter": {
+      "floor": 24,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 117,
+      "enemies": [
+        {
+          "id": "tower-normal-24-stone_golem",
+          "name": "塔のストーンゴーレム",
+          "element": "earth",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "lightning"
+          ],
+          "maxHp": 136,
+          "attack": 22,
+          "expReward": 91,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 24,
+            "tier": 2,
+            "boss": false
+          },
+          "enemyId": "stone_golem",
+          "enemyInstanceId": "tower-24-e1-stone_golem"
+        },
+        {
+          "id": "tower-normal-24-slime",
+          "name": "塔のスライム",
+          "element": "water",
+          "weaknesses": [
+            "fire"
+          ],
+          "resistances": [
+            "water"
+          ],
+          "maxHp": 71,
+          "attack": 14,
+          "expReward": 26,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 24,
+            "tier": 2,
+            "boss": false
+          },
+          "enemyId": "slime",
+          "enemyInstanceId": "tower-24-e2-slime"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-25",
+    "floor": 25,
+    "encounter": {
+      "floor": 25,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 72,
+      "enemies": [
+        {
+          "id": "tower-normal-25-slime",
+          "name": "塔のスライム",
+          "element": "water",
+          "weaknesses": [
+            "fire"
+          ],
+          "resistances": [
+            "water"
+          ],
+          "maxHp": 73,
+          "attack": 14,
+          "expReward": 26,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 25,
+            "tier": 2,
+            "boss": false
+          },
+          "enemyId": "slime",
+          "enemyInstanceId": "tower-25-e1-slime"
+        },
+        {
+          "id": "tower-normal-25-goblin",
+          "name": "塔のゴブリン",
+          "element": "fire",
+          "weaknesses": [
+            "lightning"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 95,
+          "attack": 18,
+          "expReward": 46,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 25,
+            "tier": 2,
+            "boss": false
+          },
+          "enemyId": "goblin",
+          "enemyInstanceId": "tower-25-e2-goblin"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-26",
+    "floor": 26,
+    "encounter": {
+      "floor": 26,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 137,
+      "enemies": [
+        {
+          "id": "tower-normal-26-goblin",
+          "name": "塔のゴブリン",
+          "element": "fire",
+          "weaknesses": [
+            "lightning"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 98,
+          "attack": 19,
+          "expReward": 46,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 26,
+            "tier": 2,
+            "boss": false
+          },
+          "enemyId": "goblin",
+          "enemyInstanceId": "tower-26-e1-goblin"
+        },
+        {
+          "id": "tower-normal-26-stone_golem",
+          "name": "塔のストーンゴーレム",
+          "element": "earth",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "lightning"
+          ],
+          "maxHp": 143,
+          "attack": 23,
+          "expReward": 91,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 26,
+            "tier": 2,
+            "boss": false
+          },
+          "enemyId": "stone_golem",
+          "enemyInstanceId": "tower-26-e2-stone_golem"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-27",
+    "floor": 27,
+    "encounter": {
+      "floor": 27,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 163,
+      "enemies": [
+        {
+          "id": "tower-normal-27-stone_golem",
+          "name": "塔のストーンゴーレム",
+          "element": "earth",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "lightning"
+          ],
+          "maxHp": 146,
+          "attack": 24,
+          "expReward": 91,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 27,
+            "tier": 2,
+            "boss": false
+          },
+          "enemyId": "stone_golem",
+          "enemyInstanceId": "tower-27-e1-stone_golem"
+        },
+        {
+          "id": "tower-normal-27-slime",
+          "name": "塔のスライム",
+          "element": "water",
+          "weaknesses": [
+            "fire"
+          ],
+          "resistances": [
+            "water"
+          ],
+          "maxHp": 77,
+          "attack": 15,
+          "expReward": 26,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 27,
+            "tier": 2,
+            "boss": false
+          },
+          "enemyId": "slime",
+          "enemyInstanceId": "tower-27-e2-slime"
+        },
+        {
+          "id": "tower-normal-27-goblin",
+          "name": "塔のゴブリン",
+          "element": "fire",
+          "weaknesses": [
+            "lightning"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 100,
+          "attack": 19,
+          "expReward": 46,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 27,
+            "tier": 2,
+            "boss": false
+          },
+          "enemyId": "goblin",
+          "enemyInstanceId": "tower-27-e3-goblin"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-28",
+    "floor": 28,
+    "encounter": {
+      "floor": 28,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 163,
+      "enemies": [
+        {
+          "id": "tower-normal-28-slime",
+          "name": "塔のスライム",
+          "element": "water",
+          "weaknesses": [
+            "fire"
+          ],
+          "resistances": [
+            "water"
+          ],
+          "maxHp": 79,
+          "attack": 15,
+          "expReward": 26,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 28,
+            "tier": 2,
+            "boss": false
+          },
+          "enemyId": "slime",
+          "enemyInstanceId": "tower-28-e1-slime"
+        },
+        {
+          "id": "tower-normal-28-goblin",
+          "name": "塔のゴブリン",
+          "element": "fire",
+          "weaknesses": [
+            "lightning"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 102,
+          "attack": 20,
+          "expReward": 46,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 28,
+            "tier": 2,
+            "boss": false
+          },
+          "enemyId": "goblin",
+          "enemyInstanceId": "tower-28-e2-goblin"
+        },
+        {
+          "id": "tower-normal-28-stone_golem",
+          "name": "塔のストーンゴーレム",
+          "element": "earth",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "lightning"
+          ],
+          "maxHp": 149,
+          "attack": 24,
+          "expReward": 91,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 28,
+            "tier": 2,
+            "boss": false
+          },
+          "enemyId": "stone_golem",
+          "enemyInstanceId": "tower-28-e3-stone_golem"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-29",
+    "floor": 29,
+    "encounter": {
+      "floor": 29,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 163,
+      "enemies": [
+        {
+          "id": "tower-normal-29-goblin",
+          "name": "塔のゴブリン",
+          "element": "fire",
+          "weaknesses": [
+            "lightning"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 105,
+          "attack": 20,
+          "expReward": 46,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 29,
+            "tier": 2,
+            "boss": false
+          },
+          "enemyId": "goblin",
+          "enemyInstanceId": "tower-29-e1-goblin"
+        },
+        {
+          "id": "tower-normal-29-stone_golem",
+          "name": "塔のストーンゴーレム",
+          "element": "earth",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "lightning"
+          ],
+          "maxHp": 153,
+          "attack": 25,
+          "expReward": 91,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 29,
+            "tier": 2,
+            "boss": false
+          },
+          "enemyId": "stone_golem",
+          "enemyInstanceId": "tower-29-e2-stone_golem"
+        },
+        {
+          "id": "tower-normal-29-slime",
+          "name": "塔のスライム",
+          "element": "water",
+          "weaknesses": [
+            "fire"
+          ],
+          "resistances": [
+            "water"
+          ],
+          "maxHp": 80,
+          "attack": 16,
+          "expReward": 26,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 29,
+            "tier": 2,
+            "boss": false
+          },
+          "enemyId": "slime",
+          "enemyInstanceId": "tower-29-e3-slime"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-30",
+    "floor": 30,
+    "encounter": {
+      "floor": 30,
+      "rulesVersion": 5,
+      "energyCost": 3,
+      "expReward": 228,
+      "enemies": [
+        {
+          "id": "tower-boss-30-orc_chief",
+          "name": "塔のオークチーフ",
+          "element": "fire",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 137,
+          "attack": 17,
+          "expReward": 156,
+          "energyCost": 3,
+          "actionPattern": [
+            "normal_attack",
+            "normal_attack",
+            "orc_heavy_strike"
+          ],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 30,
+            "tier": 2,
+            "boss": true
+          },
+          "enemyId": "orc_chief",
+          "enemyInstanceId": "tower-30-e1-orc_chief"
+        },
+        {
+          "id": "tower-boss-30-slime",
+          "name": "塔のスライム",
+          "element": "water",
+          "weaknesses": [
+            "fire"
+          ],
+          "resistances": [
+            "water"
+          ],
+          "maxHp": 82,
+          "attack": 16,
+          "expReward": 26,
+          "energyCost": 3,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 30,
+            "tier": 2,
+            "boss": true
+          },
+          "enemyId": "slime",
+          "enemyInstanceId": "tower-30-e2-slime"
+        },
+        {
+          "id": "tower-boss-30-goblin",
+          "name": "塔のゴブリン",
+          "element": "fire",
+          "weaknesses": [
+            "lightning"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 107,
+          "attack": 20,
+          "expReward": 46,
+          "energyCost": 3,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 30,
+            "tier": 2,
+            "boss": true
+          },
+          "enemyId": "goblin",
+          "enemyInstanceId": "tower-30-e3-goblin"
+        }
+      ],
+      "boss": true
+    }
+  },
+  {
+    "id": "tower-31",
+    "floor": 31,
+    "encounter": {
+      "floor": 31,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 29,
+      "enemies": [
+        {
+          "id": "tower-normal-31-slime",
+          "name": "塔のスライム",
+          "element": "water",
+          "weaknesses": [
+            "fire"
+          ],
+          "resistances": [
+            "water"
+          ],
+          "maxHp": 88,
+          "attack": 17,
+          "expReward": 29,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 31,
+            "tier": 3,
+            "boss": false
+          },
+          "enemyId": "slime",
+          "enemyInstanceId": "tower-31-e1-slime"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-32",
+    "floor": 32,
+    "encounter": {
+      "floor": 32,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 51,
+      "enemies": [
+        {
+          "id": "tower-normal-32-goblin",
+          "name": "塔のゴブリン",
+          "element": "fire",
+          "weaknesses": [
+            "lightning"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 117,
+          "attack": 22,
+          "expReward": 51,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 32,
+            "tier": 3,
+            "boss": false
+          },
+          "enemyId": "goblin",
+          "enemyInstanceId": "tower-32-e1-goblin"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-33",
+    "floor": 33,
+    "encounter": {
+      "floor": 33,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 102,
+      "enemies": [
+        {
+          "id": "tower-normal-33-stone_golem",
+          "name": "塔のストーンゴーレム",
+          "element": "earth",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "lightning"
+          ],
+          "maxHp": 174,
+          "attack": 28,
+          "expReward": 102,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 33,
+            "tier": 3,
+            "boss": false
+          },
+          "enemyId": "stone_golem",
+          "enemyInstanceId": "tower-33-e1-stone_golem"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-34",
+    "floor": 34,
+    "encounter": {
+      "floor": 34,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 80,
+      "enemies": [
+        {
+          "id": "tower-normal-34-slime",
+          "name": "塔のスライム",
+          "element": "water",
+          "weaknesses": [
+            "fire"
+          ],
+          "resistances": [
+            "water"
+          ],
+          "maxHp": 93,
+          "attack": 18,
+          "expReward": 29,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 34,
+            "tier": 3,
+            "boss": false
+          },
+          "enemyId": "slime",
+          "enemyInstanceId": "tower-34-e1-slime"
+        },
+        {
+          "id": "tower-normal-34-goblin",
+          "name": "塔のゴブリン",
+          "element": "fire",
+          "weaknesses": [
+            "lightning"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 121,
+          "attack": 23,
+          "expReward": 51,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 34,
+            "tier": 3,
+            "boss": false
+          },
+          "enemyId": "goblin",
+          "enemyInstanceId": "tower-34-e2-goblin"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-35",
+    "floor": 35,
+    "encounter": {
+      "floor": 35,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 153,
+      "enemies": [
+        {
+          "id": "tower-normal-35-goblin",
+          "name": "塔のゴブリン",
+          "element": "fire",
+          "weaknesses": [
+            "lightning"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 124,
+          "attack": 23,
+          "expReward": 51,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 35,
+            "tier": 3,
+            "boss": false
+          },
+          "enemyId": "goblin",
+          "enemyInstanceId": "tower-35-e1-goblin"
+        },
+        {
+          "id": "tower-normal-35-stone_golem",
+          "name": "塔のストーンゴーレム",
+          "element": "earth",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "lightning"
+          ],
+          "maxHp": 181,
+          "attack": 29,
+          "expReward": 102,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 35,
+            "tier": 3,
+            "boss": false
+          },
+          "enemyId": "stone_golem",
+          "enemyInstanceId": "tower-35-e2-stone_golem"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-36",
+    "floor": 36,
+    "encounter": {
+      "floor": 36,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 131,
+      "enemies": [
+        {
+          "id": "tower-normal-36-stone_golem",
+          "name": "塔のストーンゴーレム",
+          "element": "earth",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "lightning"
+          ],
+          "maxHp": 185,
+          "attack": 29,
+          "expReward": 102,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 36,
+            "tier": 3,
+            "boss": false
+          },
+          "enemyId": "stone_golem",
+          "enemyInstanceId": "tower-36-e1-stone_golem"
+        },
+        {
+          "id": "tower-normal-36-slime",
+          "name": "塔のスライム",
+          "element": "water",
+          "weaknesses": [
+            "fire"
+          ],
+          "resistances": [
+            "water"
+          ],
+          "maxHp": 97,
+          "attack": 18,
+          "expReward": 29,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 36,
+            "tier": 3,
+            "boss": false
+          },
+          "enemyId": "slime",
+          "enemyInstanceId": "tower-36-e2-slime"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-37",
+    "floor": 37,
+    "encounter": {
+      "floor": 37,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 182,
+      "enemies": [
+        {
+          "id": "tower-normal-37-slime",
+          "name": "塔のスライム",
+          "element": "water",
+          "weaknesses": [
+            "fire"
+          ],
+          "resistances": [
+            "water"
+          ],
+          "maxHp": 99,
+          "attack": 19,
+          "expReward": 29,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 37,
+            "tier": 3,
+            "boss": false
+          },
+          "enemyId": "slime",
+          "enemyInstanceId": "tower-37-e1-slime"
+        },
+        {
+          "id": "tower-normal-37-goblin",
+          "name": "塔のゴブリン",
+          "element": "fire",
+          "weaknesses": [
+            "lightning"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 129,
+          "attack": 24,
+          "expReward": 51,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 37,
+            "tier": 3,
+            "boss": false
+          },
+          "enemyId": "goblin",
+          "enemyInstanceId": "tower-37-e2-goblin"
+        },
+        {
+          "id": "tower-normal-37-stone_golem",
+          "name": "塔のストーンゴーレム",
+          "element": "earth",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "lightning"
+          ],
+          "maxHp": 189,
+          "attack": 30,
+          "expReward": 102,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 37,
+            "tier": 3,
+            "boss": false
+          },
+          "enemyId": "stone_golem",
+          "enemyInstanceId": "tower-37-e3-stone_golem"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-38",
+    "floor": 38,
+    "encounter": {
+      "floor": 38,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 182,
+      "enemies": [
+        {
+          "id": "tower-normal-38-goblin",
+          "name": "塔のゴブリン",
+          "element": "fire",
+          "weaknesses": [
+            "lightning"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 132,
+          "attack": 25,
+          "expReward": 51,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 38,
+            "tier": 3,
+            "boss": false
+          },
+          "enemyId": "goblin",
+          "enemyInstanceId": "tower-38-e1-goblin"
+        },
+        {
+          "id": "tower-normal-38-stone_golem",
+          "name": "塔のストーンゴーレム",
+          "element": "earth",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "lightning"
+          ],
+          "maxHp": 192,
+          "attack": 30,
+          "expReward": 102,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 38,
+            "tier": 3,
+            "boss": false
+          },
+          "enemyId": "stone_golem",
+          "enemyInstanceId": "tower-38-e2-stone_golem"
+        },
+        {
+          "id": "tower-normal-38-slime",
+          "name": "塔のスライム",
+          "element": "water",
+          "weaknesses": [
+            "fire"
+          ],
+          "resistances": [
+            "water"
+          ],
+          "maxHp": 101,
+          "attack": 19,
+          "expReward": 29,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 38,
+            "tier": 3,
+            "boss": false
+          },
+          "enemyId": "slime",
+          "enemyInstanceId": "tower-38-e3-slime"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-39",
+    "floor": 39,
+    "encounter": {
+      "floor": 39,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 182,
+      "enemies": [
+        {
+          "id": "tower-normal-39-stone_golem",
+          "name": "塔のストーンゴーレム",
+          "element": "earth",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "lightning"
+          ],
+          "maxHp": 196,
+          "attack": 31,
+          "expReward": 102,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 39,
+            "tier": 3,
+            "boss": false
+          },
+          "enemyId": "stone_golem",
+          "enemyInstanceId": "tower-39-e1-stone_golem"
+        },
+        {
+          "id": "tower-normal-39-slime",
+          "name": "塔のスライム",
+          "element": "water",
+          "weaknesses": [
+            "fire"
+          ],
+          "resistances": [
+            "water"
+          ],
+          "maxHp": 103,
+          "attack": 19,
+          "expReward": 29,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 39,
+            "tier": 3,
+            "boss": false
+          },
+          "enemyId": "slime",
+          "enemyInstanceId": "tower-39-e2-slime"
+        },
+        {
+          "id": "tower-normal-39-goblin",
+          "name": "塔のゴブリン",
+          "element": "fire",
+          "weaknesses": [
+            "lightning"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 134,
+          "attack": 25,
+          "expReward": 51,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 39,
+            "tier": 3,
+            "boss": false
+          },
+          "enemyId": "goblin",
+          "enemyInstanceId": "tower-39-e3-goblin"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-40",
+    "floor": 40,
+    "encounter": {
+      "floor": 40,
+      "rulesVersion": 5,
+      "energyCost": 3,
+      "expReward": 414,
+      "enemies": [
+        {
+          "id": "tower-boss-40-ancient_golem",
+          "name": "塔のエンシェントゴーレム",
+          "element": "earth",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "lightning"
+          ],
+          "maxHp": 242,
+          "attack": 21,
+          "expReward": 261,
+          "energyCost": 3,
+          "actionPattern": [
+            "normal_attack",
+            "golem_rock_crush",
+            "normal_attack",
+            "golem_earthquake"
+          ],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 40,
+            "tier": 3,
+            "boss": true
+          },
+          "enemyId": "ancient_golem",
+          "enemyInstanceId": "tower-40-e1-ancient_golem"
+        },
+        {
+          "id": "tower-boss-40-goblin",
+          "name": "塔のゴブリン",
+          "element": "fire",
+          "weaknesses": [
+            "lightning"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 137,
+          "attack": 25,
+          "expReward": 51,
+          "energyCost": 3,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 40,
+            "tier": 3,
+            "boss": true
+          },
+          "enemyId": "goblin",
+          "enemyInstanceId": "tower-40-e2-goblin"
+        },
+        {
+          "id": "tower-boss-40-stone_golem",
+          "name": "塔のストーンゴーレム",
+          "element": "earth",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "lightning"
+          ],
+          "maxHp": 200,
+          "attack": 31,
+          "expReward": 102,
+          "energyCost": 3,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 40,
+            "tier": 3,
+            "boss": true
+          },
+          "enemyId": "stone_golem",
+          "enemyInstanceId": "tower-40-e3-stone_golem"
+        }
+      ],
+      "boss": true
+    }
+  },
+  {
+    "id": "tower-41",
+    "floor": 41,
+    "encounter": {
+      "floor": 41,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 56,
+      "enemies": [
+        {
+          "id": "tower-normal-41-goblin",
+          "name": "塔のゴブリン",
+          "element": "fire",
+          "weaknesses": [
+            "lightning"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 146,
+          "attack": 27,
+          "expReward": 56,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 41,
+            "tier": 4,
+            "boss": false
+          },
+          "enemyId": "goblin",
+          "enemyInstanceId": "tower-41-e1-goblin"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-42",
+    "floor": 42,
+    "encounter": {
+      "floor": 42,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 112,
+      "enemies": [
+        {
+          "id": "tower-normal-42-stone_golem",
+          "name": "塔のストーンゴーレム",
+          "element": "earth",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "lightning"
+          ],
+          "maxHp": 218,
+          "attack": 34,
+          "expReward": 112,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 42,
+            "tier": 4,
+            "boss": false
+          },
+          "enemyId": "stone_golem",
+          "enemyInstanceId": "tower-42-e1-stone_golem"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-43",
+    "floor": 43,
+    "encounter": {
+      "floor": 43,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 32,
+      "enemies": [
+        {
+          "id": "tower-normal-43-slime",
+          "name": "塔のスライム",
+          "element": "water",
+          "weaknesses": [
+            "fire"
+          ],
+          "resistances": [
+            "water"
+          ],
+          "maxHp": 117,
+          "attack": 22,
+          "expReward": 32,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 43,
+            "tier": 4,
+            "boss": false
+          },
+          "enemyId": "slime",
+          "enemyInstanceId": "tower-43-e1-slime"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-44",
+    "floor": 44,
+    "encounter": {
+      "floor": 44,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 168,
+      "enemies": [
+        {
+          "id": "tower-normal-44-goblin",
+          "name": "塔のゴブリン",
+          "element": "fire",
+          "weaknesses": [
+            "lightning"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 154,
+          "attack": 28,
+          "expReward": 56,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 44,
+            "tier": 4,
+            "boss": false
+          },
+          "enemyId": "goblin",
+          "enemyInstanceId": "tower-44-e1-goblin"
+        },
+        {
+          "id": "tower-normal-44-stone_golem",
+          "name": "塔のストーンゴーレム",
+          "element": "earth",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "lightning"
+          ],
+          "maxHp": 226,
+          "attack": 35,
+          "expReward": 112,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 44,
+            "tier": 4,
+            "boss": false
+          },
+          "enemyId": "stone_golem",
+          "enemyInstanceId": "tower-44-e2-stone_golem"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-45",
+    "floor": 45,
+    "encounter": {
+      "floor": 45,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 144,
+      "enemies": [
+        {
+          "id": "tower-normal-45-stone_golem",
+          "name": "塔のストーンゴーレム",
+          "element": "earth",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "lightning"
+          ],
+          "maxHp": 230,
+          "attack": 35,
+          "expReward": 112,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 45,
+            "tier": 4,
+            "boss": false
+          },
+          "enemyId": "stone_golem",
+          "enemyInstanceId": "tower-45-e1-stone_golem"
+        },
+        {
+          "id": "tower-normal-45-slime",
+          "name": "塔のスライム",
+          "element": "water",
+          "weaknesses": [
+            "fire"
+          ],
+          "resistances": [
+            "water"
+          ],
+          "maxHp": 121,
+          "attack": 22,
+          "expReward": 32,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 45,
+            "tier": 4,
+            "boss": false
+          },
+          "enemyId": "slime",
+          "enemyInstanceId": "tower-45-e2-slime"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-46",
+    "floor": 46,
+    "encounter": {
+      "floor": 46,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 88,
+      "enemies": [
+        {
+          "id": "tower-normal-46-slime",
+          "name": "塔のスライム",
+          "element": "water",
+          "weaknesses": [
+            "fire"
+          ],
+          "resistances": [
+            "water"
+          ],
+          "maxHp": 123,
+          "attack": 23,
+          "expReward": 32,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 46,
+            "tier": 4,
+            "boss": false
+          },
+          "enemyId": "slime",
+          "enemyInstanceId": "tower-46-e1-slime"
+        },
+        {
+          "id": "tower-normal-46-goblin",
+          "name": "塔のゴブリン",
+          "element": "fire",
+          "weaknesses": [
+            "lightning"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 160,
+          "attack": 29,
+          "expReward": 56,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 46,
+            "tier": 4,
+            "boss": false
+          },
+          "enemyId": "goblin",
+          "enemyInstanceId": "tower-46-e2-goblin"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-47",
+    "floor": 47,
+    "encounter": {
+      "floor": 47,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 200,
+      "enemies": [
+        {
+          "id": "tower-normal-47-goblin",
+          "name": "塔のゴブリン",
+          "element": "fire",
+          "weaknesses": [
+            "lightning"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 163,
+          "attack": 30,
+          "expReward": 56,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 47,
+            "tier": 4,
+            "boss": false
+          },
+          "enemyId": "goblin",
+          "enemyInstanceId": "tower-47-e1-goblin"
+        },
+        {
+          "id": "tower-normal-47-stone_golem",
+          "name": "塔のストーンゴーレム",
+          "element": "earth",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "lightning"
+          ],
+          "maxHp": 238,
+          "attack": 36,
+          "expReward": 112,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 47,
+            "tier": 4,
+            "boss": false
+          },
+          "enemyId": "stone_golem",
+          "enemyInstanceId": "tower-47-e2-stone_golem"
+        },
+        {
+          "id": "tower-normal-47-slime",
+          "name": "塔のスライム",
+          "element": "water",
+          "weaknesses": [
+            "fire"
+          ],
+          "resistances": [
+            "water"
+          ],
+          "maxHp": 125,
+          "attack": 23,
+          "expReward": 32,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 47,
+            "tier": 4,
+            "boss": false
+          },
+          "enemyId": "slime",
+          "enemyInstanceId": "tower-47-e3-slime"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-48",
+    "floor": 48,
+    "encounter": {
+      "floor": 48,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 200,
+      "enemies": [
+        {
+          "id": "tower-normal-48-stone_golem",
+          "name": "塔のストーンゴーレム",
+          "element": "earth",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "lightning"
+          ],
+          "maxHp": 242,
+          "attack": 37,
+          "expReward": 112,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 48,
+            "tier": 4,
+            "boss": false
+          },
+          "enemyId": "stone_golem",
+          "enemyInstanceId": "tower-48-e1-stone_golem"
+        },
+        {
+          "id": "tower-normal-48-slime",
+          "name": "塔のスライム",
+          "element": "water",
+          "weaknesses": [
+            "fire"
+          ],
+          "resistances": [
+            "water"
+          ],
+          "maxHp": 127,
+          "attack": 23,
+          "expReward": 32,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 48,
+            "tier": 4,
+            "boss": false
+          },
+          "enemyId": "slime",
+          "enemyInstanceId": "tower-48-e2-slime"
+        },
+        {
+          "id": "tower-normal-48-goblin",
+          "name": "塔のゴブリン",
+          "element": "fire",
+          "weaknesses": [
+            "lightning"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 166,
+          "attack": 30,
+          "expReward": 56,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 48,
+            "tier": 4,
+            "boss": false
+          },
+          "enemyId": "goblin",
+          "enemyInstanceId": "tower-48-e3-goblin"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-49",
+    "floor": 49,
+    "encounter": {
+      "floor": 49,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 200,
+      "enemies": [
+        {
+          "id": "tower-normal-49-slime",
+          "name": "塔のスライム",
+          "element": "water",
+          "weaknesses": [
+            "fire"
+          ],
+          "resistances": [
+            "water"
+          ],
+          "maxHp": 130,
+          "attack": 24,
+          "expReward": 32,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 49,
+            "tier": 4,
+            "boss": false
+          },
+          "enemyId": "slime",
+          "enemyInstanceId": "tower-49-e1-slime"
+        },
+        {
+          "id": "tower-normal-49-goblin",
+          "name": "塔のゴブリン",
+          "element": "fire",
+          "weaknesses": [
+            "lightning"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 169,
+          "attack": 31,
+          "expReward": 56,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 49,
+            "tier": 4,
+            "boss": false
+          },
+          "enemyId": "goblin",
+          "enemyInstanceId": "tower-49-e2-goblin"
+        },
+        {
+          "id": "tower-normal-49-stone_golem",
+          "name": "塔のストーンゴーレム",
+          "element": "earth",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "lightning"
+          ],
+          "maxHp": 247,
+          "attack": 37,
+          "expReward": 112,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 49,
+            "tier": 4,
+            "boss": false
+          },
+          "enemyId": "stone_golem",
+          "enemyInstanceId": "tower-49-e3-stone_golem"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-50",
+    "floor": 50,
+    "encounter": {
+      "floor": 50,
+      "rulesVersion": 5,
+      "energyCost": 3,
+      "expReward": 336,
+      "enemies": [
+        {
+          "id": "tower-boss-50-orc_chief",
+          "name": "塔のオークチーフ",
+          "element": "fire",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 220,
+          "attack": 25,
+          "expReward": 192,
+          "energyCost": 3,
+          "actionPattern": [
+            "normal_attack",
+            "normal_attack",
+            "orc_heavy_strike"
+          ],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 50,
+            "tier": 4,
+            "boss": true
+          },
+          "enemyId": "orc_chief",
+          "enemyInstanceId": "tower-50-e1-orc_chief"
+        },
+        {
+          "id": "tower-boss-50-stone_golem",
+          "name": "塔のストーンゴーレム",
+          "element": "earth",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "lightning"
+          ],
+          "maxHp": 251,
+          "attack": 38,
+          "expReward": 112,
+          "energyCost": 3,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 50,
+            "tier": 4,
+            "boss": true
+          },
+          "enemyId": "stone_golem",
+          "enemyInstanceId": "tower-50-e2-stone_golem"
+        },
+        {
+          "id": "tower-boss-50-slime",
+          "name": "塔のスライム",
+          "element": "water",
+          "weaknesses": [
+            "fire"
+          ],
+          "resistances": [
+            "water"
+          ],
+          "maxHp": 132,
+          "attack": 24,
+          "expReward": 32,
+          "energyCost": 3,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 50,
+            "tier": 4,
+            "boss": true
+          },
+          "enemyId": "slime",
+          "enemyInstanceId": "tower-50-e3-slime"
+        }
+      ],
+      "boss": true
+    }
+  },
+  {
+    "id": "tower-51",
+    "floor": 51,
+    "encounter": {
+      "floor": 51,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 123,
+      "enemies": [
+        {
+          "id": "tower-normal-51-stone_golem",
+          "name": "塔のストーンゴーレム",
+          "element": "earth",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "lightning"
+          ],
+          "maxHp": 268,
+          "attack": 40,
+          "expReward": 123,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 51,
+            "tier": 5,
+            "boss": false
+          },
+          "enemyId": "stone_golem",
+          "enemyInstanceId": "tower-51-e1-stone_golem"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-52",
+    "floor": 52,
+    "encounter": {
+      "floor": 52,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 35,
+      "enemies": [
+        {
+          "id": "tower-normal-52-slime",
+          "name": "塔のスライム",
+          "element": "water",
+          "weaknesses": [
+            "fire"
+          ],
+          "resistances": [
+            "water"
+          ],
+          "maxHp": 144,
+          "attack": 26,
+          "expReward": 35,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 52,
+            "tier": 5,
+            "boss": false
+          },
+          "enemyId": "slime",
+          "enemyInstanceId": "tower-52-e1-slime"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-53",
+    "floor": 53,
+    "encounter": {
+      "floor": 53,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 61,
+      "enemies": [
+        {
+          "id": "tower-normal-53-goblin",
+          "name": "塔のゴブリン",
+          "element": "fire",
+          "weaknesses": [
+            "lightning"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 190,
+          "attack": 34,
+          "expReward": 61,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 53,
+            "tier": 5,
+            "boss": false
+          },
+          "enemyId": "goblin",
+          "enemyInstanceId": "tower-53-e1-goblin"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-54",
+    "floor": 54,
+    "encounter": {
+      "floor": 54,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 158,
+      "enemies": [
+        {
+          "id": "tower-normal-54-stone_golem",
+          "name": "塔のストーンゴーレム",
+          "element": "earth",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "lightning"
+          ],
+          "maxHp": 282,
+          "attack": 42,
+          "expReward": 123,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 54,
+            "tier": 5,
+            "boss": false
+          },
+          "enemyId": "stone_golem",
+          "enemyInstanceId": "tower-54-e1-stone_golem"
+        },
+        {
+          "id": "tower-normal-54-slime",
+          "name": "塔のスライム",
+          "element": "water",
+          "weaknesses": [
+            "fire"
+          ],
+          "resistances": [
+            "water"
+          ],
+          "maxHp": 148,
+          "attack": 27,
+          "expReward": 35,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 54,
+            "tier": 5,
+            "boss": false
+          },
+          "enemyId": "slime",
+          "enemyInstanceId": "tower-54-e2-slime"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-55",
+    "floor": 55,
+    "encounter": {
+      "floor": 55,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 96,
+      "enemies": [
+        {
+          "id": "tower-normal-55-slime",
+          "name": "塔のスライム",
+          "element": "water",
+          "weaknesses": [
+            "fire"
+          ],
+          "resistances": [
+            "water"
+          ],
+          "maxHp": 151,
+          "attack": 27,
+          "expReward": 35,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 55,
+            "tier": 5,
+            "boss": false
+          },
+          "enemyId": "slime",
+          "enemyInstanceId": "tower-55-e1-slime"
+        },
+        {
+          "id": "tower-normal-55-goblin",
+          "name": "塔のゴブリン",
+          "element": "fire",
+          "weaknesses": [
+            "lightning"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 196,
+          "attack": 35,
+          "expReward": 61,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 55,
+            "tier": 5,
+            "boss": false
+          },
+          "enemyId": "goblin",
+          "enemyInstanceId": "tower-55-e2-goblin"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-56",
+    "floor": 56,
+    "encounter": {
+      "floor": 56,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 184,
+      "enemies": [
+        {
+          "id": "tower-normal-56-goblin",
+          "name": "塔のゴブリン",
+          "element": "fire",
+          "weaknesses": [
+            "lightning"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 199,
+          "attack": 35,
+          "expReward": 61,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 56,
+            "tier": 5,
+            "boss": false
+          },
+          "enemyId": "goblin",
+          "enemyInstanceId": "tower-56-e1-goblin"
+        },
+        {
+          "id": "tower-normal-56-stone_golem",
+          "name": "塔のストーンゴーレム",
+          "element": "earth",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "lightning"
+          ],
+          "maxHp": 291,
+          "attack": 43,
+          "expReward": 123,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 56,
+            "tier": 5,
+            "boss": false
+          },
+          "enemyId": "stone_golem",
+          "enemyInstanceId": "tower-56-e2-stone_golem"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-57",
+    "floor": 57,
+    "encounter": {
+      "floor": 57,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 219,
+      "enemies": [
+        {
+          "id": "tower-normal-57-stone_golem",
+          "name": "塔のストーンゴーレム",
+          "element": "earth",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "lightning"
+          ],
+          "maxHp": 296,
+          "attack": 44,
+          "expReward": 123,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 57,
+            "tier": 5,
+            "boss": false
+          },
+          "enemyId": "stone_golem",
+          "enemyInstanceId": "tower-57-e1-stone_golem"
+        },
+        {
+          "id": "tower-normal-57-slime",
+          "name": "塔のスライム",
+          "element": "water",
+          "weaknesses": [
+            "fire"
+          ],
+          "resistances": [
+            "water"
+          ],
+          "maxHp": 156,
+          "attack": 28,
+          "expReward": 35,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 57,
+            "tier": 5,
+            "boss": false
+          },
+          "enemyId": "slime",
+          "enemyInstanceId": "tower-57-e2-slime"
+        },
+        {
+          "id": "tower-normal-57-goblin",
+          "name": "塔のゴブリン",
+          "element": "fire",
+          "weaknesses": [
+            "lightning"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 203,
+          "attack": 36,
+          "expReward": 61,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 57,
+            "tier": 5,
+            "boss": false
+          },
+          "enemyId": "goblin",
+          "enemyInstanceId": "tower-57-e3-goblin"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-58",
+    "floor": 58,
+    "encounter": {
+      "floor": 58,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 219,
+      "enemies": [
+        {
+          "id": "tower-normal-58-slime",
+          "name": "塔のスライム",
+          "element": "water",
+          "weaknesses": [
+            "fire"
+          ],
+          "resistances": [
+            "water"
+          ],
+          "maxHp": 158,
+          "attack": 28,
+          "expReward": 35,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 58,
+            "tier": 5,
+            "boss": false
+          },
+          "enemyId": "slime",
+          "enemyInstanceId": "tower-58-e1-slime"
+        },
+        {
+          "id": "tower-normal-58-goblin",
+          "name": "塔のゴブリン",
+          "element": "fire",
+          "weaknesses": [
+            "lightning"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 206,
+          "attack": 36,
+          "expReward": 61,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 58,
+            "tier": 5,
+            "boss": false
+          },
+          "enemyId": "goblin",
+          "enemyInstanceId": "tower-58-e2-goblin"
+        },
+        {
+          "id": "tower-normal-58-stone_golem",
+          "name": "塔のストーンゴーレム",
+          "element": "earth",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "lightning"
+          ],
+          "maxHp": 301,
+          "attack": 44,
+          "expReward": 123,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 58,
+            "tier": 5,
+            "boss": false
+          },
+          "enemyId": "stone_golem",
+          "enemyInstanceId": "tower-58-e3-stone_golem"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-59",
+    "floor": 59,
+    "encounter": {
+      "floor": 59,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 219,
+      "enemies": [
+        {
+          "id": "tower-normal-59-goblin",
+          "name": "塔のゴブリン",
+          "element": "fire",
+          "weaknesses": [
+            "lightning"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 209,
+          "attack": 37,
+          "expReward": 61,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 59,
+            "tier": 5,
+            "boss": false
+          },
+          "enemyId": "goblin",
+          "enemyInstanceId": "tower-59-e1-goblin"
+        },
+        {
+          "id": "tower-normal-59-stone_golem",
+          "name": "塔のストーンゴーレム",
+          "element": "earth",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "lightning"
+          ],
+          "maxHp": 306,
+          "attack": 45,
+          "expReward": 123,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 59,
+            "tier": 5,
+            "boss": false
+          },
+          "enemyId": "stone_golem",
+          "enemyInstanceId": "tower-59-e2-stone_golem"
+        },
+        {
+          "id": "tower-normal-59-slime",
+          "name": "塔のスライム",
+          "element": "water",
+          "weaknesses": [
+            "fire"
+          ],
+          "resistances": [
+            "water"
+          ],
+          "maxHp": 161,
+          "attack": 29,
+          "expReward": 35,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 59,
+            "tier": 5,
+            "boss": false
+          },
+          "enemyId": "slime",
+          "enemyInstanceId": "tower-59-e3-slime"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-60",
+    "floor": 60,
+    "encounter": {
+      "floor": 60,
+      "rulesVersion": 5,
+      "energyCost": 3,
+      "expReward": 411,
+      "enemies": [
+        {
+          "id": "tower-boss-60-ancient_golem",
+          "name": "塔のエンシェントゴーレム",
+          "element": "earth",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "lightning"
+          ],
+          "maxHp": 377,
+          "attack": 31,
+          "expReward": 315,
+          "energyCost": 3,
+          "actionPattern": [
+            "normal_attack",
+            "golem_rock_crush",
+            "normal_attack",
+            "golem_earthquake"
+          ],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 60,
+            "tier": 5,
+            "boss": true
+          },
+          "enemyId": "ancient_golem",
+          "enemyInstanceId": "tower-60-e1-ancient_golem"
+        },
+        {
+          "id": "tower-boss-60-slime",
+          "name": "塔のスライム",
+          "element": "water",
+          "weaknesses": [
+            "fire"
+          ],
+          "resistances": [
+            "water"
+          ],
+          "maxHp": 164,
+          "attack": 29,
+          "expReward": 35,
+          "energyCost": 3,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 60,
+            "tier": 5,
+            "boss": true
+          },
+          "enemyId": "slime",
+          "enemyInstanceId": "tower-60-e2-slime"
+        },
+        {
+          "id": "tower-boss-60-goblin",
+          "name": "塔のゴブリン",
+          "element": "fire",
+          "weaknesses": [
+            "lightning"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 213,
+          "attack": 37,
+          "expReward": 61,
+          "energyCost": 3,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 60,
+            "tier": 5,
+            "boss": true
+          },
+          "enemyId": "goblin",
+          "enemyInstanceId": "tower-60-e3-goblin"
+        }
+      ],
+      "boss": true
+    }
+  },
+  {
+    "id": "tower-61",
+    "floor": 61,
+    "encounter": {
+      "floor": 61,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 38,
+      "enemies": [
+        {
+          "id": "tower-normal-61-slime",
+          "name": "塔のスライム",
+          "element": "water",
+          "weaknesses": [
+            "fire"
+          ],
+          "resistances": [
+            "water"
+          ],
+          "maxHp": 175,
+          "attack": 31,
+          "expReward": 38,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 61,
+            "tier": 6,
+            "boss": false
+          },
+          "enemyId": "slime",
+          "enemyInstanceId": "tower-61-e1-slime"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-62",
+    "floor": 62,
+    "encounter": {
+      "floor": 62,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 67,
+      "enemies": [
+        {
+          "id": "tower-normal-62-goblin",
+          "name": "塔のゴブリン",
+          "element": "fire",
+          "weaknesses": [
+            "lightning"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 231,
+          "attack": 40,
+          "expReward": 67,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 62,
+            "tier": 6,
+            "boss": false
+          },
+          "enemyId": "goblin",
+          "enemyInstanceId": "tower-62-e1-goblin"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-63",
+    "floor": 63,
+    "encounter": {
+      "floor": 63,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 133,
+      "enemies": [
+        {
+          "id": "tower-normal-63-stone_golem",
+          "name": "塔のストーンゴーレム",
+          "element": "earth",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "lightning"
+          ],
+          "maxHp": 343,
+          "attack": 50,
+          "expReward": 133,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 63,
+            "tier": 6,
+            "boss": false
+          },
+          "enemyId": "stone_golem",
+          "enemyInstanceId": "tower-63-e1-stone_golem"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-64",
+    "floor": 64,
+    "encounter": {
+      "floor": 64,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 105,
+      "enemies": [
+        {
+          "id": "tower-normal-64-slime",
+          "name": "塔のスライム",
+          "element": "water",
+          "weaknesses": [
+            "fire"
+          ],
+          "resistances": [
+            "water"
+          ],
+          "maxHp": 183,
+          "attack": 32,
+          "expReward": 38,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 64,
+            "tier": 6,
+            "boss": false
+          },
+          "enemyId": "slime",
+          "enemyInstanceId": "tower-64-e1-slime"
+        },
+        {
+          "id": "tower-normal-64-goblin",
+          "name": "塔のゴブリン",
+          "element": "fire",
+          "weaknesses": [
+            "lightning"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 238,
+          "attack": 41,
+          "expReward": 67,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 64,
+            "tier": 6,
+            "boss": false
+          },
+          "enemyId": "goblin",
+          "enemyInstanceId": "tower-64-e2-goblin"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-65",
+    "floor": 65,
+    "encounter": {
+      "floor": 65,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 200,
+      "enemies": [
+        {
+          "id": "tower-normal-65-goblin",
+          "name": "塔のゴブリン",
+          "element": "fire",
+          "weaknesses": [
+            "lightning"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 242,
+          "attack": 42,
+          "expReward": 67,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 65,
+            "tier": 6,
+            "boss": false
+          },
+          "enemyId": "goblin",
+          "enemyInstanceId": "tower-65-e1-goblin"
+        },
+        {
+          "id": "tower-normal-65-stone_golem",
+          "name": "塔のストーンゴーレム",
+          "element": "earth",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "lightning"
+          ],
+          "maxHp": 354,
+          "attack": 51,
+          "expReward": 133,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 65,
+            "tier": 6,
+            "boss": false
+          },
+          "enemyId": "stone_golem",
+          "enemyInstanceId": "tower-65-e2-stone_golem"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-66",
+    "floor": 66,
+    "encounter": {
+      "floor": 66,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 171,
+      "enemies": [
+        {
+          "id": "tower-normal-66-stone_golem",
+          "name": "塔のストーンゴーレム",
+          "element": "earth",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "lightning"
+          ],
+          "maxHp": 359,
+          "attack": 52,
+          "expReward": 133,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 66,
+            "tier": 6,
+            "boss": false
+          },
+          "enemyId": "stone_golem",
+          "enemyInstanceId": "tower-66-e1-stone_golem"
+        },
+        {
+          "id": "tower-normal-66-slime",
+          "name": "塔のスライム",
+          "element": "water",
+          "weaknesses": [
+            "fire"
+          ],
+          "resistances": [
+            "water"
+          ],
+          "maxHp": 189,
+          "attack": 33,
+          "expReward": 38,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 66,
+            "tier": 6,
+            "boss": false
+          },
+          "enemyId": "slime",
+          "enemyInstanceId": "tower-66-e2-slime"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-67",
+    "floor": 67,
+    "encounter": {
+      "floor": 67,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 238,
+      "enemies": [
+        {
+          "id": "tower-normal-67-slime",
+          "name": "塔のスライム",
+          "element": "water",
+          "weaknesses": [
+            "fire"
+          ],
+          "resistances": [
+            "water"
+          ],
+          "maxHp": 192,
+          "attack": 33,
+          "expReward": 38,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 67,
+            "tier": 6,
+            "boss": false
+          },
+          "enemyId": "slime",
+          "enemyInstanceId": "tower-67-e1-slime"
+        },
+        {
+          "id": "tower-normal-67-goblin",
+          "name": "塔のゴブリン",
+          "element": "fire",
+          "weaknesses": [
+            "lightning"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 250,
+          "attack": 43,
+          "expReward": 67,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 67,
+            "tier": 6,
+            "boss": false
+          },
+          "enemyId": "goblin",
+          "enemyInstanceId": "tower-67-e2-goblin"
+        },
+        {
+          "id": "tower-normal-67-stone_golem",
+          "name": "塔のストーンゴーレム",
+          "element": "earth",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "lightning"
+          ],
+          "maxHp": 365,
+          "attack": 52,
+          "expReward": 133,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 67,
+            "tier": 6,
+            "boss": false
+          },
+          "enemyId": "stone_golem",
+          "enemyInstanceId": "tower-67-e3-stone_golem"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-68",
+    "floor": 68,
+    "encounter": {
+      "floor": 68,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 238,
+      "enemies": [
+        {
+          "id": "tower-normal-68-goblin",
+          "name": "塔のゴブリン",
+          "element": "fire",
+          "weaknesses": [
+            "lightning"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 254,
+          "attack": 43,
+          "expReward": 67,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 68,
+            "tier": 6,
+            "boss": false
+          },
+          "enemyId": "goblin",
+          "enemyInstanceId": "tower-68-e1-goblin"
+        },
+        {
+          "id": "tower-normal-68-stone_golem",
+          "name": "塔のストーンゴーレム",
+          "element": "earth",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "lightning"
+          ],
+          "maxHp": 371,
+          "attack": 53,
+          "expReward": 133,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 68,
+            "tier": 6,
+            "boss": false
+          },
+          "enemyId": "stone_golem",
+          "enemyInstanceId": "tower-68-e2-stone_golem"
+        },
+        {
+          "id": "tower-normal-68-slime",
+          "name": "塔のスライム",
+          "element": "water",
+          "weaknesses": [
+            "fire"
+          ],
+          "resistances": [
+            "water"
+          ],
+          "maxHp": 195,
+          "attack": 34,
+          "expReward": 38,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 68,
+            "tier": 6,
+            "boss": false
+          },
+          "enemyId": "slime",
+          "enemyInstanceId": "tower-68-e3-slime"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-69",
+    "floor": 69,
+    "encounter": {
+      "floor": 69,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 238,
+      "enemies": [
+        {
+          "id": "tower-normal-69-stone_golem",
+          "name": "塔のストーンゴーレム",
+          "element": "earth",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "lightning"
+          ],
+          "maxHp": 376,
+          "attack": 54,
+          "expReward": 133,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 69,
+            "tier": 6,
+            "boss": false
+          },
+          "enemyId": "stone_golem",
+          "enemyInstanceId": "tower-69-e1-stone_golem"
+        },
+        {
+          "id": "tower-normal-69-slime",
+          "name": "塔のスライム",
+          "element": "water",
+          "weaknesses": [
+            "fire"
+          ],
+          "resistances": [
+            "water"
+          ],
+          "maxHp": 198,
+          "attack": 34,
+          "expReward": 38,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 69,
+            "tier": 6,
+            "boss": false
+          },
+          "enemyId": "slime",
+          "enemyInstanceId": "tower-69-e2-slime"
+        },
+        {
+          "id": "tower-normal-69-goblin",
+          "name": "塔のゴブリン",
+          "element": "fire",
+          "weaknesses": [
+            "lightning"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 257,
+          "attack": 44,
+          "expReward": 67,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 69,
+            "tier": 6,
+            "boss": false
+          },
+          "enemyId": "goblin",
+          "enemyInstanceId": "tower-69-e3-goblin"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-70",
+    "floor": 70,
+    "encounter": {
+      "floor": 70,
+      "rulesVersion": 5,
+      "energyCost": 3,
+      "expReward": 428,
+      "enemies": [
+        {
+          "id": "tower-boss-70-orc_chief",
+          "name": "塔のオークチーフ",
+          "element": "fire",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 336,
+          "attack": 36,
+          "expReward": 228,
+          "energyCost": 3,
+          "actionPattern": [
+            "normal_attack",
+            "normal_attack",
+            "orc_heavy_strike"
+          ],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 70,
+            "tier": 6,
+            "boss": true
+          },
+          "enemyId": "orc_chief",
+          "enemyInstanceId": "tower-70-e1-orc_chief"
+        },
+        {
+          "id": "tower-boss-70-goblin",
+          "name": "塔のゴブリン",
+          "element": "fire",
+          "weaknesses": [
+            "lightning"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 261,
+          "attack": 44,
+          "expReward": 67,
+          "energyCost": 3,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 70,
+            "tier": 6,
+            "boss": true
+          },
+          "enemyId": "goblin",
+          "enemyInstanceId": "tower-70-e2-goblin"
+        },
+        {
+          "id": "tower-boss-70-stone_golem",
+          "name": "塔のストーンゴーレム",
+          "element": "earth",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "lightning"
+          ],
+          "maxHp": 382,
+          "attack": 54,
+          "expReward": 133,
+          "energyCost": 3,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 70,
+            "tier": 6,
+            "boss": true
+          },
+          "enemyId": "stone_golem",
+          "enemyInstanceId": "tower-70-e3-stone_golem"
+        }
+      ],
+      "boss": true
+    }
+  },
+  {
+    "id": "tower-71",
+    "floor": 71,
+    "encounter": {
+      "floor": 71,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 72,
+      "enemies": [
+        {
+          "id": "tower-normal-71-goblin",
+          "name": "塔のゴブリン",
+          "element": "fire",
+          "weaknesses": [
+            "lightning"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 280,
+          "attack": 47,
+          "expReward": 72,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 71,
+            "tier": 7,
+            "boss": false
+          },
+          "enemyId": "goblin",
+          "enemyInstanceId": "tower-71-e1-goblin"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-72",
+    "floor": 72,
+    "encounter": {
+      "floor": 72,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 144,
+      "enemies": [
+        {
+          "id": "tower-normal-72-stone_golem",
+          "name": "塔のストーンゴーレム",
+          "element": "earth",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "lightning"
+          ],
+          "maxHp": 415,
+          "attack": 59,
+          "expReward": 144,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 72,
+            "tier": 7,
+            "boss": false
+          },
+          "enemyId": "stone_golem",
+          "enemyInstanceId": "tower-72-e1-stone_golem"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-73",
+    "floor": 73,
+    "encounter": {
+      "floor": 73,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 41,
+      "enemies": [
+        {
+          "id": "tower-normal-73-slime",
+          "name": "塔のスライム",
+          "element": "water",
+          "weaknesses": [
+            "fire"
+          ],
+          "resistances": [
+            "water"
+          ],
+          "maxHp": 222,
+          "attack": 38,
+          "expReward": 41,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 73,
+            "tier": 7,
+            "boss": false
+          },
+          "enemyId": "slime",
+          "enemyInstanceId": "tower-73-e1-slime"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-74",
+    "floor": 74,
+    "encounter": {
+      "floor": 74,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 216,
+      "enemies": [
+        {
+          "id": "tower-normal-74-goblin",
+          "name": "塔のゴブリン",
+          "element": "fire",
+          "weaknesses": [
+            "lightning"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 292,
+          "attack": 49,
+          "expReward": 72,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 74,
+            "tier": 7,
+            "boss": false
+          },
+          "enemyId": "goblin",
+          "enemyInstanceId": "tower-74-e1-goblin"
+        },
+        {
+          "id": "tower-normal-74-stone_golem",
+          "name": "塔のストーンゴーレム",
+          "element": "earth",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "lightning"
+          ],
+          "maxHp": 427,
+          "attack": 60,
+          "expReward": 144,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 74,
+            "tier": 7,
+            "boss": false
+          },
+          "enemyId": "stone_golem",
+          "enemyInstanceId": "tower-74-e2-stone_golem"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-75",
+    "floor": 75,
+    "encounter": {
+      "floor": 75,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 185,
+      "enemies": [
+        {
+          "id": "tower-normal-75-stone_golem",
+          "name": "塔のストーンゴーレム",
+          "element": "earth",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "lightning"
+          ],
+          "maxHp": 434,
+          "attack": 61,
+          "expReward": 144,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 75,
+            "tier": 7,
+            "boss": false
+          },
+          "enemyId": "stone_golem",
+          "enemyInstanceId": "tower-75-e1-stone_golem"
+        },
+        {
+          "id": "tower-normal-75-slime",
+          "name": "塔のスライム",
+          "element": "water",
+          "weaknesses": [
+            "fire"
+          ],
+          "resistances": [
+            "water"
+          ],
+          "maxHp": 228,
+          "attack": 39,
+          "expReward": 41,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 75,
+            "tier": 7,
+            "boss": false
+          },
+          "enemyId": "slime",
+          "enemyInstanceId": "tower-75-e2-slime"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-76",
+    "floor": 76,
+    "encounter": {
+      "floor": 76,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 113,
+      "enemies": [
+        {
+          "id": "tower-normal-76-slime",
+          "name": "塔のスライム",
+          "element": "water",
+          "weaknesses": [
+            "fire"
+          ],
+          "resistances": [
+            "water"
+          ],
+          "maxHp": 232,
+          "attack": 39,
+          "expReward": 41,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 76,
+            "tier": 7,
+            "boss": false
+          },
+          "enemyId": "slime",
+          "enemyInstanceId": "tower-76-e1-slime"
+        },
+        {
+          "id": "tower-normal-76-goblin",
+          "name": "塔のゴブリン",
+          "element": "fire",
+          "weaknesses": [
+            "lightning"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 301,
+          "attack": 50,
+          "expReward": 72,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 76,
+            "tier": 7,
+            "boss": false
+          },
+          "enemyId": "goblin",
+          "enemyInstanceId": "tower-76-e2-goblin"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-77",
+    "floor": 77,
+    "encounter": {
+      "floor": 77,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 257,
+      "enemies": [
+        {
+          "id": "tower-normal-77-goblin",
+          "name": "塔のゴブリン",
+          "element": "fire",
+          "weaknesses": [
+            "lightning"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 306,
+          "attack": 51,
+          "expReward": 72,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 77,
+            "tier": 7,
+            "boss": false
+          },
+          "enemyId": "goblin",
+          "enemyInstanceId": "tower-77-e1-goblin"
+        },
+        {
+          "id": "tower-normal-77-stone_golem",
+          "name": "塔のストーンゴーレム",
+          "element": "earth",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "lightning"
+          ],
+          "maxHp": 447,
+          "attack": 62,
+          "expReward": 144,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 77,
+            "tier": 7,
+            "boss": false
+          },
+          "enemyId": "stone_golem",
+          "enemyInstanceId": "tower-77-e2-stone_golem"
+        },
+        {
+          "id": "tower-normal-77-slime",
+          "name": "塔のスライム",
+          "element": "water",
+          "weaknesses": [
+            "fire"
+          ],
+          "resistances": [
+            "water"
+          ],
+          "maxHp": 235,
+          "attack": 40,
+          "expReward": 41,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 77,
+            "tier": 7,
+            "boss": false
+          },
+          "enemyId": "slime",
+          "enemyInstanceId": "tower-77-e3-slime"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-78",
+    "floor": 78,
+    "encounter": {
+      "floor": 78,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 257,
+      "enemies": [
+        {
+          "id": "tower-normal-78-stone_golem",
+          "name": "塔のストーンゴーレム",
+          "element": "earth",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "lightning"
+          ],
+          "maxHp": 453,
+          "attack": 63,
+          "expReward": 144,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 78,
+            "tier": 7,
+            "boss": false
+          },
+          "enemyId": "stone_golem",
+          "enemyInstanceId": "tower-78-e1-stone_golem"
+        },
+        {
+          "id": "tower-normal-78-slime",
+          "name": "塔のスライム",
+          "element": "water",
+          "weaknesses": [
+            "fire"
+          ],
+          "resistances": [
+            "water"
+          ],
+          "maxHp": 239,
+          "attack": 40,
+          "expReward": 41,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 78,
+            "tier": 7,
+            "boss": false
+          },
+          "enemyId": "slime",
+          "enemyInstanceId": "tower-78-e2-slime"
+        },
+        {
+          "id": "tower-normal-78-goblin",
+          "name": "塔のゴブリン",
+          "element": "fire",
+          "weaknesses": [
+            "lightning"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 310,
+          "attack": 51,
+          "expReward": 72,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 78,
+            "tier": 7,
+            "boss": false
+          },
+          "enemyId": "goblin",
+          "enemyInstanceId": "tower-78-e3-goblin"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-79",
+    "floor": 79,
+    "encounter": {
+      "floor": 79,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 257,
+      "enemies": [
+        {
+          "id": "tower-normal-79-slime",
+          "name": "塔のスライム",
+          "element": "water",
+          "weaknesses": [
+            "fire"
+          ],
+          "resistances": [
+            "water"
+          ],
+          "maxHp": 242,
+          "attack": 40,
+          "expReward": 41,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 79,
+            "tier": 7,
+            "boss": false
+          },
+          "enemyId": "slime",
+          "enemyInstanceId": "tower-79-e1-slime"
+        },
+        {
+          "id": "tower-normal-79-goblin",
+          "name": "塔のゴブリン",
+          "element": "fire",
+          "weaknesses": [
+            "lightning"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 315,
+          "attack": 52,
+          "expReward": 72,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 79,
+            "tier": 7,
+            "boss": false
+          },
+          "enemyId": "goblin",
+          "enemyInstanceId": "tower-79-e2-goblin"
+        },
+        {
+          "id": "tower-normal-79-stone_golem",
+          "name": "塔のストーンゴーレム",
+          "element": "earth",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "lightning"
+          ],
+          "maxHp": 460,
+          "attack": 64,
+          "expReward": 144,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 79,
+            "tier": 7,
+            "boss": false
+          },
+          "enemyId": "stone_golem",
+          "enemyInstanceId": "tower-79-e3-stone_golem"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-80",
+    "floor": 80,
+    "encounter": {
+      "floor": 80,
+      "rulesVersion": 5,
+      "energyCost": 3,
+      "expReward": 554,
+      "enemies": [
+        {
+          "id": "tower-boss-80-ancient_golem",
+          "name": "塔のエンシェントゴーレム",
+          "element": "earth",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "lightning"
+          ],
+          "maxHp": 566,
+          "attack": 43,
+          "expReward": 369,
+          "energyCost": 3,
+          "actionPattern": [
+            "normal_attack",
+            "golem_rock_crush",
+            "normal_attack",
+            "golem_earthquake"
+          ],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 80,
+            "tier": 7,
+            "boss": true
+          },
+          "enemyId": "ancient_golem",
+          "enemyInstanceId": "tower-80-e1-ancient_golem"
+        },
+        {
+          "id": "tower-boss-80-stone_golem",
+          "name": "塔のストーンゴーレム",
+          "element": "earth",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "lightning"
+          ],
+          "maxHp": 467,
+          "attack": 64,
+          "expReward": 144,
+          "energyCost": 3,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 80,
+            "tier": 7,
+            "boss": true
+          },
+          "enemyId": "stone_golem",
+          "enemyInstanceId": "tower-80-e2-stone_golem"
+        },
+        {
+          "id": "tower-boss-80-slime",
+          "name": "塔のスライム",
+          "element": "water",
+          "weaknesses": [
+            "fire"
+          ],
+          "resistances": [
+            "water"
+          ],
+          "maxHp": 246,
+          "attack": 41,
+          "expReward": 41,
+          "energyCost": 3,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 80,
+            "tier": 7,
+            "boss": true
+          },
+          "enemyId": "slime",
+          "enemyInstanceId": "tower-80-e3-slime"
+        }
+      ],
+      "boss": true
+    }
+  },
+  {
+    "id": "tower-81",
+    "floor": 81,
+    "encounter": {
+      "floor": 81,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 154,
+      "enemies": [
+        {
+          "id": "tower-normal-81-stone_golem",
+          "name": "塔のストーンゴーレム",
+          "element": "earth",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "lightning"
+          ],
+          "maxHp": 499,
+          "attack": 69,
+          "expReward": 154,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 81,
+            "tier": 8,
+            "boss": false
+          },
+          "enemyId": "stone_golem",
+          "enemyInstanceId": "tower-81-e1-stone_golem"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-82",
+    "floor": 82,
+    "encounter": {
+      "floor": 82,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 44,
+      "enemies": [
+        {
+          "id": "tower-normal-82-slime",
+          "name": "塔のスライム",
+          "element": "water",
+          "weaknesses": [
+            "fire"
+          ],
+          "resistances": [
+            "water"
+          ],
+          "maxHp": 266,
+          "attack": 44,
+          "expReward": 44,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 82,
+            "tier": 8,
+            "boss": false
+          },
+          "enemyId": "slime",
+          "enemyInstanceId": "tower-82-e1-slime"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-83",
+    "floor": 83,
+    "encounter": {
+      "floor": 83,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 77,
+      "enemies": [
+        {
+          "id": "tower-normal-83-goblin",
+          "name": "塔のゴブリン",
+          "element": "fire",
+          "weaknesses": [
+            "lightning"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 351,
+          "attack": 57,
+          "expReward": 77,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 83,
+            "tier": 8,
+            "boss": false
+          },
+          "enemyId": "goblin",
+          "enemyInstanceId": "tower-83-e1-goblin"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-84",
+    "floor": 84,
+    "encounter": {
+      "floor": 84,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 198,
+      "enemies": [
+        {
+          "id": "tower-normal-84-stone_golem",
+          "name": "塔のストーンゴーレム",
+          "element": "earth",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "lightning"
+          ],
+          "maxHp": 521,
+          "attack": 71,
+          "expReward": 154,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 84,
+            "tier": 8,
+            "boss": false
+          },
+          "enemyId": "stone_golem",
+          "enemyInstanceId": "tower-84-e1-stone_golem"
+        },
+        {
+          "id": "tower-normal-84-slime",
+          "name": "塔のスライム",
+          "element": "water",
+          "weaknesses": [
+            "fire"
+          ],
+          "resistances": [
+            "water"
+          ],
+          "maxHp": 274,
+          "attack": 45,
+          "expReward": 44,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 84,
+            "tier": 8,
+            "boss": false
+          },
+          "enemyId": "slime",
+          "enemyInstanceId": "tower-84-e2-slime"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-85",
+    "floor": 85,
+    "encounter": {
+      "floor": 85,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 121,
+      "enemies": [
+        {
+          "id": "tower-normal-85-slime",
+          "name": "塔のスライム",
+          "element": "water",
+          "weaknesses": [
+            "fire"
+          ],
+          "resistances": [
+            "water"
+          ],
+          "maxHp": 278,
+          "attack": 46,
+          "expReward": 44,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 85,
+            "tier": 8,
+            "boss": false
+          },
+          "enemyId": "slime",
+          "enemyInstanceId": "tower-85-e1-slime"
+        },
+        {
+          "id": "tower-normal-85-goblin",
+          "name": "塔のゴブリン",
+          "element": "fire",
+          "weaknesses": [
+            "lightning"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 362,
+          "attack": 59,
+          "expReward": 77,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 85,
+            "tier": 8,
+            "boss": false
+          },
+          "enemyId": "goblin",
+          "enemyInstanceId": "tower-85-e2-goblin"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-86",
+    "floor": 86,
+    "encounter": {
+      "floor": 86,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 231,
+      "enemies": [
+        {
+          "id": "tower-normal-86-goblin",
+          "name": "塔のゴブリン",
+          "element": "fire",
+          "weaknesses": [
+            "lightning"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 367,
+          "attack": 59,
+          "expReward": 77,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 86,
+            "tier": 8,
+            "boss": false
+          },
+          "enemyId": "goblin",
+          "enemyInstanceId": "tower-86-e1-goblin"
+        },
+        {
+          "id": "tower-normal-86-stone_golem",
+          "name": "塔のストーンゴーレム",
+          "element": "earth",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "lightning"
+          ],
+          "maxHp": 536,
+          "attack": 72,
+          "expReward": 154,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 86,
+            "tier": 8,
+            "boss": false
+          },
+          "enemyId": "stone_golem",
+          "enemyInstanceId": "tower-86-e2-stone_golem"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-87",
+    "floor": 87,
+    "encounter": {
+      "floor": 87,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 275,
+      "enemies": [
+        {
+          "id": "tower-normal-87-stone_golem",
+          "name": "塔のストーンゴーレム",
+          "element": "earth",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "lightning"
+          ],
+          "maxHp": 544,
+          "attack": 73,
+          "expReward": 154,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 87,
+            "tier": 8,
+            "boss": false
+          },
+          "enemyId": "stone_golem",
+          "enemyInstanceId": "tower-87-e1-stone_golem"
+        },
+        {
+          "id": "tower-normal-87-slime",
+          "name": "塔のスライム",
+          "element": "water",
+          "weaknesses": [
+            "fire"
+          ],
+          "resistances": [
+            "water"
+          ],
+          "maxHp": 286,
+          "attack": 47,
+          "expReward": 44,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 87,
+            "tier": 8,
+            "boss": false
+          },
+          "enemyId": "slime",
+          "enemyInstanceId": "tower-87-e2-slime"
+        },
+        {
+          "id": "tower-normal-87-goblin",
+          "name": "塔のゴブリン",
+          "element": "fire",
+          "weaknesses": [
+            "lightning"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 372,
+          "attack": 60,
+          "expReward": 77,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 87,
+            "tier": 8,
+            "boss": false
+          },
+          "enemyId": "goblin",
+          "enemyInstanceId": "tower-87-e3-goblin"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-88",
+    "floor": 88,
+    "encounter": {
+      "floor": 88,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 275,
+      "enemies": [
+        {
+          "id": "tower-normal-88-slime",
+          "name": "塔のスライム",
+          "element": "water",
+          "weaknesses": [
+            "fire"
+          ],
+          "resistances": [
+            "water"
+          ],
+          "maxHp": 290,
+          "attack": 47,
+          "expReward": 44,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 88,
+            "tier": 8,
+            "boss": false
+          },
+          "enemyId": "slime",
+          "enemyInstanceId": "tower-88-e1-slime"
+        },
+        {
+          "id": "tower-normal-88-goblin",
+          "name": "塔のゴブリン",
+          "element": "fire",
+          "weaknesses": [
+            "lightning"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 377,
+          "attack": 61,
+          "expReward": 77,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 88,
+            "tier": 8,
+            "boss": false
+          },
+          "enemyId": "goblin",
+          "enemyInstanceId": "tower-88-e2-goblin"
+        },
+        {
+          "id": "tower-normal-88-stone_golem",
+          "name": "塔のストーンゴーレム",
+          "element": "earth",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "lightning"
+          ],
+          "maxHp": 552,
+          "attack": 74,
+          "expReward": 154,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 88,
+            "tier": 8,
+            "boss": false
+          },
+          "enemyId": "stone_golem",
+          "enemyInstanceId": "tower-88-e3-stone_golem"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-89",
+    "floor": 89,
+    "encounter": {
+      "floor": 89,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 275,
+      "enemies": [
+        {
+          "id": "tower-normal-89-goblin",
+          "name": "塔のゴブリン",
+          "element": "fire",
+          "weaknesses": [
+            "lightning"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 383,
+          "attack": 61,
+          "expReward": 77,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 89,
+            "tier": 8,
+            "boss": false
+          },
+          "enemyId": "goblin",
+          "enemyInstanceId": "tower-89-e1-goblin"
+        },
+        {
+          "id": "tower-normal-89-stone_golem",
+          "name": "塔のストーンゴーレム",
+          "element": "earth",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "lightning"
+          ],
+          "maxHp": 560,
+          "attack": 75,
+          "expReward": 154,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 89,
+            "tier": 8,
+            "boss": false
+          },
+          "enemyId": "stone_golem",
+          "enemyInstanceId": "tower-89-e2-stone_golem"
+        },
+        {
+          "id": "tower-normal-89-slime",
+          "name": "塔のスライム",
+          "element": "water",
+          "weaknesses": [
+            "fire"
+          ],
+          "resistances": [
+            "water"
+          ],
+          "maxHp": 294,
+          "attack": 48,
+          "expReward": 44,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 89,
+            "tier": 8,
+            "boss": false
+          },
+          "enemyId": "slime",
+          "enemyInstanceId": "tower-89-e3-slime"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-90",
+    "floor": 90,
+    "encounter": {
+      "floor": 90,
+      "rulesVersion": 5,
+      "energyCost": 3,
+      "expReward": 385,
+      "enemies": [
+        {
+          "id": "tower-boss-90-orc_chief",
+          "name": "塔のオークチーフ",
+          "element": "fire",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 499,
+          "attack": 51,
+          "expReward": 264,
+          "energyCost": 3,
+          "actionPattern": [
+            "normal_attack",
+            "normal_attack",
+            "orc_heavy_strike"
+          ],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 90,
+            "tier": 8,
+            "boss": true
+          },
+          "enemyId": "orc_chief",
+          "enemyInstanceId": "tower-90-e1-orc_chief"
+        },
+        {
+          "id": "tower-boss-90-slime",
+          "name": "塔のスライム",
+          "element": "water",
+          "weaknesses": [
+            "fire"
+          ],
+          "resistances": [
+            "water"
+          ],
+          "maxHp": 299,
+          "attack": 48,
+          "expReward": 44,
+          "energyCost": 3,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 90,
+            "tier": 8,
+            "boss": true
+          },
+          "enemyId": "slime",
+          "enemyInstanceId": "tower-90-e2-slime"
+        },
+        {
+          "id": "tower-boss-90-goblin",
+          "name": "塔のゴブリン",
+          "element": "fire",
+          "weaknesses": [
+            "lightning"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 388,
+          "attack": 62,
+          "expReward": 77,
+          "energyCost": 3,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 90,
+            "tier": 8,
+            "boss": true
+          },
+          "enemyId": "goblin",
+          "enemyInstanceId": "tower-90-e3-goblin"
+        }
+      ],
+      "boss": true
+    }
+  },
+  {
+    "id": "tower-91",
+    "floor": 91,
+    "encounter": {
+      "floor": 91,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 47,
+      "enemies": [
+        {
+          "id": "tower-normal-91-slime",
+          "name": "塔のスライム",
+          "element": "water",
+          "weaknesses": [
+            "fire"
+          ],
+          "resistances": [
+            "water"
+          ],
+          "maxHp": 319,
+          "attack": 51,
+          "expReward": 47,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 91,
+            "tier": 9,
+            "boss": false
+          },
+          "enemyId": "slime",
+          "enemyInstanceId": "tower-91-e1-slime"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-92",
+    "floor": 92,
+    "encounter": {
+      "floor": 92,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 82,
+      "enemies": [
+        {
+          "id": "tower-normal-92-goblin",
+          "name": "塔のゴブリン",
+          "element": "fire",
+          "weaknesses": [
+            "lightning"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 421,
+          "attack": 67,
+          "expReward": 82,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 92,
+            "tier": 9,
+            "boss": false
+          },
+          "enemyId": "goblin",
+          "enemyInstanceId": "tower-92-e1-goblin"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-93",
+    "floor": 93,
+    "encounter": {
+      "floor": 93,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 164,
+      "enemies": [
+        {
+          "id": "tower-normal-93-stone_golem",
+          "name": "塔のストーンゴーレム",
+          "element": "earth",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "lightning"
+          ],
+          "maxHp": 623,
+          "attack": 82,
+          "expReward": 164,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 93,
+            "tier": 9,
+            "boss": false
+          },
+          "enemyId": "stone_golem",
+          "enemyInstanceId": "tower-93-e1-stone_golem"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-94",
+    "floor": 94,
+    "encounter": {
+      "floor": 94,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 129,
+      "enemies": [
+        {
+          "id": "tower-normal-94-slime",
+          "name": "塔のスライム",
+          "element": "water",
+          "weaknesses": [
+            "fire"
+          ],
+          "resistances": [
+            "water"
+          ],
+          "maxHp": 333,
+          "attack": 53,
+          "expReward": 47,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 94,
+            "tier": 9,
+            "boss": false
+          },
+          "enemyId": "slime",
+          "enemyInstanceId": "tower-94-e1-slime"
+        },
+        {
+          "id": "tower-normal-94-goblin",
+          "name": "塔のゴブリン",
+          "element": "fire",
+          "weaknesses": [
+            "lightning"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 432,
+          "attack": 68,
+          "expReward": 82,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 94,
+            "tier": 9,
+            "boss": false
+          },
+          "enemyId": "goblin",
+          "enemyInstanceId": "tower-94-e2-goblin"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-95",
+    "floor": 95,
+    "encounter": {
+      "floor": 95,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 246,
+      "enemies": [
+        {
+          "id": "tower-normal-95-goblin",
+          "name": "塔のゴブリン",
+          "element": "fire",
+          "weaknesses": [
+            "lightning"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 438,
+          "attack": 69,
+          "expReward": 82,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 95,
+            "tier": 9,
+            "boss": false
+          },
+          "enemyId": "goblin",
+          "enemyInstanceId": "tower-95-e1-goblin"
+        },
+        {
+          "id": "tower-normal-95-stone_golem",
+          "name": "塔のストーンゴーレム",
+          "element": "earth",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "lightning"
+          ],
+          "maxHp": 641,
+          "attack": 84,
+          "expReward": 164,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 95,
+            "tier": 9,
+            "boss": false
+          },
+          "enemyId": "stone_golem",
+          "enemyInstanceId": "tower-95-e2-stone_golem"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-96",
+    "floor": 96,
+    "encounter": {
+      "floor": 96,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 211,
+      "enemies": [
+        {
+          "id": "tower-normal-96-stone_golem",
+          "name": "塔のストーンゴーレム",
+          "element": "earth",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "lightning"
+          ],
+          "maxHp": 650,
+          "attack": 85,
+          "expReward": 164,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 96,
+            "tier": 9,
+            "boss": false
+          },
+          "enemyId": "stone_golem",
+          "enemyInstanceId": "tower-96-e1-stone_golem"
+        },
+        {
+          "id": "tower-normal-96-slime",
+          "name": "塔のスライム",
+          "element": "water",
+          "weaknesses": [
+            "fire"
+          ],
+          "resistances": [
+            "water"
+          ],
+          "maxHp": 342,
+          "attack": 54,
+          "expReward": 47,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 96,
+            "tier": 9,
+            "boss": false
+          },
+          "enemyId": "slime",
+          "enemyInstanceId": "tower-96-e2-slime"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-97",
+    "floor": 97,
+    "encounter": {
+      "floor": 97,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 293,
+      "enemies": [
+        {
+          "id": "tower-normal-97-slime",
+          "name": "塔のスライム",
+          "element": "water",
+          "weaknesses": [
+            "fire"
+          ],
+          "resistances": [
+            "water"
+          ],
+          "maxHp": 347,
+          "attack": 55,
+          "expReward": 47,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 97,
+            "tier": 9,
+            "boss": false
+          },
+          "enemyId": "slime",
+          "enemyInstanceId": "tower-97-e1-slime"
+        },
+        {
+          "id": "tower-normal-97-goblin",
+          "name": "塔のゴブリン",
+          "element": "fire",
+          "weaknesses": [
+            "lightning"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 451,
+          "attack": 70,
+          "expReward": 82,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 97,
+            "tier": 9,
+            "boss": false
+          },
+          "enemyId": "goblin",
+          "enemyInstanceId": "tower-97-e2-goblin"
+        },
+        {
+          "id": "tower-normal-97-stone_golem",
+          "name": "塔のストーンゴーレム",
+          "element": "earth",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "lightning"
+          ],
+          "maxHp": 659,
+          "attack": 86,
+          "expReward": 164,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 97,
+            "tier": 9,
+            "boss": false
+          },
+          "enemyId": "stone_golem",
+          "enemyInstanceId": "tower-97-e3-stone_golem"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-98",
+    "floor": 98,
+    "encounter": {
+      "floor": 98,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 293,
+      "enemies": [
+        {
+          "id": "tower-normal-98-goblin",
+          "name": "塔のゴブリン",
+          "element": "fire",
+          "weaknesses": [
+            "lightning"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 457,
+          "attack": 71,
+          "expReward": 82,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 98,
+            "tier": 9,
+            "boss": false
+          },
+          "enemyId": "goblin",
+          "enemyInstanceId": "tower-98-e1-goblin"
+        },
+        {
+          "id": "tower-normal-98-stone_golem",
+          "name": "塔のストーンゴーレム",
+          "element": "earth",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "lightning"
+          ],
+          "maxHp": 668,
+          "attack": 87,
+          "expReward": 164,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 98,
+            "tier": 9,
+            "boss": false
+          },
+          "enemyId": "stone_golem",
+          "enemyInstanceId": "tower-98-e2-stone_golem"
+        },
+        {
+          "id": "tower-normal-98-slime",
+          "name": "塔のスライム",
+          "element": "water",
+          "weaknesses": [
+            "fire"
+          ],
+          "resistances": [
+            "water"
+          ],
+          "maxHp": 352,
+          "attack": 55,
+          "expReward": 47,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 98,
+            "tier": 9,
+            "boss": false
+          },
+          "enemyId": "slime",
+          "enemyInstanceId": "tower-98-e3-slime"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-99",
+    "floor": 99,
+    "encounter": {
+      "floor": 99,
+      "rulesVersion": 5,
+      "energyCost": 1,
+      "expReward": 293,
+      "enemies": [
+        {
+          "id": "tower-normal-99-stone_golem",
+          "name": "塔のストーンゴーレム",
+          "element": "earth",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "lightning"
+          ],
+          "maxHp": 677,
+          "attack": 88,
+          "expReward": 164,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 99,
+            "tier": 9,
+            "boss": false
+          },
+          "enemyId": "stone_golem",
+          "enemyInstanceId": "tower-99-e1-stone_golem"
+        },
+        {
+          "id": "tower-normal-99-slime",
+          "name": "塔のスライム",
+          "element": "water",
+          "weaknesses": [
+            "fire"
+          ],
+          "resistances": [
+            "water"
+          ],
+          "maxHp": 357,
+          "attack": 56,
+          "expReward": 47,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 99,
+            "tier": 9,
+            "boss": false
+          },
+          "enemyId": "slime",
+          "enemyInstanceId": "tower-99-e2-slime"
+        },
+        {
+          "id": "tower-normal-99-goblin",
+          "name": "塔のゴブリン",
+          "element": "fire",
+          "weaknesses": [
+            "lightning"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 463,
+          "attack": 72,
+          "expReward": 82,
+          "energyCost": 1,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 99,
+            "tier": 9,
+            "boss": false
+          },
+          "enemyId": "goblin",
+          "enemyInstanceId": "tower-99-e3-goblin"
+        }
+      ],
+      "boss": false
+    }
+  },
+  {
+    "id": "tower-100",
+    "floor": 100,
+    "encounter": {
+      "floor": 100,
+      "rulesVersion": 5,
+      "energyCost": 3,
+      "expReward": 669,
+      "enemies": [
+        {
+          "id": "tower-boss-100-ancient_golem",
+          "name": "塔のエンシェントゴーレム",
+          "element": "earth",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "lightning"
+          ],
+          "maxHp": 832,
+          "attack": 59,
+          "expReward": 423,
+          "energyCost": 3,
+          "actionPattern": [
+            "normal_attack",
+            "golem_rock_crush",
+            "normal_attack",
+            "golem_earthquake"
+          ],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 100,
+            "tier": 9,
+            "boss": true
+          },
+          "enemyId": "ancient_golem",
+          "enemyInstanceId": "tower-100-e1-ancient_golem"
+        },
+        {
+          "id": "tower-boss-100-goblin",
+          "name": "塔のゴブリン",
+          "element": "fire",
+          "weaknesses": [
+            "lightning"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 470,
+          "attack": 73,
+          "expReward": 82,
+          "energyCost": 3,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 100,
+            "tier": 9,
+            "boss": true
+          },
+          "enemyId": "goblin",
+          "enemyInstanceId": "tower-100-e2-goblin"
+        },
+        {
+          "id": "tower-boss-100-stone_golem",
+          "name": "塔のストーンゴーレム",
+          "element": "earth",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "lightning"
+          ],
+          "maxHp": 687,
+          "attack": 89,
+          "expReward": 164,
+          "energyCost": 3,
+          "actionPattern": [],
+          "tower": {
+            "rulesVersion": 5,
+            "floor": 100,
+            "tier": 9,
+            "boss": true
+          },
+          "enemyId": "stone_golem",
+          "enemyInstanceId": "tower-100-e3-stone_golem"
+        }
+      ],
+      "boss": true
+    }
+  },
+  {
+    "id": "weekly_ignis",
+    "encounter": {
+      "rulesVersion": 4,
+      "energyCost": 3,
+      "expReward": 180,
+      "enemies": [
+        {
+          "id": "weekly_ignis",
+          "name": "炎帝イグニス",
+          "element": "fire",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "fire"
+          ],
+          "maxHp": 400,
+          "attack": 26,
+          "alchemyItemId": "dragon_scale",
+          "weekId": "2026-W01",
+          "energyCost": 3,
+          "expReward": 180,
+          "actionPattern": [
+            {
+              "id": "normal",
+              "name": "攻撃",
+              "powerPercent": 100
+            },
+            {
+              "id": "power",
+              "name": "強撃",
+              "powerPercent": 150
+            }
+          ],
+          "reward": {
+            "goldTicket": 1,
+            "starFragments": 30,
+            "alchemyItemId": "dragon_scale",
+            "alchemyItemQuantity": 1,
+            "expReward": 180
+          },
+          "rulesVersion": 4,
+          "enemyInstanceId": "weekly_ignis"
+        }
+      ]
+    }
+  },
+  {
+    "id": "weekly_leviathan",
+    "encounter": {
+      "rulesVersion": 4,
+      "energyCost": 3,
+      "expReward": 180,
+      "enemies": [
+        {
+          "id": "weekly_leviathan",
+          "name": "蒼海竜リヴァイア",
+          "element": "water",
+          "weaknesses": [
+            "lightning"
+          ],
+          "resistances": [
+            "water"
+          ],
+          "maxHp": 420,
+          "attack": 25,
+          "alchemyItemId": "sage_stone",
+          "weekId": "2026-W02",
+          "energyCost": 3,
+          "expReward": 180,
+          "actionPattern": [
+            {
+              "id": "normal",
+              "name": "攻撃",
+              "powerPercent": 100
+            },
+            {
+              "id": "power",
+              "name": "強撃",
+              "powerPercent": 150
+            }
+          ],
+          "reward": {
+            "goldTicket": 1,
+            "starFragments": 30,
+            "alchemyItemId": "sage_stone",
+            "alchemyItemQuantity": 1,
+            "expReward": 180
+          },
+          "rulesVersion": 4,
+          "enemyInstanceId": "weekly_leviathan"
+        }
+      ]
+    }
+  },
+  {
+    "id": "weekly_volt",
+    "encounter": {
+      "rulesVersion": 4,
+      "energyCost": 3,
+      "expReward": 180,
+      "enemies": [
+        {
+          "id": "weekly_volt",
+          "name": "雷王ヴォルト",
+          "element": "lightning",
+          "weaknesses": [
+            "fire"
+          ],
+          "resistances": [
+            "lightning"
+          ],
+          "maxHp": 400,
+          "attack": 27,
+          "alchemyItemId": "ancient_core",
+          "weekId": "2026-W03",
+          "energyCost": 3,
+          "expReward": 180,
+          "actionPattern": [
+            {
+              "id": "normal",
+              "name": "攻撃",
+              "powerPercent": 100
+            },
+            {
+              "id": "power",
+              "name": "強撃",
+              "powerPercent": 150
+            }
+          ],
+          "reward": {
+            "goldTicket": 1,
+            "starFragments": 30,
+            "alchemyItemId": "ancient_core",
+            "alchemyItemQuantity": 1,
+            "expReward": 180
+          },
+          "rulesVersion": 4,
+          "enemyInstanceId": "weekly_volt"
+        }
+      ]
+    }
+  },
+  {
+    "id": "weekly_gaia",
+    "encounter": {
+      "rulesVersion": 4,
+      "energyCost": 3,
+      "expReward": 180,
+      "enemies": [
+        {
+          "id": "weekly_gaia",
+          "name": "大地巨神ガイア",
+          "element": "earth",
+          "weaknesses": [
+            "water"
+          ],
+          "resistances": [
+            "lightning"
+          ],
+          "maxHp": 440,
+          "attack": 25,
+          "alchemyItemId": "celestial_cloth",
+          "weekId": "2026-W04",
+          "energyCost": 3,
+          "expReward": 180,
+          "actionPattern": [
+            {
+              "id": "normal",
+              "name": "攻撃",
+              "powerPercent": 100
+            },
+            {
+              "id": "power",
+              "name": "強撃",
+              "powerPercent": 150
+            }
+          ],
+          "reward": {
+            "goldTicket": 1,
+            "starFragments": 30,
+            "alchemyItemId": "celestial_cloth",
+            "alchemyItemQuantity": 1,
+            "expReward": 180
+          },
+          "rulesVersion": 4,
+          "enemyInstanceId": "weekly_gaia"
+        }
+      ]
+    }
+  },
+  {
+    "id": "campaign-slime",
+    "enemy": {
+      "id": "slime",
+      "name": "スライム",
+      "element": "water",
+      "weaknesses": [
+        "fire"
+      ],
+      "resistances": [
+        "water"
+      ],
+      "maxHp": 20,
+      "attack": 3,
+      "energyCost": 1,
+      "expReward": 20
+    }
+  },
+  {
+    "id": "campaign-goblin",
+    "enemy": {
+      "id": "goblin",
+      "name": "ゴブリン",
+      "element": "fire",
+      "weaknesses": [
+        "lightning"
+      ],
+      "resistances": [
+        "fire"
+      ],
+      "maxHp": 38,
+      "attack": 5,
+      "energyCost": 1,
+      "expReward": 35
+    }
+  },
+  {
+    "id": "campaign-stone_golem",
+    "enemy": {
+      "id": "stone_golem",
+      "name": "ストーンゴーレム",
+      "element": "earth",
+      "weaknesses": [
+        "water"
+      ],
+      "resistances": [
+        "lightning"
+      ],
+      "maxHp": 74,
+      "attack": 7,
+      "energyCost": 2,
+      "expReward": 70
+    }
+  },
+  {
+    "id": "campaign-orc_chief",
+    "enemy": {
+      "id": "orc_chief",
+      "name": "オークチーフ",
+      "element": "fire",
+      "weaknesses": [
+        "water"
+      ],
+      "resistances": [
+        "fire"
+      ],
+      "maxHp": 74,
+      "attack": 7,
+      "energyCost": 3,
+      "expReward": 120,
+      "actionPattern": [
+        "normal_attack",
+        "normal_attack",
+        "orc_heavy_strike"
+      ],
+      "firstClearReward": {
+        "gold": 150,
+        "materials": {
+          "iron": 5,
+          "wisdom_scroll": 2
+        }
+      }
+    },
+    "boss": true
+  },
+  {
+    "id": "campaign-ancient_golem",
+    "enemy": {
+      "id": "ancient_golem",
+      "name": "エンシェントゴーレム",
+      "element": "earth",
+      "weaknesses": [
+        "water"
+      ],
+      "resistances": [
+        "lightning"
+      ],
+      "maxHp": 102,
+      "attack": 8,
+      "energyCost": 4,
+      "expReward": 180,
+      "actionPattern": [
+        "normal_attack",
+        "golem_rock_crush",
+        "normal_attack",
+        "golem_earthquake"
+      ],
+      "firstClearReward": {
+        "gold": 250,
+        "materials": {
+          "mineral": 5,
+          "logic_core": 3
+        }
+      }
+    },
+    "boss": true
+  }
+]
