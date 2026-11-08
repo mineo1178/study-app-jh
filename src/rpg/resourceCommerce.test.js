@@ -10,28 +10,26 @@ import { preparePurchase, prepareResourcePurchase } from '../data/rpgShopReposit
 import { prepareMaterialTrade } from '../data/rpgMaterialExchangeRepository.js';
 
 const buys = Object.values(RESOURCE_SHOP_CATALOG), trades = Object.values(MATERIAL_TRADE_CATALOG);
-const rich = { gold: 5000, materials: Object.fromEntries(MATERIAL_KEYS.map(key => [key, 50])) };
+const rich = { gold: 50000, materials: Object.fromEntries(MATERIAL_KEYS.map(key => [key, 50])) };
 const buy = (itemId, profile = rich, quantity = 1) => prepareResourcePurchase({ profile, itemId, quantity, actionId: 'buy', now: 1 });
 const trade = (recipeId, profile = rich, quantity = 1) => prepareMaterialTrade({ profile, recipeId, quantity, actionId: 'trade', now: 1 });
 describe('resource catalog and validation', () => {
-  it('defines 18 unique products and 108 unique recipes with valid IDs, counts and prices', () => {
-    expect(buys).toHaveLength(18); expect(trades).toHaveLength(108);
+  it('defines 26 unique products and 124 unique recipes with valid IDs, counts and prices', () => {
+    expect(buys).toHaveLength(26); expect(trades).toHaveLength(124);
     const ids = [...buys, ...trades].map(item => item.id);
     expect(new Set(ids).size).toBe(ids.length);
     for (const item of [...buys, ...trades]) {
       expect(item.name).toBeTruthy();
       for (const [key, count] of Object.entries({ ...item.cost.materials, ...item.receive.materials })) { expect(MATERIAL_KEYS).toContain(key); expect(Number.isSafeInteger(count) && count > 0).toBe(true); }
-      for (const [key, count] of Object.entries(item.receive.alchemyItems)) { expect(['N', 'R']).toContain(ALCHEMY_ITEMS[key]?.rarity); expect(count).toBe(1); }
+      for (const [key, count] of Object.entries(item.receive.alchemyItems)) { expect(['N', 'R', 'SR', 'SSR']).toContain(ALCHEMY_ITEMS[key]?.rarity); expect(count).toBe(1); }
       if (buys.includes(item)) expect(Number.isSafeInteger(item.cost.gold) && item.cost.gold > 0).toBe(true);
     }
     for (const recipe of trades.filter(item => item.category === 'alchemy')) expect(Object.values(recipe.cost.materials).reduce((a,b) => a+b, 0)).toBe(ALCHEMY_ITEMS[Object.keys(recipe.receive.alchemyItems)[0]].rarity === 'N' ? 5 : 12);
   });
-  it.each(Object.values(EQUIPMENT_CATALOG))('maintains the sale status of $id', item => {
-    const purchasable = hasEquipmentPrice(item);
-    expect(getShopItemState(rich, item).purchasable).toBe(purchasable);
-    if (purchasable) expect(preparePurchase({ profile: rich, item, actionId: 'equipment', now: 1 }).ledger.cost).toEqual(item.cost);
-    else expect(() => preparePurchase({ profile: rich, item, actionId: 'equipment', now: 1 })).toThrow('ITEM_NOT_FOR_SALE');
-    expect(Object.values(EQUIPMENT_CATALOG).filter(hasEquipmentPrice)).toHaveLength(6);
+  it.each(Object.values(EQUIPMENT_CATALOG))('offers $id at its catalog price', item => {
+    expect(hasEquipmentPrice(item)).toBe(true);
+    expect(getShopItemState(rich, item).purchasable).toBe(true);
+    expect(preparePurchase({ profile: rich, item, actionId: 'equipment', now: 1 }).ledger.cost).toEqual(item.cost);
   });
   it.each([undefined, null, {}, { id: 'bad' }, { id: 'fake', cost: { gold: 0 } }, { id: 'fake', cost: { gold: -1 } }])('does not offer unpriced equipment: %j', item => expect(getShopItemState(rich, item).purchasable).toBe(false));
   it.each(['missing', '__proto__', 'constructor'])('rejects unknown catalog ID %s', id => {
@@ -47,6 +45,14 @@ describe('resource catalog and validation', () => {
   });
 });
 describe('resource transfers and economy', () => {
+  it('sells one duplicate below replacement cost and preserves the last copy', () => {
+    const profile = { ...rich, gacha: { alchemyItems: { dragon_scale: 2 }, starFragments: 10 } };
+    const sold = trade('sell_dragon_scale', profile);
+    expect(sold.profile.gold).toBe(rich.gold + 1200);
+    expect(sold.profile.gacha).toMatchObject({ alchemyItems: { dragon_scale: 1 }, starFragments: 10 });
+    expect(() => trade('sell_dragon_scale', sold.profile)).toThrow('INSUFFICIENT_EXCHANGE_MATERIAL');
+    expect(buy('alchemy_dragon_scale', sold.profile).profile.gold).toBeLessThan(rich.gold);
+  });
   it.each(buys)('buys $id with matching ledger and balance deltas', item => {
     const result = buy(item.id);
     expect(result.profile.gold).toBe(rich.gold - item.cost.gold);
@@ -56,7 +62,9 @@ describe('resource transfers and economy', () => {
     expect(() => buy(item.id, { gold: item.cost.gold - 1 })).toThrow('INSUFFICIENT_GOLD');
   });
   it.each(trades)('exchanges $id with exact deductions and gains', item => {
-    const result = trade(item.id);
+    const alchemyItems = Object.fromEntries(Object.keys(item.cost.alchemyItems || {}).map(key => [key, 2]));
+    const result = trade(item.id, { ...rich, gacha: { alchemyItems } });
+    for (const key of Object.keys(alchemyItems)) expect(result.profile.gacha.alchemyItems[key]).toBe(1);
     for (const key of MATERIAL_KEYS) expect(result.profile.materials[key]).toBe(rich.materials[key] - (item.cost.materials[key] || 0) + (item.receive.materials[key] || 0));
     expect(result.profile.gold).toBe(rich.gold + item.receive.gold);
     expect(result.ledger.cost).toEqual(item.cost); expect(result.ledger.receive).toEqual(item.receive);
@@ -76,10 +84,10 @@ describe('resource transfers and economy', () => {
     expect(state.available).toBe(false); expect(state.rows[0]).toMatchObject({ before: 20, after: -10, shortage: 10 }); expect(profile).toEqual(before);
   });
   it('has no value-increasing cycle under a common potential for every product and recipe', () => {
-    const value = resources => (resources.gold || 0) + Object.values(resources.materials || {}).reduce((a,b) => a+b, 0) * 5 + Object.entries(resources.alchemyItems || {}).reduce((sum,[key,count]) => sum + count * (ALCHEMY_ITEMS[key].rarity === 'N' ? 25 : 60), 0);
+    const value = resources => (resources.gold || 0) + Object.values(resources.materials || {}).reduce((a,b) => a+b, 0) * 5 + Object.entries(resources.alchemyItems || {}).reduce((sum,[key,count]) => sum + count * ({ N: 25, R: 60, SR: 300, SSR: 1200 }[ALCHEMY_ITEMS[key].rarity]), 0);
     for (const item of [...buys, ...trades]) expect(value(item.receive)).toBeLessThanOrEqual(value(item.cost));
     // Every allowed step is non-increasing, hence any composition is too.
-    expect(buys.filter(item => item.category === 'alchemy').map(item => item.cost.gold)).toEqual([90,90,90,90,240,240,240,240]);
+    expect(buys.filter(item => item.category === 'alchemy').map(item => item.cost.gold)).toEqual([90,90,90,90,240,240,240,240,3000,3000,3000,3000,12000,12000,12000,12000]);
   });
   it('loses 75G after buying three materials then selling them and loses resources on swap loops', () => {
     let profile = { gold: 100, materials: { iron: 0 } };

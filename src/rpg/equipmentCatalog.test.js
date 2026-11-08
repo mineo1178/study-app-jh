@@ -3,7 +3,7 @@ import { EQUIPMENT_CATALOG, EQUIPMENT_CATALOG_VERSION, EQUIPMENT_SLOTS, getEquip
 
 describe('equipment catalog', () => {
   it('provides versioned shop and alchemy equipment', () => {
-    expect(EQUIPMENT_CATALOG_VERSION).toBe(3);
+    expect(EQUIPMENT_CATALOG_VERSION).toBe(4);
     expect(Object.keys(EQUIPMENT_CATALOG)).toHaveLength(22);
     for (const item of Object.values(EQUIPMENT_CATALOG)) {
       expect(item).toMatchObject({ id: expect.any(String), name: expect.any(String), rarity: expect.any(String), description: expect.any(String) });

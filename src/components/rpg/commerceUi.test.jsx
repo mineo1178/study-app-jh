@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
+import GachaPanel from './GachaPanel.jsx';
 import RpgShop from './RpgShop.jsx';
 import MaterialExchange from './MaterialExchange.jsx';
 import PurchaseConfirmModal from './PurchaseConfirmModal.jsx';
@@ -7,16 +8,21 @@ import MaterialExchangeConfirmModal from './MaterialExchangeConfirmModal.jsx';
 import { RESOURCE_SHOP_CATALOG } from '../../rpg/resourceShopCatalog.js';
 const profile={ gold: 1000, materials: { iron: 10 } };
 describe('commerce rendering', () => {
-  it('shows all three shop categories, six sale buttons, and 16 alchemy-only labels without 0 GOLD prices', () => {
+  it('shows all shop categories and every equipment item with a positive price', () => {
     const html=renderToStaticMarkup(<RpgShop profile={profile}/>);
     expect(html).toContain('学習素材'); expect(html).toContain('錬金素材');
-    expect((html.match(/>購入する</g)||[])).toHaveLength(6);
-    expect((html.match(/>錬金専用</g)||[])).toHaveLength(16);
+    expect((html.match(/>購入する</g)||[])).toHaveLength(22);
+    expect(html).toContain('42,000 GOLD');
     expect(html).not.toMatch(/>0 GOLD</);
   });
-  it('shows three exchange categories and disables an unselected recipe', () => {
+  it('shows the exchange categories and disables an unselected recipe', () => {
     const html=renderToStaticMarkup(<MaterialExchange profile={profile}/>);
-    expect(html).toContain('GOLDへ交換'); expect(html).toContain('錬金素材へ交換'); expect(html).toMatch(/disabled=""[^>]*>交換内容を確認する/);
+    expect(html).toContain('余った錬金素材を売る'); expect(html).toContain('GOLDへ交換'); expect(html).toContain('錬金素材へ交換'); expect(html).toMatch(/disabled=""[^>]*>交換内容を確認する/);
+  });
+  it('renders the discounted normal and all four focused gacha', () => {
+    const html = renderToStaticMarkup(<GachaPanel profile={{ gold: 10000 }}/>);
+    for (const label of ['3,000 GOLD', '武器装備', '防具装備', 'アクセサリー装備', '回復・防御スキルを使う仲間', 'PREMIUM・特別レア']) expect(html).toContain(label);
+    expect((html.match(/>1回引く</g) || [])).toHaveLength(8);
   });
   it('shows authoritative price, quantity and before/after values in a named modal', () => {
     const html=renderToStaticMarkup(<PurchaseConfirmModal item={RESOURCE_SHOP_CATALOG.material_iron} profile={profile}/>);

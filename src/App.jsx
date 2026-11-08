@@ -24,6 +24,7 @@ import { createRpgActionId, equipItem, purchaseEquipment, purchaseResource, uneq
 import { createMaterialExchangeActionId, exchangeMaterial } from './data/rpgMaterialExchangeRepository';
 import { attackBattle, createBattleActionId, createBattleId, rpgBattleRef, startBattle, startBossBattle, startTowerBattle, startWeeklyBossBattle, useBattleSkill as runBattleSkill } from './data/rpgBattleRepository';
 import { saveParty } from './data/rpgPartyRepository';
+import { getGachaResultName } from './rpg/gachaCatalog';
 import { createGachaActionId, drawGacha, exchangeGachaFragments, purchaseGachaTicket } from './data/rpgGachaRepository';
 import { craftAlchemy, createAlchemyActionId } from './data/rpgAlchemyRepository';
 import { rpgProgressRef } from './data/rpgProgressRepository';
@@ -114,7 +115,7 @@ const getTasksCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-
 const getTestsCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tests');
 const getStudySessionsCol = () => studySessionsCollection(db, FAMILY_ID);
 const getActiveTimerRef = () => activeTimerRef(db, FAMILY_ID);
-const APP_VERSION = 'v2.9.15';
+const APP_VERSION = 'v2.9.16';
 const isDocumentHidden = () => typeof document !== 'undefined' && document.hidden;
 // ==========================================
 // Constants & Master Data
@@ -897,6 +898,7 @@ export default function App() {
     const [savingParty, setSavingParty] = useState(false);
     const [savingTitle, setSavingTitle] = useState(false);
     const [gachaPending, setGachaPending] = useState(false);
+    const gachaPendingRef = useRef(false);
     const [alchemyPending, setAlchemyPending] = useState(false);
     const [activeTimer, setActiveTimer] = useState(null);
     const [deviceTestEnabled] = useState(() => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('deviceTest') === '1');
@@ -1396,15 +1398,16 @@ export default function App() {
         }
     };
     const handleGacha = async (operation, ...args) => {
-        if (isSampleMode || !user || gachaPending) return;
+        if (isSampleMode || !user || gachaPendingRef.current) return;
+        gachaPendingRef.current = true;
         setGachaPending(true); setRpgStatus(null);
         try {
             const actionId = createGachaActionId(operation === 'buy' ? 'gacha-ticket-purchase' : operation === 'draw' ? 'gacha-draw' : 'gacha-fragment-exchange');
             const result = operation === 'buy' ? await purchaseGachaTicket({ db, familyId: FAMILY_ID, ticketType: args[0], actionId }) : operation === 'draw' ? await drawGacha({ db, familyId: FAMILY_ID, ticketType: args[0], actionId }) : await exchangeGachaFragments({ db, familyId: FAMILY_ID, kind: args[0], targetId: args[1], actionId });
             const draw = result.ledger;
-            setRpgStatus(result.applied ? { kind: 'success', message: operation === 'draw' ? `${draw.rarity} ${draw.resultType === 'member' ? draw.memberId : draw.itemId}${draw.duplicate ? ` / かけら +${draw.starFragmentsGained}` : ''}` : 'ガチャの取引が完了しました' } : { kind: 'error', message: rpgErrorMessage({ code: result.reason }) });
+            setRpgStatus(result.applied ? { kind: 'success', message: operation === 'draw' ? `${draw.rarity} ${getGachaResultName({ resultType: draw.resultType, resultId: draw.memberId || draw.itemId || draw.equipmentId })}${draw.duplicate ? ` / かけら +${draw.starFragmentsGained}` : ''}` : 'ガチャの取引が完了しました' } : { kind: 'error', message: rpgErrorMessage({ code: result.reason }) });
         } catch (error) { setRpgStatus({ kind: 'error', message: rpgErrorMessage(error) }); }
-        finally { setGachaPending(false); }
+        finally { gachaPendingRef.current = false; setGachaPending(false); }
     };
     const handleAlchemyCraft = async (recipeId) => {
         if (isSampleMode || !user || alchemyPending) return;

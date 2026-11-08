@@ -9,8 +9,12 @@ export function resourceTransactionState(profile, offer) {
   if (!offer) return { available: false, rows: [] };
   const rows = [{ key: 'gold', label: 'GOLD', before: Number(current.gold) || 0, spend: offer.cost.gold, receive: offer.receive.gold }];
   for (const key of new Set([...Object.keys(offer.cost.materials), ...Object.keys(offer.receive.materials)])) rows.push({ key, label: MATERIAL_DEFS[key].label, before: Number(current.materials[key]) || 0, spend: offer.cost.materials[key] || 0, receive: offer.receive.materials[key] || 0 });
-  for (const [key, receive] of Object.entries(offer.receive.alchemyItems)) rows.push({ key, label: ALCHEMY_ITEMS[key].name, before: Number(current.gacha.alchemyItems[key]) || 0, spend: 0, receive });
-  return { available: rows.every(row => Number.isSafeInteger(row.before) && row.before >= row.spend && Number.isSafeInteger(row.before - row.spend + row.receive)), rows: rows.map(row => ({ ...row, after: row.before - row.spend + row.receive, shortage: Math.max(0, row.spend - row.before) })) };
+  const alchemyCosts = offer.cost.alchemyItems || {};
+  for (const key of new Set([...Object.keys(alchemyCosts), ...Object.keys(offer.receive.alchemyItems)])) {
+    const spend = alchemyCosts[key] || 0;
+    rows.push({ key, label: ALCHEMY_ITEMS[key].name, before: Number(current.gacha.alchemyItems[key]) || 0, spend, receive: offer.receive.alchemyItems[key] || 0, reserve: spend ? 1 : 0 });
+  }
+  return { available: rows.every(row => Number.isSafeInteger(row.before) && row.before >= row.spend + (row.reserve || 0) && Number.isSafeInteger(row.before - row.spend + row.receive)), rows: rows.map(row => ({ ...row, after: row.before - row.spend + row.receive, shortage: Math.max(0, row.spend + (row.reserve || 0) - row.before) })) };
 }
 export function prepareResourceTransaction({ profile = {}, offer, actionId, now, type, catalogVersion, quantity = 1 }) {
   validateResourceQuantity(quantity);
@@ -21,9 +25,11 @@ export function prepareResourceTransaction({ profile = {}, offer, actionId, now,
   const materials = { ...current.materials };
   for (const key of new Set([...Object.keys(offer.cost.materials), ...Object.keys(offer.receive.materials)])) materials[key] = (Number(materials[key]) || 0) - (offer.cost.materials[key] || 0) + (offer.receive.materials[key] || 0);
   const alchemyItems = { ...current.gacha.alchemyItems };
-  for (const [key, count] of Object.entries(offer.receive.alchemyItems)) alchemyItems[key] = (Number(alchemyItems[key]) || 0) + count;
+  const alchemyCosts = offer.cost.alchemyItems || {};
+  const alchemyKeys = new Set([...Object.keys(alchemyCosts), ...Object.keys(offer.receive.alchemyItems)]);
+  for (const key of alchemyKeys) alchemyItems[key] = (Number(alchemyItems[key]) || 0) - (alchemyCosts[key] || 0) + (offer.receive.alchemyItems[key] || 0);
   return {
-    profile: { ...profile, gold: (Number(current.gold) || 0) - offer.cost.gold + offer.receive.gold, materials, ...(Object.keys(offer.receive.alchemyItems).length ? { gacha: { ...current.gacha, ...(profile.gacha || {}), alchemyItems } } : {}), updatedAt: now },
+    profile: { ...profile, gold: (Number(current.gold) || 0) - offer.cost.gold + offer.receive.gold, materials, ...(alchemyKeys.size ? { gacha: { ...current.gacha, ...(profile.gacha || {}), alchemyItems } } : {}), updatedAt: now },
     ledger: { schemaVersion: 2, type, actionId, catalogVersion, quantity, itemId: offer.id, itemSnapshot: structuredClone(offer), cost: structuredClone(offer.cost), receive: structuredClone(offer.receive), status: 'applied', appliedAt: now },
   };
 }

@@ -57,8 +57,14 @@ describe('atomic commerce transactions (optimistic retry mock)', () => {
     for(const actionId of ['',null,12,'bad/id']) { await expect(buy(actionId)).rejects.toThrow('INVALID_ACTION_ID'); await expect(trade(actionId)).rejects.toThrow('INVALID_ACTION_ID'); }
     expect(store.docs).toEqual(before);
   });
-  it('rejects unpriced equipment explicitly through the public transaction API', async () => {
+  it('serializes competing sales of the same spare alchemy item', async () => {
+    store.docs.set(path, { gold: 90, gacha: { alchemyItems: { dragon_scale: 2 } } });
+    const results = await Promise.allSettled([trade('a', 'sell_dragon_scale'), trade('b', 'sell_dragon_scale')]);
+    expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(1);
+    expect(store.docs.get(path)).toMatchObject({ gold: 1290, gacha: { alchemyItems: { dragon_scale: 1 } } });
+  });
+  it('rejects equipment purchases without enough GOLD through the public transaction API', async () => {
     const before=structuredClone(store.docs);
-    await expect(purchaseEquipment({ ...args, itemId: 'dragon_star_blade', actionId: 'free' })).rejects.toThrow('ITEM_NOT_FOR_SALE'); expect(store.docs).toEqual(before);
+    await expect(purchaseEquipment({ ...args, itemId: 'dragon_star_blade', actionId: 'free' })).rejects.toThrow('INSUFFICIENT_GOLD'); expect(store.docs).toEqual(before);
   });
 });

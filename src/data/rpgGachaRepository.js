@@ -1,6 +1,6 @@
 import { runTransaction } from 'firebase/firestore';
 import { normalizePlayerProfile } from '../rpg/playerProfile.js';
-import { ALCHEMY_ITEMS, calculateRarity, FRAGMENTS_BY_RARITY, GACHA_RATES, MEMBER_RATES, membersForRarity, itemsForRarity, TICKET_PRICES, TICKET_TYPES } from '../rpg/gachaCatalog.js';
+import { ALCHEMY_ITEMS, calculateRarity, FOCUSED_GACHA, focusedPrizePool, FRAGMENTS_BY_RARITY, GACHA_RATES, MEMBER_RATES, membersForRarity, itemsForRarity, TICKET_PRICES, TICKET_TYPES } from '../rpg/gachaCatalog.js';
 import { playerProfileRef } from './rewardLedgerRepository.js';
 import { rpgActionLedgerRef } from './rpgShopRepository.js';
 import { assertNoPendingRewardCorrections, rewardIntegrityRef } from './rewardCorrectionRepository.js';
@@ -20,16 +20,24 @@ export function prepareTicketPurchase({ profile, ticketType, actionId, now }) {
 export function prepareDraw({ profile, ticketType, actionId, now, rolls = { rarityRoll: randomPercent(), categoryRoll: randomPercent(), poolRoll: randomPercent() } }) {
   if (!validTicket(ticketType)) throw failure('INVALID_TICKET_TYPE');
   const current = normalizePlayerProfile(profile); if (!integer(current.gacha.ticketBalances[ticketType])) throw failure('INSUFFICIENT_TICKETS');
-  const pityApplied = integer(current.gacha.drawsSinceSsr) >= 19 ? 'ssr' : integer(current.gacha.drawsSinceSrPlus) >= 9 ? 'sr' : 'none';
+  const focused = Object.hasOwn(FOCUSED_GACHA, ticketType);
+  const pityApplied = focused ? 'none' : integer(current.gacha.drawsSinceSsr) >= 19 ? 'ssr' : integer(current.gacha.drawsSinceSrPlus) >= 9 ? 'sr' : 'none';
   const rarity = calculateRarity({ ticketType, drawsSinceSrPlus: integer(current.gacha.drawsSinceSrPlus), drawsSinceSsr: integer(current.gacha.drawsSinceSsr), rarityRoll: rolls.rarityRoll });
-  const isMember = rarity !== 'N' && rolls.categoryRoll < MEMBER_RATES[rarity]; const pool = isMember ? membersForRarity(rarity) : itemsForRarity(rarity); const result = pool[Math.min(pool.length - 1, Math.floor((rolls.poolRoll / 100) * pool.length))];
-  const duplicate = isMember && current.unlockedPartyMemberIds.includes(result.id); const fragments = duplicate ? FRAGMENTS_BY_RARITY[rarity] : 0;
-  const gacha = { ...current.gacha, ticketBalances: { ...current.gacha.ticketBalances, [ticketType]: integer(current.gacha.ticketBalances[ticketType]) - 1 }, drawsSinceSrPlus: rarity === 'SR' || rarity === 'SSR' ? 0 : integer(current.gacha.drawsSinceSrPlus) + 1, drawsSinceSsr: rarity === 'SSR' ? 0 : integer(current.gacha.drawsSinceSsr) + 1, starFragments: integer(current.gacha.starFragments) + fragments, alchemyItems: { ...current.gacha.alchemyItems } };
-  if (!isMember) gacha.alchemyItems[result.id] = integer(gacha.alchemyItems[result.id]) + 1;
-  const recent = [{ rarity, resultType: isMember ? 'member' : 'item', resultId: result.id, duplicate, starFragmentsGained: fragments, drawnAt: now }, ...current.gacha.recentDraws].slice(0, 20);
+  const isMember = focused ? ticketType === 'skill' : rarity !== 'N' && rolls.categoryRoll < MEMBER_RATES[rarity];
+  const resultType = isMember ? 'member' : focused ? 'equipment' : 'item';
+  const pool = focused ? focusedPrizePool(ticketType, rarity) : isMember ? membersForRarity(rarity) : itemsForRarity(rarity);
+  const result = pool[Math.min(pool.length - 1, Math.floor((rolls.poolRoll / 100) * pool.length))];
+  const duplicate = isMember ? current.unlockedPartyMemberIds.includes(result.id) : resultType === 'equipment' && Boolean(current.ownedEquipment[result.id]);
+  const fragments = !duplicate ? 0 : isMember ? FRAGMENTS_BY_RARITY[rarity] : { N: 2, R: 5, SR: 12, SSR: 30 }[rarity];
+  const gacha = { ...current.gacha, ticketBalances: { ...current.gacha.ticketBalances, [ticketType]: integer(current.gacha.ticketBalances[ticketType]) - 1 }, drawsSinceSrPlus: focused ? current.gacha.drawsSinceSrPlus : rarity === 'SR' || rarity === 'SSR' ? 0 : integer(current.gacha.drawsSinceSrPlus) + 1, drawsSinceSsr: focused ? current.gacha.drawsSinceSsr : rarity === 'SSR' ? 0 : integer(current.gacha.drawsSinceSsr) + 1, starFragments: integer(current.gacha.starFragments) + fragments, alchemyItems: { ...current.gacha.alchemyItems } };
+  if (resultType === 'item') gacha.alchemyItems[result.id] = integer(gacha.alchemyItems[result.id]) + 1;
+  const recent = [{ rarity, resultType, resultId: result.id, duplicate, starFragmentsGained: fragments, drawnAt: now }, ...current.gacha.recentDraws].slice(0, 20);
   gacha.recentDraws = recent;
-  const profileNext = { ...current, gacha, unlockedPartyMemberIds: isMember && !duplicate ? [...current.unlockedPartyMemberIds, result.id] : current.unlockedPartyMemberIds, updatedAt: now };
-  return { profile: profileNext, ledger: action(actionId, 'gacha_draw', now, { ticketType, rolls, rarity, resultType: isMember ? 'member' : 'item', memberId: isMember ? result.id : null, itemId: isMember ? null : result.id, duplicate, starFragmentsGained: fragments, pityApplied, drawnAt: now }) };
+  const ownedEquipment = resultType === 'equipment' && !duplicate
+    ? { ...current.ownedEquipment, [result.id]: { acquiredAt: now, sourceActionId: actionId } }
+    : current.ownedEquipment;
+  const profileNext = { ...current, gacha, ownedEquipment, unlockedPartyMemberIds: isMember && !duplicate ? [...current.unlockedPartyMemberIds, result.id] : current.unlockedPartyMemberIds, updatedAt: now };
+  return { profile: profileNext, ledger: action(actionId, 'gacha_draw', now, { ticketType, rolls, rarity, resultType, memberId: isMember ? result.id : null, itemId: resultType === 'item' ? result.id : null, ...(resultType === 'equipment' ? { equipmentId: result.id } : {}), duplicate, starFragmentsGained: fragments, pityApplied, drawnAt: now }) };
 }
 export function prepareFragmentExchange({ profile, kind, targetId, actionId, now }) {
   const current = normalizePlayerProfile(profile); const ticketCosts = { silver: 80, gold: 150, premium: 350 }; const itemCost = kind === 'item' && ALCHEMY_ITEMS[targetId] ? (ALCHEMY_ITEMS[targetId].rarity === 'R' ? 25 : ALCHEMY_ITEMS[targetId].rarity === 'SR' ? 60 : null) : null; const cost = kind === 'ticket' ? ticketCosts[targetId] : itemCost;
@@ -40,6 +48,10 @@ export function prepareFragmentExchange({ profile, kind, targetId, actionId, now
 }
 async function apply({ db, familyId, actionId, requiresIntegrity = true, makeChange }) { const profileRef = playerProfileRef(db, familyId); const ledgerRef = rpgActionLedgerRef(db, familyId, actionId); const integrityRef = rewardIntegrityRef(db, familyId); return runTransaction(db, async (transaction) => { const [profile, ledger, integrity] = await Promise.all([transaction.get(profileRef), transaction.get(ledgerRef), transaction.get(integrityRef)]); if (ledger.exists()) return { applied: false, reason: 'ALREADY_APPLIED' }; if (requiresIntegrity) assertNoPendingRewardCorrections(integrity.exists() ? integrity.data() : {}); const change = makeChange(profile.exists() ? profile.data() : {}); transaction.set(profileRef, change.profile); transaction.set(ledgerRef, change.ledger); return { applied: true, ...change }; }); }
 export const purchaseGachaTicket = ({ db, familyId, ticketType, actionId }) => apply({ db, familyId, actionId, makeChange: (profile) => prepareTicketPurchase({ profile, ticketType, actionId, now: Date.now() }) });
-export const drawGacha = ({ db, familyId, ticketType, actionId }) => apply({ db, familyId, actionId, makeChange: (profile) => prepareDraw({ profile, ticketType, actionId, now: Date.now() }) });
+export function drawGacha({ db, familyId, ticketType, actionId }) {
+  const rolls = { rarityRoll: randomPercent(), categoryRoll: randomPercent(), poolRoll: randomPercent() };
+  const now = Date.now();
+  return apply({ db, familyId, actionId, makeChange: profile => prepareDraw({ profile, ticketType, actionId, now, rolls }) });
+}
 export const exchangeGachaFragments = ({ db, familyId, kind, targetId, actionId }) => apply({ db, familyId, actionId, makeChange: (profile) => prepareFragmentExchange({ profile, kind, targetId, actionId, now: Date.now() }) });
 export const validateGachaRates = () => Object.values(GACHA_RATES).every((rates) => Object.values(rates).reduce((sum, value) => sum + value, 0) === 100) && Object.values(MEMBER_RATES).every((rate) => rate >= 0 && rate <= 100);

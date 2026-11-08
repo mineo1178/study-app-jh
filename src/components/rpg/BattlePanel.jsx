@@ -6,7 +6,7 @@ import VictoryResult from './VictoryResult.jsx';
 import DefeatResult from './DefeatResult.jsx';
 import { getChapter } from '../../rpg/chapterCatalog.js';
 import { getBoss } from '../../rpg/bossCatalog.js';
-import { isBossUnlocked, normalizeRpgProgress } from '../../rpg/rpgProgress.js';
+import { isBossUnlocked, normalizeRpgProgress, scaleCampaignEnemy } from '../../rpg/rpgProgress.js';
 import { isTowerBossFloor, buildTowerEncounter } from '../../rpg/towerCatalog.js';
 import { normalizeTowerProgress } from '../../rpg/towerProgress.js';
 import PartyBattleArena from './PartyBattleArena.jsx';
@@ -65,7 +65,7 @@ export default function BattlePanel({ profile, progress, towerProgress, battle, 
   return <section>
     <p className="text-[10px] font-black tracking-widest text-rose-600">CHAPTER {chapter.number}</p><h2 className="text-xl font-black text-slate-800">{chapter.name}</h2><p className="mt-2 text-sm font-bold text-slate-600">通常敵撃破 {safe.normalWins} / {chapter.normalWinsRequired}</p>
     <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-200"><div className="h-full bg-rose-500 transition-all" style={{ width: `${progressPercent}%` }}/></div><p className={`mt-2 text-xs font-black ${unlocked ? 'text-amber-600' : 'text-slate-500'}`}>{unlocked ? 'BOSS UNLOCKED' : `BOSS解放まであと ${remaining} 勝`}</p>
-    <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{chapter.normalEnemyIds.map((id) => <EnemyCard key={id} enemy={ENEMY_CATALOG[id]} profile={profile} onStart={onStartRequest} starting={startingEnemyId === id}/>)}</div>
+    <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{chapter.normalEnemyIds.map((id) => <EnemyCard key={id} enemy={scaleCampaignEnemy(ENEMY_CATALOG[id], safe)} profile={profile} onStart={onStartRequest} starting={startingEnemyId === id}/>)}</div>
     <article className="mt-5 rounded-2xl border-2 border-amber-300 bg-amber-50 p-5 text-slate-700"><p className="text-[10px] font-black tracking-widest text-amber-700">CHAPTER BOSS</p><h3 className="mt-1 text-lg font-black">{boss.name}</h3><p className="mt-2 text-sm">HP {boss.maxHp} ・ Attack {boss.attack} ・ Energy {boss.energyCost}</p><p className="mt-2 text-xs">初回クリア報酬：GOLD +{boss.firstClearReward.gold} / {Object.entries(boss.firstClearReward.materials).map(([id, quantity]) => `${id} ×${quantity}`).join(' ・ ')}</p><p className={`mt-2 text-xs font-bold ${energy >= boss.energyCost ? 'text-emerald-600' : 'text-rose-600'}`}>Battle Energy {energy} / 必要{boss.energyCost}{energy >= boss.energyCost ? '' : ' ・ Energyが足りません'}</p><button type="button" disabled={!unlocked || energy < boss.energyCost || bossStarting} onClick={() => onStartRequest?.({ ...boss, isBoss: true })} className="mt-4 w-full rounded-xl bg-amber-600 py-3 text-sm font-black text-white disabled:bg-slate-300">{bossStarting ? '開始中…' : unlocked ? 'BOSSに挑戦する' : `あと${remaining}勝で解放`}</button></article>
   </section>;
 }

@@ -13,7 +13,7 @@ import { normalizeBattle } from '../rpg/battleState.js';
 import { playerProfileRef } from './rewardLedgerRepository.js';
 import { getChapter, CHAPTER_CATALOG_VERSION } from '../rpg/chapterCatalog.js';
 import { getBoss, BOSS_CATALOG_VERSION } from '../rpg/bossCatalog.js';
-import { applyBossClearProgress, applyBossClearProgressFromSnapshot, applyNormalVictoryProgress, applyNormalVictoryProgressFromSnapshot, isBossUnlocked, normalizeRpgProgress } from '../rpg/rpgProgress.js';
+import { applyBossClearProgress, applyBossClearProgressFromSnapshot, applyNormalVictoryProgress, applyNormalVictoryProgressFromSnapshot, isBossUnlocked, normalizeRpgProgress, scaleCampaignEnemy } from '../rpg/rpgProgress.js';
 import { rpgProgressRef } from './rpgProgressRepository.js';
 import { enemyActionForTurn, snapshotEnemyActionPattern } from '../rpg/enemyActionCatalog.js';
 import { assertNoPendingRewardCorrections, rewardIntegrityRef } from './rewardCorrectionRepository.js';
@@ -139,7 +139,7 @@ export async function startBattle({ db, familyId, enemyId, battleId }) {
     assertNoPendingRewardCorrections(integritySnap.exists() ? integritySnap.data() : {});
     const currentProgress = normalizeRpgProgress(progressSnap.exists() ? progressSnap.data() : {}); const chapter = getChapter(currentProgress.currentChapterId);
     if (!chapter.normalEnemyIds.includes(enemyId)) throw failure('ENEMY_NOT_AVAILABLE_IN_CHAPTER');
-    const change = prepareBattleStart({ profile: profileSnap.exists() ? profileSnap.data() : {}, enemy, battleId, now, chapter });
+    const change = prepareBattleStart({ profile: profileSnap.exists() ? profileSnap.data() : {}, enemy: scaleCampaignEnemy(enemy, currentProgress), battleId, now, chapter });
     transaction.set(profile, change.profile); transaction.set(battle, change.battle); transaction.set(ledger, change.ledger);
     return { applied: true, battle: change.battle };
   });

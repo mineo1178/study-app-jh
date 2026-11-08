@@ -1,7 +1,8 @@
 import { MATERIAL_DEFS, MATERIAL_KEYS } from './rewardConfig.js';
 import { ALCHEMY_ITEMS } from './gachaCatalog.js';
+import { ALCHEMY_SHOP_GOLD } from './resourceShopCatalog.js';
 
-export const MATERIAL_TRADE_CATALOG_VERSION = 1;
+export const MATERIAL_TRADE_CATALOG_VERSION = 2;
 export const MATERIAL_EXCHANGE_GIVE = 3;
 export const MATERIAL_EXCHANGE_RECEIVE = 1;
 export const materialSwapId = (source, target) => 'swap_' + source + '_to_' + target;
@@ -18,6 +19,7 @@ const alchemyCosts = {
 export const MATERIAL_TRADE_CATALOG = Object.freeze(Object.fromEntries([
   ...MATERIAL_KEYS.flatMap(source => MATERIAL_KEYS.filter(target => target !== source).map(target => ({ id: materialSwapId(source, target), category: 'materials', name: MATERIAL_DEFS[target].label, cost: { gold: 0, materials: { [source]: MATERIAL_EXCHANGE_GIVE } }, receive: { gold: 0, materials: { [target]: MATERIAL_EXCHANGE_RECEIVE }, alchemyItems: {} } }))),
   ...MATERIAL_KEYS.map(key => ({ id: 'gold_' + key, category: 'gold', name: MATERIAL_DEFS[key].label + ' → 15 GOLD', cost: { gold: 0, materials: { [key]: 3 } }, receive: { gold: 15, materials: {}, alchemyItems: {} } })),
+  ...Object.values(ALCHEMY_ITEMS).map(item => ({ id: 'sell_' + item.id, category: 'sell', name: item.name + ' → ' + Math.floor(ALCHEMY_SHOP_GOLD[item.rarity] / 10) + ' GOLD', cost: { gold: 0, materials: {}, alchemyItems: { [item.id]: 1 } }, receive: { gold: Math.floor(ALCHEMY_SHOP_GOLD[item.rarity] / 10), materials: {}, alchemyItems: {} } })),
   ...Object.entries(alchemyCosts).map(([key, materials]) => ({ id: 'trade_' + key, category: 'alchemy', name: ALCHEMY_ITEMS[key].name, cost: { gold: 0, materials }, receive: { gold: 0, materials: {}, alchemyItems: { [key]: 1 } } })),
 ].map(item => [item.id, item])));
 export const getMaterialTrade = id => Object.hasOwn(MATERIAL_TRADE_CATALOG, id) ? MATERIAL_TRADE_CATALOG[id] : null;

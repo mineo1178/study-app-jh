@@ -1,7 +1,9 @@
-export const EQUIPMENT_CATALOG_VERSION = 3;
+export const EQUIPMENT_CATALOG_VERSION = 4;
 export const EQUIPMENT_SLOTS = Object.freeze(['weapon', 'armor', 'accessory']);
 
-export const EQUIPMENT_CATALOG = Object.freeze({
+const EXCHANGE_GOLD = { N: 1800, R: 6500, SR: 18000, SSR: 42000 };
+
+const equipment = {
   iron_sword: { id: 'iron_sword', name: '鉄の剣', slot: 'weapon', rarity: 'common', description: '冒険の基本となる武器。', stats: { attack: 5, defense: 0 }, cost: { gold: 80, materials: { iron: 5 } } },
   scholar_blade: { id: 'scholar_blade', name: '賢者の剣', slot: 'weapon', rarity: 'rare', description: '知識を力に変える剣。', stats: { attack: 8, defense: 0 }, cost: { gold: 150, materials: { wisdom_scroll: 3, mana_rune: 3 } } },
   mineral_armor: { id: 'mineral_armor', name: '鉱石の鎧', slot: 'armor', rarity: 'common', description: '鉱石を鍛えて作った堅牢な鎧。', stats: { attack: 1, defense: 3 }, cost: { gold: 100, materials: { mineral: 5 } } },
@@ -24,6 +26,9 @@ export const EQUIPMENT_CATALOG = Object.freeze({
   sage_staff: { id: 'sage_staff', name: '賢者の杖', slot: 'weapon', rarity: 'SSR', description: '賢者の石を冠した杖。', stats: { attack: 14, defense: 2 } },
   dragon_scale_armor: { id: 'dragon_scale_armor', name: '竜鱗の鎧', slot: 'armor', rarity: 'SSR', description: '竜鱗の堅牢な鎧。', stats: { attack: 0, defense: 12 } },
   celestial_robe: { id: 'celestial_robe', name: '天空の法衣', slot: 'armor', rarity: 'SSR', description: '天空布で仕立てた法衣。', stats: { attack: 3, defense: 10 } },
-});
+};
 
-export const getEquipmentCatalogItem = (itemId) => EQUIPMENT_CATALOG[itemId] || null;
+export const EQUIPMENT_CATALOG = Object.freeze(Object.fromEntries(Object.entries(equipment).map(([id, item]) => [
+  id, item.cost ? item : { ...item, cost: { gold: EXCHANGE_GOLD[item.rarity], materials: {} } },
+])));
+export const getEquipmentCatalogItem = (itemId) => Object.hasOwn(EQUIPMENT_CATALOG, itemId) ? EQUIPMENT_CATALOG[itemId] : null;

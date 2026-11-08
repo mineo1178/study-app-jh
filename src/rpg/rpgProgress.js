@@ -6,6 +6,20 @@ export const isBossUnlocked = (progress, chapter = getChapter(normalizeRpgProgre
 export const applyNormalVictoryProgress = (progress, chapterId, now) => { const safe = normalizeRpgProgress(progress); const chapter = getChapter(chapterId); if (!chapter || safe.currentChapterId !== chapter.id) throw Object.assign(new Error('CHAPTER_STATE_MISMATCH'), { code: 'CHAPTER_STATE_MISMATCH' }); return { ...safe, normalWins: Math.min(chapter.normalWinsRequired, safe.normalWins + 1), updatedAt: now }; };
 export const applyBossClearProgress = (progress, chapterId, now) => { const safe = normalizeRpgProgress(progress); const chapter = getChapter(chapterId); if (!chapter || !isBossUnlocked(safe, chapter)) throw Object.assign(new Error('BOSS_LOCKED'), { code: 'BOSS_LOCKED' }); const completedChapterIds = [...new Set([...safe.completedChapterIds, chapter.id])]; return chapter.nextChapterId ? { ...safe, currentChapterId: chapter.nextChapterId, normalWins: 0, completedChapterIds, campaignCompleted: false, updatedAt: now } : { ...safe, completedChapterIds, campaignCompleted: true, updatedAt: now }; };
 
+export function scaleCampaignEnemy(enemy, progress) {
+  const { normalWins, completedChapterIds, currentChapterId } = normalizeRpgProgress(progress);
+  const previousWins = completedChapterIds.reduce((sum, id) =>
+    sum + (id === currentChapterId ? 0 : getChapter(id).normalWinsRequired), 0);
+  const tiers = Math.min(5, Math.floor((previousWins + normalWins) / 5));
+  if (!tiers) return enemy;
+  const laterTiers = tiers - 1;
+  return {
+    ...enemy,
+    maxHp: Math.ceil(enemy.maxHp * (103 + laterTiers * 4) / 100),
+    attack: Math.ceil(enemy.attack * (102 + laterTiers * 3) / 100),
+  };
+}
+
 // Battle schema v7+ must complete against the chapter rules captured at battle
 // start.  Do not normalize normalWins through the mutable chapter catalog here.
 const normalizeSnapshotProgress = (progress = {}) => {
