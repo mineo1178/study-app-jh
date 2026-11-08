@@ -32,3 +32,5 @@ npx firebase emulators:exec --config firebase.reward-retry-worker1.json --projec
 ```
 
 The first GitHub run exposed a Linux shell difference: the unquoted test exclusion expanded to the direct children of the Rules folder, allowing the nested proof to enter the default Vitest run without an emulator. The proof file has an explicit non-default suffix and is discovered only by its dedicated Vitest config. A second CI run showed that the expanded directory was also passed to Vitest as a positional filter. The npm test script now quotes the glob so Vitest receives the same exclusion on Linux and Windows.
+
+The first clean CI run that reached the race suite found a local-only default log destination. The proof now writes final states only when AUDIT_FINAL_PATH is explicitly supplied, as it already is in the repeat runner. State assertions run regardless of logging.

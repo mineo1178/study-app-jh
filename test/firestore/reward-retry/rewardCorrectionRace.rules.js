@@ -40,7 +40,7 @@ async function verifyFinal(args,pending,rate){
  expect(adjustment).toMatchObject({adjustmentId:pending.adjustmentId,revision:1,status:'applied',deduction:{gold:40*rate}});
  expect(integrity.pendingSessionIds).toEqual([]);
  expect(session.recordedSeconds).toBe(1200);
- appendFileSync(process.env.AUDIT_FINAL_PATH || 'docs/reward-retry-fix/logs/final-states.jsonl',JSON.stringify({policy:ledger.rewardPolicyVersion,profile:saved,ledger,adjustment,integrity,session})+'\n');
+ if (process.env.AUDIT_FINAL_PATH) appendFileSync(process.env.AUDIT_FINAL_PATH,JSON.stringify({policy:ledger.rewardPolicyVersion,profile:saved,ledger,adjustment,integrity,session})+'\n');
  expect((await retryPendingRewardCorrection(args)).reason).toBe('NO_PENDING_CORRECTION');
  expect((await getDoc(doc(args.db,...profilePath))).data().gold).toBe(0);
  expect((await correctStudySessionReward({...args,correction:{correctionId:'audit-correction',recordedSeconds:1200,validation:{status:'valid'}}})).reason).toBe('ALREADY_APPLIED');
