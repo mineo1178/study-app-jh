@@ -1,0 +1,727 @@
+{
+  "head": "7649834c9e3c27f5eba07302bb30de2c30b73216",
+  "worker": 0,
+  "emulator": "127.0.0.1:8087",
+  "results": [
+    {
+      "id": "isolated-1",
+      "group": "isolated",
+      "expected": 2,
+      "args": [
+        "test/firestore/firestore.rules.test.js",
+        "--testNamePattern",
+        "keeps insufficient correction pending and retries its stored deduction once under contention"
+      ],
+      "started": "2026-11-03T07:01:29.581Z",
+      "ended": "2026-11-03T07:01:35.226Z",
+      "exitCode": 0,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 69,
+      "failures": []
+    },
+    {
+      "id": "isolated-3",
+      "group": "isolated",
+      "expected": 2,
+      "args": [
+        "test/firestore/firestore.rules.test.js",
+        "--testNamePattern",
+        "keeps insufficient correction pending and retries its stored deduction once under contention"
+      ],
+      "started": "2026-11-03T07:01:35.227Z",
+      "ended": "2026-11-03T07:01:40.007Z",
+      "exitCode": 0,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 69,
+      "failures": []
+    },
+    {
+      "id": "isolated-5",
+      "group": "isolated",
+      "expected": 2,
+      "args": [
+        "test/firestore/firestore.rules.test.js",
+        "--testNamePattern",
+        "keeps insufficient correction pending and retries its stored deduction once under contention"
+      ],
+      "started": "2026-11-03T07:01:40.008Z",
+      "ended": "2026-11-03T07:01:44.443Z",
+      "exitCode": 0,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 69,
+      "failures": []
+    },
+    {
+      "id": "isolated-7",
+      "group": "isolated",
+      "expected": 2,
+      "args": [
+        "test/firestore/firestore.rules.test.js",
+        "--testNamePattern",
+        "keeps insufficient correction pending and retries its stored deduction once under contention"
+      ],
+      "started": "2026-11-03T07:01:44.444Z",
+      "ended": "2026-11-03T07:01:49.289Z",
+      "exitCode": 0,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 69,
+      "failures": []
+    },
+    {
+      "id": "isolated-9",
+      "group": "isolated",
+      "expected": 2,
+      "args": [
+        "test/firestore/firestore.rules.test.js",
+        "--testNamePattern",
+        "keeps insufficient correction pending and retries its stored deduction once under contention"
+      ],
+      "started": "2026-11-03T07:01:49.290Z",
+      "ended": "2026-11-03T07:01:53.766Z",
+      "exitCode": 0,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 69,
+      "failures": []
+    },
+    {
+      "id": "isolated-11",
+      "group": "isolated",
+      "expected": 2,
+      "args": [
+        "test/firestore/firestore.rules.test.js",
+        "--testNamePattern",
+        "keeps insufficient correction pending and retries its stored deduction once under contention"
+      ],
+      "started": "2026-11-03T07:01:53.767Z",
+      "ended": "2026-11-03T07:01:57.252Z",
+      "exitCode": 0,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 69,
+      "failures": []
+    },
+    {
+      "id": "isolated-13",
+      "group": "isolated",
+      "expected": 2,
+      "args": [
+        "test/firestore/firestore.rules.test.js",
+        "--testNamePattern",
+        "keeps insufficient correction pending and retries its stored deduction once under contention"
+      ],
+      "started": "2026-11-03T07:01:57.252Z",
+      "ended": "2026-11-03T07:02:01.294Z",
+      "exitCode": 0,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 69,
+      "failures": []
+    },
+    {
+      "id": "isolated-15",
+      "group": "isolated",
+      "expected": 2,
+      "args": [
+        "test/firestore/firestore.rules.test.js",
+        "--testNamePattern",
+        "keeps insufficient correction pending and retries its stored deduction once under contention"
+      ],
+      "started": "2026-11-03T07:02:01.295Z",
+      "ended": "2026-11-03T07:02:05.638Z",
+      "exitCode": 0,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 69,
+      "failures": []
+    },
+    {
+      "id": "isolated-17",
+      "group": "isolated",
+      "expected": 2,
+      "args": [
+        "test/firestore/firestore.rules.test.js",
+        "--testNamePattern",
+        "keeps insufficient correction pending and retries its stored deduction once under contention"
+      ],
+      "started": "2026-11-03T07:02:05.638Z",
+      "ended": "2026-11-03T07:02:10.151Z",
+      "exitCode": 0,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 69,
+      "failures": []
+    },
+    {
+      "id": "isolated-19",
+      "group": "isolated",
+      "expected": 2,
+      "args": [
+        "test/firestore/firestore.rules.test.js",
+        "--testNamePattern",
+        "keeps insufficient correction pending and retries its stored deduction once under contention"
+      ],
+      "started": "2026-11-03T07:02:10.152Z",
+      "ended": "2026-11-03T07:02:14.675Z",
+      "exitCode": 0,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 69,
+      "failures": []
+    },
+    {
+      "id": "isolated-21",
+      "group": "isolated",
+      "expected": 2,
+      "args": [
+        "test/firestore/firestore.rules.test.js",
+        "--testNamePattern",
+        "keeps insufficient correction pending and retries its stored deduction once under contention"
+      ],
+      "started": "2026-11-03T07:02:14.676Z",
+      "ended": "2026-11-03T07:02:48.797Z",
+      "exitCode": 0,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 69,
+      "failures": []
+    },
+    {
+      "id": "isolated-23",
+      "group": "isolated",
+      "expected": 2,
+      "args": [
+        "test/firestore/firestore.rules.test.js",
+        "--testNamePattern",
+        "keeps insufficient correction pending and retries its stored deduction once under contention"
+      ],
+      "started": "2026-11-03T07:02:48.798Z",
+      "ended": "2026-11-03T07:02:53.043Z",
+      "exitCode": 0,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 69,
+      "failures": []
+    },
+    {
+      "id": "isolated-25",
+      "group": "isolated",
+      "expected": 2,
+      "args": [
+        "test/firestore/firestore.rules.test.js",
+        "--testNamePattern",
+        "keeps insufficient correction pending and retries its stored deduction once under contention"
+      ],
+      "started": "2026-11-03T07:02:53.044Z",
+      "ended": "2026-11-03T07:02:57.016Z",
+      "exitCode": 0,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 69,
+      "failures": []
+    },
+    {
+      "id": "isolated-27",
+      "group": "isolated",
+      "expected": 2,
+      "args": [
+        "test/firestore/firestore.rules.test.js",
+        "--testNamePattern",
+        "keeps insufficient correction pending and retries its stored deduction once under contention"
+      ],
+      "started": "2026-11-03T07:02:57.017Z",
+      "ended": "2026-11-03T07:03:01.652Z",
+      "exitCode": 0,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 69,
+      "failures": []
+    },
+    {
+      "id": "isolated-29",
+      "group": "isolated",
+      "expected": 2,
+      "args": [
+        "test/firestore/firestore.rules.test.js",
+        "--testNamePattern",
+        "keeps insufficient correction pending and retries its stored deduction once under contention"
+      ],
+      "started": "2026-11-03T07:03:01.652Z",
+      "ended": "2026-11-03T07:03:05.720Z",
+      "exitCode": 0,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 69,
+      "failures": []
+    },
+    {
+      "id": "isolated-31",
+      "group": "isolated",
+      "expected": 2,
+      "args": [
+        "test/firestore/firestore.rules.test.js",
+        "--testNamePattern",
+        "keeps insufficient correction pending and retries its stored deduction once under contention"
+      ],
+      "started": "2026-11-03T07:03:05.721Z",
+      "ended": "2026-11-03T07:03:10.152Z",
+      "exitCode": 0,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 69,
+      "failures": []
+    },
+    {
+      "id": "isolated-33",
+      "group": "isolated",
+      "expected": 2,
+      "args": [
+        "test/firestore/firestore.rules.test.js",
+        "--testNamePattern",
+        "keeps insufficient correction pending and retries its stored deduction once under contention"
+      ],
+      "started": "2026-11-03T07:03:10.153Z",
+      "ended": "2026-11-03T07:03:14.768Z",
+      "exitCode": 0,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 69,
+      "failures": []
+    },
+    {
+      "id": "isolated-35",
+      "group": "isolated",
+      "expected": 2,
+      "args": [
+        "test/firestore/firestore.rules.test.js",
+        "--testNamePattern",
+        "keeps insufficient correction pending and retries its stored deduction once under contention"
+      ],
+      "started": "2026-11-03T07:03:14.769Z",
+      "ended": "2026-11-03T07:03:18.916Z",
+      "exitCode": 0,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 69,
+      "failures": []
+    },
+    {
+      "id": "isolated-37",
+      "group": "isolated",
+      "expected": 2,
+      "args": [
+        "test/firestore/firestore.rules.test.js",
+        "--testNamePattern",
+        "keeps insufficient correction pending and retries its stored deduction once under contention"
+      ],
+      "started": "2026-11-03T07:03:18.917Z",
+      "ended": "2026-11-03T07:03:23.246Z",
+      "exitCode": 0,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 69,
+      "failures": []
+    },
+    {
+      "id": "isolated-39",
+      "group": "isolated",
+      "expected": 2,
+      "args": [
+        "test/firestore/firestore.rules.test.js",
+        "--testNamePattern",
+        "keeps insufficient correction pending and retries its stored deduction once under contention"
+      ],
+      "started": "2026-11-03T07:03:23.247Z",
+      "ended": "2026-11-03T07:03:27.513Z",
+      "exitCode": 0,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 69,
+      "failures": []
+    },
+    {
+      "id": "isolated-41",
+      "group": "isolated",
+      "expected": 2,
+      "args": [
+        "test/firestore/firestore.rules.test.js",
+        "--testNamePattern",
+        "keeps insufficient correction pending and retries its stored deduction once under contention"
+      ],
+      "started": "2026-11-03T07:03:27.513Z",
+      "ended": "2026-11-03T07:03:31.139Z",
+      "exitCode": 0,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 69,
+      "failures": []
+    },
+    {
+      "id": "isolated-43",
+      "group": "isolated",
+      "expected": 2,
+      "args": [
+        "test/firestore/firestore.rules.test.js",
+        "--testNamePattern",
+        "keeps insufficient correction pending and retries its stored deduction once under contention"
+      ],
+      "started": "2026-11-03T07:03:31.139Z",
+      "ended": "2026-11-03T07:03:36.304Z",
+      "exitCode": 0,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 69,
+      "failures": []
+    },
+    {
+      "id": "isolated-45",
+      "group": "isolated",
+      "expected": 2,
+      "args": [
+        "test/firestore/firestore.rules.test.js",
+        "--testNamePattern",
+        "keeps insufficient correction pending and retries its stored deduction once under contention"
+      ],
+      "started": "2026-11-03T07:03:36.305Z",
+      "ended": "2026-11-03T07:03:40.665Z",
+      "exitCode": 0,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 69,
+      "failures": []
+    },
+    {
+      "id": "isolated-47",
+      "group": "isolated",
+      "expected": 2,
+      "args": [
+        "test/firestore/firestore.rules.test.js",
+        "--testNamePattern",
+        "keeps insufficient correction pending and retries its stored deduction once under contention"
+      ],
+      "started": "2026-11-03T07:03:40.666Z",
+      "ended": "2026-11-03T07:03:44.457Z",
+      "exitCode": 0,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 69,
+      "failures": []
+    },
+    {
+      "id": "isolated-49",
+      "group": "isolated",
+      "expected": 2,
+      "args": [
+        "test/firestore/firestore.rules.test.js",
+        "--testNamePattern",
+        "keeps insufficient correction pending and retries its stored deduction once under contention"
+      ],
+      "started": "2026-11-03T07:03:44.458Z",
+      "ended": "2026-11-03T07:03:49.513Z",
+      "exitCode": 0,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 69,
+      "failures": []
+    },
+    {
+      "id": "full-1",
+      "group": "full",
+      "expected": 71,
+      "args": [
+        "test/firestore/firestore.rules.test.js"
+      ],
+      "started": "2026-11-03T07:03:49.514Z",
+      "ended": "2026-11-03T07:05:00.933Z",
+      "exitCode": 0,
+      "passed": 71,
+      "failed": 0,
+      "skipped": 0,
+      "failures": []
+    },
+    {
+      "id": "full-3",
+      "group": "full",
+      "expected": 71,
+      "args": [
+        "test/firestore/firestore.rules.test.js"
+      ],
+      "started": "2026-11-03T07:05:00.933Z",
+      "ended": "2026-11-03T07:06:11.872Z",
+      "exitCode": 0,
+      "passed": 71,
+      "failed": 0,
+      "skipped": 0,
+      "failures": []
+    },
+    {
+      "id": "full-5",
+      "group": "full",
+      "expected": 71,
+      "args": [
+        "test/firestore/firestore.rules.test.js"
+      ],
+      "started": "2026-11-03T07:06:11.873Z",
+      "ended": "2026-11-03T07:07:21.136Z",
+      "exitCode": 0,
+      "passed": 71,
+      "failed": 0,
+      "skipped": 0,
+      "failures": []
+    },
+    {
+      "id": "full-7",
+      "group": "full",
+      "expected": 71,
+      "args": [
+        "test/firestore/firestore.rules.test.js"
+      ],
+      "started": "2026-11-03T07:07:21.137Z",
+      "ended": "2026-11-03T07:08:27.942Z",
+      "exitCode": 0,
+      "passed": 71,
+      "failed": 0,
+      "skipped": 0,
+      "failures": []
+    },
+    {
+      "id": "full-9",
+      "group": "full",
+      "expected": 71,
+      "args": [
+        "test/firestore/firestore.rules.test.js"
+      ],
+      "started": "2026-11-03T07:08:27.942Z",
+      "ended": "2026-11-03T07:09:41.796Z",
+      "exitCode": 1,
+      "passed": 70,
+      "failed": 1,
+      "skipped": 0,
+      "failures": [
+        {
+          "name": "versioned reward real transactions rpg-reward-v1 corrects once, keeps the original ledger, then reverses only the remaining grant once across clients",
+          "messages": [
+            "Error: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n    at task (file:///C:/dev/study-app-jh/node_modules/vitest/dist/chunks/run.CQOUYP-x.js:2681:43)\n    at Object.<anonymous> (file:///C:/dev/study-app-jh/node_modules/vitest/dist/chunks/run.CQOUYP-x.js:2698:16)\n    at Object.<anonymous> (file:///C:/dev/study-app-jh/node_modules/vitest/dist/chunks/run.CQOUYP-x.js:2471:28)\n    at chain (file:///C:/dev/study-app-jh/node_modules/vitest/dist/chunks/run.CQOUYP-x.js:1859:14)\n    at C:/dev/study-app-jh-reward-retry-fix/test/firestore/firestore.rules.test.js:297:3\n    at file:///C:/dev/study-app-jh/node_modules/vitest/dist/chunks/run.CQOUYP-x.js:2825:92\n    at file:///C:/dev/study-app-jh/node_modules/vitest/dist/chunks/run.CQOUYP-x.js:2763:52\n    at runWithSuite (file:///C:/dev/study-app-jh/node_modules/vitest/dist/chunks/run.CQOUYP-x.js:3248:8)\n    at Object.collect (file:///C:/dev/study-app-jh/node_modules/vitest/dist/chunks/run.CQOUYP-x.js:2763:22)\n    at Object.collect (file:///C:/dev/study-app-jh/node_modules/vitest/dist/chunks/run.CQOUYP-x.js:2768:51)"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "full-11",
+      "group": "full",
+      "expected": 71,
+      "args": [
+        "test/firestore/firestore.rules.test.js"
+      ],
+      "started": "2026-11-03T07:09:41.796Z",
+      "ended": "2026-11-03T07:10:49.448Z",
+      "exitCode": 0,
+      "passed": 71,
+      "failed": 0,
+      "skipped": 0,
+      "failures": []
+    },
+    {
+      "id": "full-13",
+      "group": "full",
+      "expected": 71,
+      "args": [
+        "test/firestore/firestore.rules.test.js"
+      ],
+      "started": "2026-11-03T07:10:49.449Z",
+      "ended": "2026-11-03T07:11:55.691Z",
+      "exitCode": 0,
+      "passed": 71,
+      "failed": 0,
+      "skipped": 0,
+      "failures": []
+    },
+    {
+      "id": "full-15",
+      "group": "full",
+      "expected": 71,
+      "args": [
+        "test/firestore/firestore.rules.test.js"
+      ],
+      "started": "2026-11-03T07:11:55.691Z",
+      "ended": "2026-11-03T07:13:05.353Z",
+      "exitCode": 0,
+      "passed": 71,
+      "failed": 0,
+      "skipped": 0,
+      "failures": []
+    },
+    {
+      "id": "full-17",
+      "group": "full",
+      "expected": 71,
+      "args": [
+        "test/firestore/firestore.rules.test.js"
+      ],
+      "started": "2026-11-03T07:13:05.354Z",
+      "ended": "2026-11-03T07:14:15.400Z",
+      "exitCode": 0,
+      "passed": 71,
+      "failed": 0,
+      "skipped": 0,
+      "failures": []
+    },
+    {
+      "id": "full-19",
+      "group": "full",
+      "expected": 71,
+      "args": [
+        "test/firestore/firestore.rules.test.js"
+      ],
+      "started": "2026-11-03T07:14:15.401Z",
+      "ended": "2026-11-03T07:15:22.939Z",
+      "exitCode": 0,
+      "passed": 71,
+      "failed": 0,
+      "skipped": 0,
+      "failures": []
+    },
+    {
+      "id": "shuffle-1",
+      "group": "shuffle",
+      "expected": 71,
+      "args": [
+        "test/firestore/firestore.rules.test.js",
+        "--sequence.shuffle",
+        "--sequence.seed",
+        "4101"
+      ],
+      "started": "2026-11-03T07:15:22.939Z",
+      "ended": "2026-11-03T07:16:30.440Z",
+      "exitCode": 0,
+      "passed": 71,
+      "failed": 0,
+      "skipped": 0,
+      "failures": []
+    },
+    {
+      "id": "shuffle-3",
+      "group": "shuffle",
+      "expected": 71,
+      "args": [
+        "test/firestore/firestore.rules.test.js",
+        "--sequence.shuffle",
+        "--sequence.seed",
+        "4103"
+      ],
+      "started": "2026-11-03T07:16:30.441Z",
+      "ended": "2026-11-03T07:17:37.220Z",
+      "exitCode": 0,
+      "passed": 71,
+      "failed": 0,
+      "skipped": 0,
+      "failures": []
+    },
+    {
+      "id": "shuffle-5",
+      "group": "shuffle",
+      "expected": 71,
+      "args": [
+        "test/firestore/firestore.rules.test.js",
+        "--sequence.shuffle",
+        "--sequence.seed",
+        "4105"
+      ],
+      "started": "2026-11-03T07:17:37.220Z",
+      "ended": "2026-11-03T07:18:45.563Z",
+      "exitCode": 0,
+      "passed": 71,
+      "failed": 0,
+      "skipped": 0,
+      "failures": []
+    },
+    {
+      "id": "shuffle-7",
+      "group": "shuffle",
+      "expected": 71,
+      "args": [
+        "test/firestore/firestore.rules.test.js",
+        "--sequence.shuffle",
+        "--sequence.seed",
+        "4107"
+      ],
+      "started": "2026-11-03T07:18:45.564Z",
+      "ended": "2026-11-03T07:19:52.604Z",
+      "exitCode": 0,
+      "passed": 71,
+      "failed": 0,
+      "skipped": 0,
+      "failures": []
+    },
+    {
+      "id": "shuffle-9",
+      "group": "shuffle",
+      "expected": 71,
+      "args": [
+        "test/firestore/firestore.rules.test.js",
+        "--sequence.shuffle",
+        "--sequence.seed",
+        "4109"
+      ],
+      "started": "2026-11-03T07:19:52.605Z",
+      "ended": "2026-11-03T07:21:02.391Z",
+      "exitCode": 0,
+      "passed": 71,
+      "failed": 0,
+      "skipped": 0,
+      "failures": []
+    },
+    {
+      "id": "race-1",
+      "group": "race",
+      "expected": 8,
+      "args": [
+        "--config",
+        "test/firestore/reward-retry/vitest.config.mjs"
+      ],
+      "started": "2026-11-03T07:21:02.391Z",
+      "ended": "2026-11-03T07:21:12.184Z",
+      "exitCode": 0,
+      "passed": 8,
+      "failed": 0,
+      "skipped": 0,
+      "failures": []
+    },
+    {
+      "id": "race-3",
+      "group": "race",
+      "expected": 8,
+      "args": [
+        "--config",
+        "test/firestore/reward-retry/vitest.config.mjs"
+      ],
+      "started": "2026-11-03T07:21:12.185Z",
+      "ended": "2026-11-03T07:21:21.512Z",
+      "exitCode": 0,
+      "passed": 8,
+      "failed": 0,
+      "skipped": 0,
+      "failures": []
+    },
+    {
+      "id": "race-5",
+      "group": "race",
+      "expected": 8,
+      "args": [
+        "--config",
+        "test/firestore/reward-retry/vitest.config.mjs"
+      ],
+      "started": "2026-11-03T07:21:21.513Z",
+      "ended": "2026-11-03T07:21:30.147Z",
+      "exitCode": 0,
+      "passed": 8,
+      "failed": 0,
+      "skipped": 0,
+      "failures": []
+    }
+  ]
+}
