@@ -94,3 +94,15 @@ Vercel Production設定をUIで読取確認。Production Branch=main、Every com
 ## 監査資料の確定（追加依頼）
 
 上記「新規commit/pushなし」は監査終了時点の記録。今回の明示依頼に従って専用監査ブランチへ成果物をcommit/pushする。アプリ・PR #5・mainは未変更。既存gitignoreで除外されるlogsディレクトリの全実行ログ/JSON/JSONLはrun-evidence.json.gzへ格納し、manifestでSHA256を保持する。
+
+## STOP保存失敗の追加検証
+
+2026-11-08、統合HEAD 7649834c の Preview をアプリ内ブラウザーの新しいタブで開き、未ログインのサンプルで数学ワークを START → STOP。保存失敗アラートを再現し、コンソールで `Record save failed: Error: prompt() is not supported.` を確認した。メモ用のネイティブダイアログで例外が発生し、履歴更新には到達しない。アラートを閉じた後も計測が継続した。サンプルには Firestore 保存がないため、この失敗は Firebase の設定・認証・Rules・通信や Issue #4 の訂正 transaction と独立する。[Issue #6](https://github.com/mineo1178/study-app-jh/issues/6) に記録した。
+
+ループバックの Auth と Firestore Emulator を `demo-study-app-jh` で起動し、合成ユーザーで実ログイン。未認証および異なる family の読み取り拒否、START → PAUSE → RESUME を確認した。認証を外した STOP は `permission-denied` となり、再認証後にタイマーとセグメントが保存前と一致し、履歴は0件だった。並列 STOP と再送で120秒のセッションを1件だけ保存し、アクティブタイマーが消えることを確認した。テストは repository を直接呼ぶ。Preview でのログイン後 GUI の STOP と、通常ブラウザーでのメモ入力は未実施。
+
+再実行はリポジトリルートで次のコマンドを使用する。
+
+```sh
+npx firebase emulators:exec --config firebase.stop-audit.json --project demo-study-app-jh --only auth,firestore "node docs/audit-v2913/emulatorStop.js"
+```
