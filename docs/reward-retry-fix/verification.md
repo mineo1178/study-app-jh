@@ -30,3 +30,5 @@ mkdir -p docs/reward-retry-fix/logs
 npx firebase emulators:exec --config firebase.reward-retry-worker0.json --project demo-study-app-jh --only firestore "node scripts/reward-retry/repeatRegression.js 0"
 npx firebase emulators:exec --config firebase.reward-retry-worker1.json --project demo-study-app-jh --only firestore "node scripts/reward-retry/repeatRegression.js 1"
 ```
+
+The first GitHub run exposed a Linux shell difference: the unquoted test exclusion expanded to the direct children of the Rules folder, allowing the nested proof to enter the default Vitest run without an emulator. The proof file now has an explicit non-default suffix and is discovered only by its dedicated Vitest config. The application test script is unchanged.
