@@ -105,8 +105,8 @@ describe('battle transaction logic', () => {
   it('applies a boss final hit once with reward and chapter progress in the returned atomic change', () => {
     const start = prepareBattleStart({ profile: { ...profile, battleEnergy: 3 }, enemy: BOSS_CATALOG.orc_chief, battleId: 'boss-a', now, battleKind: 'boss', bossId: 'orc_chief', chapter: getChapter('chapter_1') });
     const final = prepareBattleAttack({ battle: { ...start.battle, enemyHp: 1 }, profile: start.profile, progress: { currentChapterId: 'chapter_1', normalWins: 3 }, actionId: 'boss-final', now });
-    expect(final.battle).toMatchObject({ status: 'won', victory: { bossClear: { chapterAfter: 'chapter_2', reward: { gold: 150, materials: { iron: 5, wisdom_scroll: 2 } } } } });
-    expect(final.profile).toMatchObject({ gold: 150, materials: { iron: 5, wisdom_scroll: 2 }, activeBattleId: null });
+    expect(final.battle).toMatchObject({ status: 'won', victory: { bossClear: { chapterAfter: 'chapter_2', reward: { gold: 450, materials: { iron: 5, wisdom_scroll: 2 } } } } });
+    expect(final.profile).toMatchObject({ gold: 450, materials: { iron: 5, wisdom_scroll: 2 }, activeBattleId: null });
     expect(final.progress).toMatchObject({ currentChapterId: 'chapter_2', normalWins: 0, completedChapterIds: ['chapter_1'] });
     expect(final.bossClearLedger).toMatchObject({ type: 'boss_clear', chapterId: 'chapter_1', bossId: 'orc_chief' });
     [final.battle, final.profile, final.progress, final.victoryLedger, final.bossClearLedger].forEach((payload) => expect(findUndefinedPaths(payload)).toEqual([]));

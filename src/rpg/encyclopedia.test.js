@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { buildEncyclopedia, deriveEncyclopediaDiscovery, getEncyclopediaCatalog } from './encyclopedia.js';
 
 describe('RPG encyclopedia selectors', () => {
-  it('builds the four canonical categories with 59 total entries', () => {
+  it('builds the four canonical categories with 63 total entries', () => {
     const catalog = getEncyclopediaCatalog();
-    expect(Object.fromEntries(Object.entries(catalog).map(([key, values]) => [key, values.length]))).toEqual({ members: 16, enemies: 9, equipment: 18, alchemyItems: 16 });
-    expect(Object.values(catalog).flat()).toHaveLength(59);
+    expect(Object.fromEntries(Object.entries(catalog).map(([key, values]) => [key, values.length]))).toEqual({ members: 16, enemies: 9, equipment: 22, alchemyItems: 16 });
+    expect(Object.values(catalog).flat()).toHaveLength(63);
   });
 
   it('keeps starter members discovered and uses unlocked ids for gacha members', () => {

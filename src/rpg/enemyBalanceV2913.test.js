@@ -17,13 +17,17 @@ const weekly = before.filter(t => t.id.startsWith('weekly_'));
 describe('v2.9.13 enemy-only balance', () => {
   it.each(before.filter(t=>t.floor))('limits changes and preserves every reward / pattern at $id', target => {
     const old=target.encounter, next=buildTowerEncounter({floor:target.floor});
-    expect(next.rulesVersion).toBe(6);
+    expect(next.rulesVersion).toBe(7);
     expect(strip(next)).toEqual(strip(old));
     const expected=candidateTarget(target,'medium').encounter;
     next.enemies.forEach((e,i)=> {
-      expect(e.maxHp).toBe(expected.enemies[i].maxHp);
+      const oldHp = expected.enemies[i].maxHp;
+      if (target.floor < 10) {
+        expect(e.maxHp).toBeLessThan(oldHp + 1);
+        expect(Math.abs(e.maxHp - oldHp * (1 - (10 - target.floor) * 0.012))).toBeLessThan(1);
+      } else expect(e.maxHp).toBe(oldHp);
       expect(e.attack).toBe(expected.enemies[i].attack);
-      if(target.floor<=20 || target.floor>=60) {
+      if((target.floor>=10 && target.floor<=20) || target.floor>=60) {
         expect(e.maxHp).toBe(old.enemies[i].maxHp);
         expect(e.attack).toBe(old.enemies[i].attack);
       }
@@ -39,10 +43,10 @@ describe('v2.9.13 enemy-only balance', () => {
     expect(start.battle.enemyStates[0].hp).toBe(next.maxHp);
     expect(start.battle.weeklyBossSnapshot.rulesVersion).toBe(5);
   });
-  it('uses version 6 and new HP at the Tower start boundary',()=> {
+  it('uses version 7 and new HP at the Tower start boundary',()=> {
     const encounter=buildTowerEncounter({floor:40});
     const start=preparePartyTowerStart({profile:BALANCE_PLAYERS.trained,encounter,battleId:'new',now:1});
-    expect(start.battle.towerRulesVersion).toBe(6);
+    expect(start.battle.towerRulesVersion).toBe(7);
     expect(start.battle.enemyStates.map(e=>e.hp)).toEqual(encounter.enemies.map(e=>e.maxHp));
     expect(start.profile.battleEnergy).toBe(BALANCE_PLAYERS.trained.battleEnergy-encounter.energyCost);
   });

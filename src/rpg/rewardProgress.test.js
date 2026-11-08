@@ -51,7 +51,7 @@ describe('confirmed reward progress', () => {
   it('does not count live, invalid or unclaimed rewards as confirmed currency', () => {
     const profile = { gold: 0, liveTimer: { recordedSeconds: 7200 }, sessions: [{ recordedSeconds: 7200, validation: { status: 'invalid' } }], unclaimedQuestGold: 120 };
     expect(deriveRewardProgress(profile).goals[0].available).toBe(false);
-    expect(deriveRewardProgress(profile).goals[0].remainingMinutes).toBe(Math.ceil(price / 100));
+    expect(deriveRewardProgress(profile).goals[0].remainingMinutes).toBe(Math.ceil(price / 150));
   });
   it('keeps locked purchases unavailable while corrections are pending', () => {
     const result = deriveRewardProgress({ gold: price, gacha: { ticketBalances: { normal: 1 } } }, { blocked: true });

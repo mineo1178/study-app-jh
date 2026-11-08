@@ -1,4 +1,4 @@
-export const EQUIPMENT_CATALOG_VERSION = 2;
+export const EQUIPMENT_CATALOG_VERSION = 3;
 export const EQUIPMENT_SLOTS = Object.freeze(['weapon', 'armor', 'accessory']);
 
 export const EQUIPMENT_CATALOG = Object.freeze({
@@ -8,6 +8,10 @@ export const EQUIPMENT_CATALOG = Object.freeze({
   balanced_robe: { id: 'balanced_robe', name: '調和のローブ', slot: 'armor', rarity: 'rare', description: '多様な学びを織り込んだ魔法の衣。', stats: { attack: 2, defense: 5 }, cost: { gold: 180, materials: { craft_cloth: 3, vitality: 3, resonance: 2 } } },
   history_charm: { id: 'history_charm', name: '歴史の護符', slot: 'accessory', rarity: 'common', description: '積み重ねた知識を守る護符。', stats: { attack: 1, defense: 1 }, cost: { gold: 70, materials: { history_seal: 4 } } },
   logic_badge: { id: 'logic_badge', name: '論理のバッジ', slot: 'accessory', rarity: 'rare', description: 'ひらめきと論理を結びつける徽章。', stats: { attack: 2, defense: 1 }, cost: { gold: 120, materials: { logic_core: 4, mana_rune: 2 } } },
+  tempered_sword: { id: 'tempered_sword', name: '鍛え直した剣', slot: 'weapon', rarity: 'N', description: '少ない素材で作れる、攻撃向きの剣。', stats: { attack: 7, defense: 0 } },
+  padded_vest: { id: 'padded_vest', name: '綿入りベスト', slot: 'armor', rarity: 'N', description: '強化糸で編んだ、防御向きの軽い服。', stats: { attack: 0, defense: 5 } },
+  stone_talisman: { id: 'stone_talisman', name: '硬石のお守り', slot: 'accessory', rarity: 'N', description: '攻撃よりも防御を重視したお守り。', stats: { attack: 0, defense: 3 } },
+  herb_brooch: { id: 'herb_brooch', name: '魔力草のブローチ', slot: 'accessory', rarity: 'N', description: '攻撃と防御を両方支えるブローチ。', stats: { attack: 2, defense: 2 } },
   silver_iron_blade: { id: 'silver_iron_blade', name: '銀鉄の剣', slot: 'weapon', rarity: 'R', description: '銀鉱石で鍛えた剣。', stats: { attack: 10, defense: 0 } },
   arcane_staff: { id: 'arcane_staff', name: '魔導の杖', slot: 'weapon', rarity: 'R', description: '魔力を導く杖。', stats: { attack: 9, defense: 1 } },
   beast_armor: { id: 'beast_armor', name: '魔獣皮の鎧', slot: 'armor', rarity: 'R', description: '魔獣の皮を使った鎧。', stats: { attack: 0, defense: 7 } },

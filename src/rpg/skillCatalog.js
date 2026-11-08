@@ -1,5 +1,7 @@
-export const SKILL_CATALOG_VERSION = 2;
+export const SKILL_CATALOG_VERSION = 3;
 export const SKILL_CATALOG = Object.freeze({
+  power_strike: { id: 'power_strike', name: '渾身撃', description: '属性に左右されない強い一撃。', kind: 'attack', element: 'neutral', powerPercent: 170, maxUses: 2 },
+  quick_heal: { id: 'quick_heal', name: '手当て', description: '少ないMPで対象のHPを少し回復する。', kind: 'heal', element: 'neutral', healPercent: 18, maxUses: 2 },
   flame_slash: { id: 'flame_slash', name: '炎斬り', description: '炎属性の一撃。', kind: 'attack', element: 'fire', powerPercent: 125, maxUses: 2 },
   aqua_edge: { id: 'aqua_edge', name: '水刃', description: '水属性の一撃。', kind: 'attack', element: 'water', powerPercent: 125, maxUses: 2 },
   thunder_strike: { id: 'thunder_strike', name: '雷撃', description: '雷属性の一撃。', kind: 'attack', element: 'lightning', powerPercent: 125, maxUses: 2 },

@@ -12,7 +12,7 @@ const historicalScenarios=BALANCE_SCENARIOS.map(t=>t.enemy?t:v2911.find(old=>old
 describe('individual enemy relief and unchanged rewards',()=>{
  it('retains base relief beneath the v2.9.10 Tower ramp, actions, affinities and rewards',()=>{
   for(const old of before.scenarios){const next=historicalScenarios.find(row=>row.id===old.id);const oldEnemies=old.enemy?[old.enemy]:old.encounter.enemies,newEnemies=next.enemy?[next.enemy]:next.encounter.enemies;
-   oldEnemies.forEach((enemy,i)=>{const current=newEnemies[i];const ramp=old.id.startsWith('tower-')?(Math.max(0,old.floor-20)/80)**2:0;expect(current.maxHp).toBeLessThanOrEqual(Math.ceil(enemy.maxHp*(1+0.4*ramp)));expect(current.attack).toBeLessThanOrEqual(Math.ceil(enemy.attack*(1+0.2*ramp)));for(const key of ['element','weaknesses','resistances','energyCost','expReward','reward','firstClearReward','actionPattern'])expect(current[key]).toEqual(enemy[key]);});
+   oldEnemies.forEach((enemy,i)=>{const current=newEnemies[i];const ramp=old.id.startsWith('tower-')?(Math.max(0,old.floor-20)/80)**2:0;expect(current.maxHp).toBeLessThanOrEqual(Math.ceil(enemy.maxHp*(1+0.4*ramp)));expect(current.attack).toBeLessThanOrEqual(Math.ceil(enemy.attack*(1+0.2*ramp)));for(const key of ['element','weaknesses','resistances','energyCost','expReward','reward','actionPattern'])expect(current[key]).toEqual(enemy[key]);expect(current.firstClearReward?.materials).toEqual(enemy.firstClearReward?.materials);});
   }
   expect(BALANCE_SCENARIOS.find(row=>row.id==='campaign-slime').enemy).toMatchObject({maxHp:20,attack:3});
  });
