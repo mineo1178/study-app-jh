@@ -1,0 +1,30 @@
+name: Issue 4 reward correction verification
+on:
+  pull_request:
+    branches: [integration/gui-rpg-v2913]
+permissions:
+  contents: read
+jobs:
+  verify:
+    if: github.head_ref == 'codex/issue4-reward-retry'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.11.1'
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - run: npm ci
+      - run: npm test
+      - run: npm run lint
+      - run: npm run build
+      - run: git diff --check origin/integration/gui-rpg-v2913...HEAD
+      - run: npm run test:rules
+      - run: npx firebase emulators:exec --config firebase.reward-retry.json --project demo-study-app-jh --only firestore "npx vitest run --config test/firestore/reward-retry/vitest.config.mjs"

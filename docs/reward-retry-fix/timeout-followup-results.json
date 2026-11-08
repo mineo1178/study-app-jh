@@ -1,0 +1,22 @@
+[
+  {
+    "fullName": "versioned reward real transactions rpg-reward-v1 corrects once, keeps the original ledger, then reverses only the remaining grant once across clients",
+    "status": "passed",
+    "duration": 3078.0398
+  },
+  {
+    "fullName": "versioned reward real transactions rpg-reward-v1 keeps insufficient correction pending and retries its stored deduction once under contention",
+    "status": "passed",
+    "duration": 1317.1567999999997
+  },
+  {
+    "fullName": "versioned reward real transactions rpg-reward-v2 corrects once, keeps the original ledger, then reverses only the remaining grant once across clients",
+    "status": "passed",
+    "duration": 2368.3252
+  },
+  {
+    "fullName": "versioned reward real transactions rpg-reward-v2 keeps insufficient correction pending and retries its stored deduction once under contention",
+    "status": "passed",
+    "duration": 1378.116900000001
+  }
+]

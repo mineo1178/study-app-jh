@@ -1,0 +1,1 @@
+{"firestore":{"rules":"firestore.rules"},"emulators":{"firestore":{"port":8089,"websocketPort":9159},"hub":{"port":4409},"logging":{"port":4509},"ui":{"enabled":false},"singleProjectMode":true}}
