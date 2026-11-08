@@ -336,6 +336,22 @@ describe('reward policy start/finish rollover transaction',()=>{
   });
 });
 
+it('keeps a manual STOP timestamp and memo across a failed save and saves only once', async () => {
+  const task = { id: 'math', subjectId: 's_math', activityType: 'problem_solving' };
+  const args = { db: userDb(), familyId: appFamilyId, task, timerId: 'memo-stop' };
+  const timer = await startActiveTimer({ ...args, ownerClientId: 'a', now: 1000000 });
+  const request = { ...args, endAt: 1120000, memo: '数学の復習', staleProof: null,
+    expectedTiming: { state: 'running', segmentStartedAt: timer.segmentStartedAt, segmentCount: 0 } };
+  await expect(finishActiveTimer({ ...request, expectedTiming: { ...request.expectedTiming, segmentCount: 1 } }))
+    .rejects.toThrow('TIMER_STATE_CHANGED');
+  const sessionRef = ref(args.db, appPath(appFamilyId, 'studySessions', args.timerId));
+  expect((await getDoc(sessionRef)).exists()).toBe(false);
+  expect((await getDoc(ref(args.db, appPath(appFamilyId, 'activeTimers', 'current')))).data().timerId).toBe(args.timerId);
+  const results = await Promise.all([finishActiveTimer(request), finishActiveTimer({ ...request, db: userDb('b') })]);
+  expect(results.filter(result => !result.alreadyFinished)).toHaveLength(1);
+  expect((await getDoc(sessionRef)).data()).toMatchObject({ memo: request.memo, recordedSeconds: 120, createdAt: request.endAt });
+}, 15000);
+
 describe('pre-relief battle snapshots in real transactions',()=>{
  it.each(oldBattles.map((change,index)=>[index,change]))('keeps old mode %s enemy and party snapshots',async(_index,change)=>{
   await seedDoc(appPath(appFamilyId,'rpg','playerProfile'),change.profile);await seedDoc(appPath(appFamilyId,'rpgBattles',change.battle.battleId),change.battle);

@@ -114,7 +114,7 @@ const getTasksCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-
 const getTestsCol = () => collection(db, 'families', FAMILY_ID, 'apps', 'junior-high', 'tests');
 const getStudySessionsCol = () => studySessionsCollection(db, FAMILY_ID);
 const getActiveTimerRef = () => activeTimerRef(db, FAMILY_ID);
-const APP_VERSION = 'v2.9.13';
+const APP_VERSION = 'v2.9.14';
 const isDocumentHidden = () => typeof document !== 'undefined' && document.hidden;
 // ==========================================
 // Constants & Master Data
@@ -609,8 +609,8 @@ const StrictTimer = ({ task, isAnyOtherRunning, isSaving, canPause = true, canSt
     const handleSaveClick = () => {
         if (isSaving)
             return;
-        const totalToSave = totalSecondsForFinish(task, Date.now());
-        onSave({ ...task, currentDuration: totalToSave, isRunning: false, sessionStartTime: null }, totalToSave);
+        const endAt = Date.now();
+        onSave(task, totalSecondsForFinish(task, endAt), endAt);
     };
 
     const breakActive = Boolean(task.break?.active);
@@ -928,6 +928,8 @@ export default function App() {
     const [staleCheckNow, setStaleCheckNow] = useState(() => Date.now());
     const [liveNow, setLiveNow] = useState(() => Date.now());
     const [isSavingRecord, setIsSavingRecord] = useState(false);
+    const [stopDraft, setStopDraft] = useState(null);
+    const [stopError, setStopError] = useState('');
     const [staleTimerNotice, setStaleTimerNotice] = useState(null);
     const [rewardIntegrity, setRewardIntegrity] = useState({ pendingSessionIds: [] });
     const [pendingCorrectionLedgers, setPendingCorrectionLedgers] = useState({});
@@ -1519,20 +1521,18 @@ export default function App() {
             setRpgStatus({ kind: 'error', message: '称号の保存に失敗しました。もう一度お試しください。' });
         } finally { setSavingTitle(false); }
     };
-    const handleSaveLegacyRecord = async (task, totalSeconds) => {
+    const handleSaveLegacyRecord = async (task, totalSeconds, memo, endedAt) => {
         if (savingRecordRef.current)
             return;
         savingRecordRef.current = true;
         setIsSavingRecord(true);
         try {
-            const memo = prompt("学習内容：") || "";
             const now = Date.now();
-            const today = getTodayStr();
+            const today = getDateStrFromTimestamp(endedAt);
             const beforeAdventure = isSampleMode ? gameProgress(tasks, today) : null;
-            const startedAt = task.sessionStartTime || (now - (totalSeconds * 1000));
-            const endedAt = now;
+            const startedAt = endedAt - totalSeconds * 1000;
             const historyItem = {
-                id: `${task.id}-${now}`,
+                id: `${task.id}-${endedAt}`,
                 date: today,
                 duration: totalSeconds,
                 memo,
@@ -1566,10 +1566,7 @@ export default function App() {
                 flags: resultRecord.integrity?.flags || [],
             });
             setSelectedTaskId(null);
-        }
-        catch (err) {
-            console.error("Record save failed:", err);
-            alert("保存に失敗しました。");
+            return true;
         }
         finally {
             savingRecordRef.current = false;
@@ -1622,28 +1619,24 @@ export default function App() {
     }, [activeTimer, currentClientId, idleController, isSampleMode, user]);
     // The latest closure is mirrored for reading-limit and idle callbacks.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    const handleSaveRecord = async (task, totalSeconds, { memoOverride = null, endAtOverride = null, reason = 'USER_STOP', idle = null } = {}) => {
-        if (!idle && idleController.current?.blocksStale()) {
+    const handleSaveRecord = async (task, totalSeconds, { memoOverride = '', endAtOverride = null, reason = 'USER_STOP', idle = null, manualStop = null } = {}) => {
+        if (!idle && activeTimer && (!manualStop || manualStop.timerId === activeTimer.timerId) && idleController.current?.blocksStale()) {
             const state = idleController.current.getState();
-            idle = { ownerClientId: currentClientId, segmentStartedAt: activeTimer.segmentStartedAt, lastUserActivityAt: state.lastUserActivityAt };
-            endAtOverride = state.idleDeadline; memoOverride = ''; reason = 'IDLE_15_MINUTES';
+            if (!manualStop || state.idleDeadline <= manualStop.endAt) {
+                idle = { ownerClientId: currentClientId, segmentStartedAt: activeTimer.segmentStartedAt, lastUserActivityAt: state.lastUserActivityAt };
+                endAtOverride = state.idleDeadline; memoOverride = ''; reason = 'IDLE_15_MINUTES';
+            }
         }
         recordTimerDiagnostic('stop_control', { ...diagnosticTimerState(activeTimer), reason, sampleMode: isSampleMode, source: 'app.handleSaveRecord' });
-        if (isSampleMode || !user || !activeTimer || activeTimer.taskId !== task.id) {
+        if (!manualStop?.timerId && (isSampleMode || !user || !activeTimer || activeTimer.taskId !== task.id)) {
             if (idle) return { skipped: true, reason: 'IDLE_STATE_CHANGED' };
-            return handleSaveLegacyRecord(task, totalSeconds);
+            return handleSaveLegacyRecord(task, totalSeconds, memoOverride, endAtOverride ?? Date.now());
         }
         if (savingRecordRef.current) return;
         savingRecordRef.current = true;
         setIsSavingRecord(true);
         try {
-            const memo = memoOverride ?? prompt('学習内容：') ?? '';
-            // A blocking memo prompt may outlive the idle deadline.
-            if (!idle && idleController.current?.blocksStale()) {
-                const state = idleController.current.getState();
-                idle = { ownerClientId: currentClientId, segmentStartedAt: activeTimer.segmentStartedAt, lastUserActivityAt: state.lastUserActivityAt };
-                endAtOverride = state.idleDeadline;
-            }
+            const timerId = manualStop?.timerId ?? activeTimer.timerId;
             feedbackSession.queue.hold();
             const now = Date.now();
             const endAt = endAtOverride || now;
@@ -1651,21 +1644,22 @@ export default function App() {
                 db,
                 familyId: FAMILY_ID,
                 task,
-                timerId: activeTimer.timerId,
+                timerId,
                 endAt,
-                memo,
+                memo: memoOverride,
                 idle,
-                observation: idleController.current?.getObservation(),
+                observation: manualStop ? manualStop.observation : idleController.current?.getObservation(),
+                expectedTiming: manualStop?.expectedTiming,
             });
             if (result.skipped) return result;
             const validation = result.session.validation;
-            if (!result.alreadyFinished && isPendingStudyTimeReview(result.session)) openTimeReview({ ...result.session, id: activeTimer.timerId });
+            if (!result.alreadyFinished && isPendingStudyTimeReview(result.session)) openTimeReview({ ...result.session, id: timerId });
             if (idle) feedbackSession.queue.enqueue(idleStopFeedback(result));
             feedbackSession.queue.enqueue(studyFeedback(result, task.title));
             let reward = null;
             if (!result.alreadyFinished && result.session.rewardPolicyVersion) {
                 try {
-                    reward = await applyStudySessionReward({ db, familyId: FAMILY_ID, session: { ...result.session, id: activeTimer.timerId } });
+                    reward = await applyStudySessionReward({ db, familyId: FAMILY_ID, session: { ...result.session, id: timerId } });
                 } catch (error) {
                     console.error('Study reward deferred:', error);
                 }
@@ -1680,13 +1674,44 @@ export default function App() {
         }
         catch (err) {
             console.error('Study session finish failed:', err);
-            if (idle) throw err;
+            if (idle || manualStop) throw err;
             alert(err.message === 'TIMER_NOT_ACTIVE' ? 'このタイマーはすでに停止されています。' : '保存に失敗しました。');
         }
         finally {
             feedbackSession.queue.release();
             savingRecordRef.current = false;
             setIsSavingRecord(false);
+        }
+    };
+    const openStopMemo = (task, totalSeconds, endAt) => {
+        if (savingRecordRef.current || (stopDraft?.isSampleMode === isSampleMode && stopDraft.uid === user?.uid)) return;
+        const timer = isSampleMode ? null : activeTimer;
+        if (!isSampleMode && timer?.taskId !== task.id) return;
+        setStopError('');
+        setStopDraft({
+            task, totalSeconds, endAt, timerId: timer?.timerId, isSampleMode, uid: user?.uid,
+            observation: idleController.current?.getObservation(),
+            expectedTiming: timer ? {
+                state: timer.state, segmentStartedAt: timer.segmentStartedAt,
+                segmentCount: timer.segments?.length ?? 0,
+                breakStartedAt: timer.break?.startedAt,
+            } : undefined,
+        });
+    };
+    const submitStopMemo = async (event) => {
+        event.preventDefault();
+        if (savingRecordRef.current) return;
+        const memo = new FormData(event.currentTarget).get('memo') || '';
+        setStopError('');
+        try {
+            const result = await handleSaveRecord(stopDraft.task, stopDraft.totalSeconds, {
+                memoOverride: memo, endAtOverride: stopDraft.endAt, manualStop: stopDraft,
+            });
+            if (result && !result.skipped) setStopDraft(null);
+        } catch (error) {
+            setStopError(['TIMER_STATE_CHANGED', 'TIMER_NOT_ACTIVE'].includes(error.message)
+                ? '別の端末などでタイマーの状態が変わりました。閉じて現在の状態を確認してください。'
+                : '保存できませんでした。メモとSTOP時点の計測時間を保持しています。もう一度保存してください。');
         }
     };
     useEffect(() => {
@@ -2428,7 +2453,7 @@ export default function App() {
                          <button type="button" aria-label="学習項目詳細を閉じる" title="閉じる" onClick={() => setSelectedTaskId(null)} className="p-3 bg-white rounded-2xl shadow-sm hover:bg-slate-50 transition shrink-0 text-left"><X size={24}/></button>
                       </div>
                       <div className="jh-timer-content flex-1 overflow-y-auto p-6 sm:p-10 space-y-10 no-scrollbar pb-32 text-left">
-                          <StrictTimer task={timerViewTask} isAnyOtherRunning={isSampleMode && isAnyTaskRunning && activeTimerTask?.id !== task.id && !task.isRunning} isSaving={isSavingRecord} canPause={activeTimerTask?.id !== task.id || activeTimerIsOwner} canStart={activeTimerTask?.id !== task.id || activeTimerIsOwner} canStop={isSampleMode || activeTimerTask?.id === task.id} onUpdate={handleTimerUpdate} onBreak={handleBreak} onSave={handleSaveRecord}/>
+                          <StrictTimer task={timerViewTask} isAnyOtherRunning={isSampleMode && isAnyTaskRunning && activeTimerTask?.id !== task.id && !task.isRunning} isSaving={isSavingRecord} canPause={activeTimerTask?.id !== task.id || activeTimerIsOwner} canStart={activeTimerTask?.id !== task.id || activeTimerIsOwner} canStop={isSampleMode || activeTimerTask?.id === task.id} onUpdate={handleTimerUpdate} onBreak={handleBreak} onSave={openStopMemo}/>
                           {activeTimerTask?.id === task.id && !activeTimerIsOwner && <div className="rounded-2xl bg-slate-50 p-3 text-xs font-bold text-slate-500">別の端末で開始された計測です。この端末から停止できます。</div>}
                          <div className="space-y-4 text-left">
                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 px-2 text-left"><Search size={14}/> 学習メモ</label>
@@ -2475,6 +2500,21 @@ export default function App() {
              </div>
           </GuiDialog>)}
 
+        {stopDraft && stopDraft.isSampleMode === isSampleMode && stopDraft.uid === user?.uid && (<GuiDialog className={modalOverlayClass + ' z-[130]!'} label="学習記録を保存" onClose={() => { if (!savingRecordRef.current) setStopDraft(null); }}>
+          <form onSubmit={submitStopMemo} className="w-full max-w-md rounded-3xl bg-white p-6 space-y-4">
+            <h3 className="text-lg font-black">学習記録を保存</h3>
+            <p className="text-sm text-slate-600">STOP時点の学習時間 {formatHms(stopDraft.totalSeconds)}</p>
+            <label className="block text-sm font-bold">
+              学習内容（任意）
+              <input name="memo" readOnly={isSavingRecord} className="mt-2 block w-full rounded-xl border border-slate-300 p-3 text-base"/>
+            </label>
+            {stopError && <p role="alert" className="text-sm text-red-700">{stopError}</p>}
+            <div className="flex justify-end gap-3">
+              <button type="button" disabled={isSavingRecord} onClick={() => setStopDraft(null)} className="rounded-xl px-4 py-3 font-bold">キャンセル</button>
+              <button type="submit" disabled={isSavingRecord} className="rounded-xl bg-blue-700 px-4 py-3 font-bold text-white disabled:opacity-50">{isSavingRecord ? '保存中…' : '保存'}</button>
+            </div>
+          </form>
+        </GuiDialog>)}
         {isAddingTest && (<GuiDialog className={modalOverlayClass} label="成績登録" onClose={() => { setIsAddingTest(false); setEditingTest(null); setTestFormError(null); }}>
              <div className="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 h-[85vh] flex flex-col text-left">
                 <div className="p-6 border-b border-slate-50 flex justify-between items-center bg-slate-50/50 shrink-0 text-left leading-none text-left text-left">

@@ -261,7 +261,7 @@ export function buildFinishedTimerSession(timer, task = {}, { endAt = Date.now()
   };
 }
 
-export async function finishActiveTimer({ db, familyId, task, timerId, endAt = Date.now(), memo = '', idle = null, observation = null, staleProof = timerStaleObserver.proof() }) {
+export async function finishActiveTimer({ db, familyId, task, timerId, endAt = Date.now(), memo = '', idle = null, observation = null, expectedTiming = null, staleProof = timerStaleObserver.proof() }) {
   const timerRef = activeTimerRef(db, familyId);
   const sessionRef = doc(db, 'families', familyId, 'apps', 'junior-high', 'studySessions', timerId);
   return traceTimerOperation('stop', { timerId, source: 'repository.finishActiveTimer' }, () => runTransaction(db, async (transaction) => {
@@ -275,6 +275,12 @@ export async function finishActiveTimer({ db, familyId, task, timerId, endAt = D
       return { skipped: true, reason: 'IDLE_STATE_CHANGED' };
     }
     if (!canFinishActiveTimer(timer, timerId)) throw new Error('TIMER_NOT_ACTIVE');
+    if (expectedTiming && (timer.state !== expectedTiming.state
+      || timer.segmentStartedAt !== expectedTiming.segmentStartedAt
+      || (timer.segments?.length ?? 0) !== expectedTiming.segmentCount
+      || timer.break?.startedAt !== expectedTiming.breakStartedAt)) {
+      throw new Error('TIMER_STATE_CHANGED');
+    }
     recordTimerDiagnostic('stop_transaction_state', { ...diagnosticTimerState(timer, endAt), source: 'repository.finishActiveTimer' });
     const session = buildFinishedTimerSession(timer, task, { endAt, memo, staleProof, idle, observation });
     recordTimerDiagnostic('review_required', { timerId, reviewRequired: Boolean(session.timeReview), validationStatus: session.validation.status });
